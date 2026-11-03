@@ -18,6 +18,7 @@ import hmac
 import os
 import secrets
 import sys
+from urllib.parse import parse_qsl, urlencode
 from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -34,23 +35,26 @@ app = FastAPI(title="biseojin")
 
 class _FixPath:
     """
-    Vercel 이 함수에 넘기는 경로가 설정·버전에 따라 다르다.
-    '/api/config' 로 올 수도, '/config' 로 올 수도, '/api/index/config' 로 올 수도 있다.
-    어느 쪽이든 '/api/...' 로 맞춰서 라우트가 찾을 수 있게 한다.
+    Vercel 은 rewrite 한 뒤 함수에 원래 경로를 넘기지 않는다 (함수는 '/api/index.py' 만 받는다).
+    그래서 vercel.json 이 원래 경로를 ?__path= 로 실어 보내고, 여기서 되살린다.
     """
     def __init__(self, inner):
         self.inner = inner
 
     async def __call__(self, scope, receive, send):
         if scope.get("type") == "http":
-            p = scope.get("path") or "/"
-            for pre in ("/api/index.py", "/api/index"):
-                if p.startswith(pre):
-                    p = p[len(pre):] or "/"
-                    break
-            if not p.startswith("/api/") and p != "/api":
-                p = "/api" + (p if p.startswith("/") else "/" + p)
-            scope = {**scope, "path": p, "raw_path": p.encode(), "_orig_path": scope.get("path")}
+            orig = scope.get("path") or "/"
+            q = parse_qsl((scope.get("query_string") or b"").decode(), keep_blank_values=True)
+            rest = next((v for k, v in q if k == "__path"), None)
+            q = [(k, v) for k, v in q if k != "__path"]
+            if rest is not None:
+                p = "/api/" + rest.lstrip("/")
+            else:
+                p = orig
+                if not p.startswith("/api/"):
+                    p = "/api" + (p if p.startswith("/") else "/" + p)
+            scope = {**scope, "path": p, "raw_path": p.encode(),
+                     "query_string": urlencode(q).encode(), "_orig_path": orig}
         await self.inner(scope, receive, send)
 
 
