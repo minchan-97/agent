@@ -3,6 +3,6 @@
     "api/index.py": { "includeFiles": "biseo/**", "maxDuration": 60 }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" }
+    { "source": "/api/(.*)", "destination": "/api/index.py" }
   ]
 }
