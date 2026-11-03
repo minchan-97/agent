@@ -35,12 +35,17 @@ def _now():
 
 
 # ---------- 만들기·읽기 ----------
-def create(sb, goal: str) -> dict:
+def create(sb, goal: str, skill_id=None) -> dict:
+    from . import skills
     goal = mask(goal.strip())[:500]
     if len(goal) < 2:
         raise ValueError("과제 목표가 너무 짧음")
-    return sb.table("tasks").insert({"goal": goal, "status": "open",
-                                     "next_step": "어떻게 할지 정하기"}).execute().data[0]
+    row = {"goal": goal, "status": "open", "next_step": "어떻게 할지 정하기"}
+    sk = skills.get(sb, skill_id) if skill_id else None
+    if sk:
+        row["skill_id"] = sk["id"]
+        skills.mark_used(sb, sk)
+    return sb.table("tasks").insert(row).execute().data[0]
 
 
 def get(sb, task_id: int):
@@ -111,7 +116,7 @@ STEP_CONTRACT = """
 """
 
 
-def _messages(agent_name: str, t: dict) -> list:
+def _messages(agent_name: str, t: dict, skill: dict | None = None) -> list:
     now = datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d (%a) %H:%M")
     log = (t.get("log") or [])[-LOG_KEEP:]
     lines = []
@@ -128,6 +133,10 @@ def _messages(agent_name: str, t: dict) -> list:
     system = (f"너는 '{agent_name}'라는 이름의 개인 비서이고, 맡은 과제를 한 걸음씩 진행 중이야.\n"
               "가치:\n- " + "\n- ".join(VALUES) + f"\n지금 시각(한국): {now}\n"
               + STEP_CONTRACT)
+    if skill:
+        tools = ", ".join(skill.get("tools") or []) or "없음(생각과 정리만)"
+        system += (f"\n\n이 과제는 '{skill['name']}' 기능으로 시작됐다. 이 기능의 방식:\n"
+                   f"{skill['instructions']}\n이 기능에서 쓸 수 있는 도구: {tools}")
     user = (f"과제 목표: {t['goal']}\n"
             f"지금까지 {t['steps']}걸음 / 최대 {t['max_steps']}걸음\n\n"
             "기록:\n" + ("\n".join(lines) if lines else "(아직 없음)") +
@@ -159,12 +168,15 @@ def step(sb, agent: dict, task_id: int, ask_llm) -> dict:
             t, {"by": "agent", "outcome": "걸음 수 한도에 닿아 멈춤"})})
         return {"task": t, "notify": f"'{t['goal'][:30]}' 과제가 걸음 한도에 닿아 멈췄어요."}
 
-    out = ask_llm(_messages(agent.get("name") or "비서", t))
+    from . import skills
+    skill = skills.get(sb, t.get("skill_id"))
+    allowed = set(skill.get("tools") or []) if skill else set(TOOLS)
+    out = ask_llm(_messages(agent.get("name") or "비서", t, skill))
     thought = str(out.get("thought", ""))[:300]
     status = out.get("status") if out.get("status") in ("continue", "ask_user", "done") else "continue"
     action = out.get("action") if isinstance(out.get("action"), dict) else None
-    if action and action.get("kind") not in TOOLS:
-        action = None
+    if action and action.get("kind") not in allowed:
+        action = None          # 기능이 허락하지 않은 도구는 쓰지 않는다
 
     entry = {"by": "agent", "thought": thought}
     patch = {"steps": t["steps"] + 1, "last_step_at": _now(),
