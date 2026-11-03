@@ -40,6 +40,35 @@ body{background:var(--bg);color:var(--ink);font:16px/1.6 var(--sans);-webkit-fon
 button,input,textarea{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .wrap{max-width:640px;margin:0 auto;padding:0 18px;height:100%;display:flex;flex-direction:column}
+.wrap.wide{max-width:1040px}
+
+/* 앱 틀: 사이드바 + 대화 */
+.app{display:flex;gap:24px;height:100%}
+.chat{flex:1;min-width:0;display:flex;flex-direction:column;height:100%}
+.side{width:260px;flex:none;overflow-y:auto;padding:18px 18px 18px 0;border-right:1px solid var(--line)}
+.side h2{font-size:.95rem;font-weight:600;margin:0 0 8px}
+.side h2 + .hint{margin-top:-4px}
+.side section + section{margin-top:22px}
+.side .hint{color:var(--muted);font-size:.85rem;margin:0 0 10px}
+.feat{padding:9px 0;border-bottom:1px solid var(--line)}
+.feat:last-child{border-bottom:0}
+.feat .fname{font-weight:600}
+.feat .fname small{font-weight:400;color:var(--muted);margin-left:6px}
+.feat .fdesc{color:var(--muted);font-size:.88rem}
+.feat .ftools{color:var(--muted);font-size:.8rem;margin-top:2px}
+.feat .row{margin-top:8px}
+.feat .row input{flex:1 1 100%;min-width:0;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.feat .row .btn{padding:6px 12px;font-size:.85rem}
+.menuBtn{display:none;background:none;border:1px solid var(--line);border-radius:8px;color:var(--accent);padding:5px 10px;margin-right:10px;cursor:pointer;font-size:.9rem}
+.scrim{position:fixed;inset:0;background:rgb(0 0 0 / .3);z-index:15}
+@media (max-width: 899px){
+  .side{position:fixed;inset:0 auto 0 0;width:min(84vw,310px);background:var(--surface);z-index:20;
+        padding:calc(18px + env(safe-area-inset-top,0px)) 18px 18px;transform:translateX(-102%);border-right:1px solid var(--line)}
+  .side.open{transform:none}
+  .menuBtn{display:inline-block}
+}
+@media (min-width: 900px){ .scrim{display:none!important} }
+@media (prefers-reduced-motion: no-preference){ .side{transition:transform .2s ease-out} }
 [hidden]{display:none!important}
 
 /* 로그인 */
@@ -65,7 +94,7 @@ button,input,textarea{font:inherit;color:inherit}
 .naming .note{color:var(--muted);font-size:.9rem;margin:20px 0 28px}
 
 /* 대화 */
-header.top{display:flex;align-items:baseline;justify-content:space-between;padding:18px 0 10px;border-bottom:1px solid var(--line)}
+header.top{display:flex;align-items:center;justify-content:space-between;padding:18px 0 10px;border-bottom:1px solid var(--line)}
 header.top h1{font:700 1.7rem/1.1 var(--serif);margin:0;color:var(--accent)}
 header.top button{background:none;border:0;color:var(--muted);cursor:pointer;font-size:.9rem;padding:6px}
 
@@ -137,9 +166,25 @@ dialog code{display:block;background:var(--bg);padding:8px 10px;border-radius:8p
   </section>
 
   <!-- 3. 대화 -->
-  <section id="main" hidden style="display:flex;flex-direction:column;height:100%">
+  <section id="main" class="app" hidden>
+    <aside class="side" id="side" aria-label="기능 목록">
+      <section>
+        <h2>기본 기능</h2>
+        <p class="hint">늘 있는 기능이라 지울 수 없어요.</p>
+        <div id="builtinList"></div>
+      </section>
+      <section>
+        <h2>추가된 기능</h2>
+        <div id="customList"></div>
+      </section>
+    </aside>
+
+    <div class="chat">
     <header class="top">
-      <h1 id="agentName"></h1>
+      <div style="display:flex;align-items:center;min-width:0">
+        <button class="menuBtn" id="openSide" aria-controls="side" aria-expanded="false">기능</button>
+        <h1 id="agentName"></h1>
+      </div>
       <button id="openSettings">설정</button>
     </header>
 
@@ -163,7 +208,9 @@ dialog code{display:block;background:var(--bg);padding:8px 10px;border-radius:8p
       <textarea id="text" rows="1" placeholder="부탁할 일을 적어 주세요"></textarea>
       <button class="btn" id="send">보내기</button>
     </form>
+    </div>
   </section>
+  <div class="scrim" id="scrim" hidden></div>
 </div>
 
 <dialog id="settings">
@@ -198,6 +245,7 @@ async function api(path, opts = {}) {
 
 function show(id) {
   for (const s of ["boot", "auth", "naming", "main"]) $(s).hidden = s !== id;
+  document.querySelector(".wrap").classList.toggle("wide", id === "main");
 }
 
 /* ---------- 로그인 ---------- */
@@ -301,6 +349,10 @@ function describe(a) {
     const t = g.due_at ? new Date(g.due_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
     return `${t}에 알림: ${g.text || ""}`;
   }
+  if (a.kind === "create_skill") {
+    const tools = (g.tools || []).map((t) => ({ search: "검색", note: "메모", reminder: "알림", draft: "초안" }[t])).filter(Boolean);
+    return `‘${g.name || ""}’ — ${g.description || ""}${tools.length ? `\n쓰는 도구: ${tools.join(", ")}` : ""}\n${a.reason || ""}`.trim();
+  }
   if (a.kind === "draft") return `${g.to ? g.to + "에게 · " : ""}${g.text || ""}`;
   return g.text || g.query || a.reason || "";
 }
@@ -396,7 +448,63 @@ async function loadTasks() {
   $("taskList").replaceChildren(...all.map(taskEl));
 }
 
-async function refresh() { await Promise.all([loadActions(), loadTasks()]); }
+/* ---------- 사이드바: 기능 ---------- */
+function setSide(open) {
+  $("side").classList.toggle("open", open);
+  $("scrim").hidden = !open;
+  $("openSide").setAttribute("aria-expanded", String(open));
+}
+$("openSide").addEventListener("click", () => setSide(true));
+$("scrim").addEventListener("click", () => setSide(false));
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") setSide(false); });
+
+function featEl({ name, description, tag, tools }) {
+  const d = document.createElement("div"); d.className = "feat";
+  const n = document.createElement("div"); n.className = "fname"; n.textContent = name;
+  if (tag) { const t = document.createElement("small"); t.textContent = tag; n.append(t); }
+  const p = document.createElement("div"); p.className = "fdesc"; p.textContent = description || "";
+  d.append(n, p);
+  if (tools) { const u = document.createElement("div"); u.className = "ftools"; u.textContent = tools; d.append(u); }
+  return d;
+}
+
+function customEl(c) {
+  const d = featEl({
+    name: c.name, description: c.description,
+    tag: c.origin === "agent" ? "비서가 제안" : "",
+    tools: `쓰는 도구: ${c.tool_labels.length ? c.tool_labels.join(", ") : "없음"} · ${c.uses}번 씀`,
+  });
+  const row = document.createElement("div"); row.className = "row";
+  const input = document.createElement("input");
+  input.placeholder = "무엇에 쓸지 (선택)"; input.setAttribute("aria-label", `${c.name} 실행 내용`);
+  row.append(
+    input,
+    btn("실행", false, async () => {
+      await api(`/api/skills/${c.id}/run`, { method: "POST", body: JSON.stringify({ text: input.value.trim() }) });
+      setSide(false);
+    }),
+    btn("지우기", true, async () => {
+      if (!confirm(`'${c.name}' 기능을 지울까요? 이 기능으로 진행 중인 일은 기본 방식으로 이어져요.`)) return;
+      await api(`/api/skills/${c.id}/remove`, { method: "POST" });
+    }),
+  );
+  d.append(row);
+  return d;
+}
+
+async function loadSkills() {
+  const { builtin, custom } = await api("/api/skills");
+  $("builtinList").replaceChildren(...builtin.map((b) => featEl({ name: b.name, description: b.description })));
+  if (!custom.length) {
+    const p = document.createElement("p"); p.className = "hint";
+    p.textContent = "아직 없어요. 대화에서 “회의 준비하는 기능 만들어 줘”처럼 부탁하면, 확인을 거쳐 여기에 생겨요.";
+    $("customList").replaceChildren(p);
+  } else {
+    $("customList").replaceChildren(...custom.map(customEl));
+  }
+}
+
+async function refresh() { await Promise.all([loadActions(), loadTasks(), loadSkills()]); }
 
 /* ---------- 설정 ---------- */
 $("openSettings").addEventListener("click", () => $("settings").showModal());
