@@ -14,6 +14,7 @@ brain.py — 한 번의 대화 턴.
 """
 import json
 import os
+import re
 from datetime import datetime, timedelta, timezone
 
 from . import actions as act
@@ -55,11 +56,30 @@ actions 에 쓸 수 있는 kind 와 args
 - 하자고 한 일이 "이미 끝났다"고 말하지 마. 실행할지는 시스템과 사용자가 정한다.
   "메모로 남겨 둘게요", "알림을 걸어 둘게요"처럼 말하면 충분하다.
 - 할 일이 없으면 actions 는 [].
+- 경기 일정·결과, 날씨, 가격, 뉴스, 개봉·출시일처럼 바뀌는 바깥 사실은 네 기억으로 답하지 마.
+  search 를 요청하고, reply 에는 날짜·시간·상대·숫자를 쓰지 말고 "찾아볼게요" 정도만 써.
 - task_answers: 아래 [답을 기다리는 과제]의 질문에 사용자가 이번 말로 답했으면 그 답을 넣어. 아니면 [].
 - user_facts: 이번 사용자 말에서 사용자가 '자기 자신'에 대해 직접 밝힌 오래 갈 사실만,
   "사용자는 ..." 꼴의 짧은 평서문으로. 업무 내용(메일·일정 세부·문서), 다른 사람의 정보,
   네 추측, 네가 한 말은 절대 넣지 마. 없으면 [].
 """
+
+
+# 규칙이 먼저 (몰랑이 outbox 원칙): 바뀌는 바깥 사실을 묻는 말이면,
+# 모델이 검색을 안 하겠다고 해도 시스템이 검색을 강제한다.
+_LIVE_FACT = re.compile(
+    r"(일정|경기|대진|라인업|결과|스코어|점수|순위|중계|날씨|기온|강수|미세먼지|"
+    r"가격|시세|환율|주가|뉴스|속보|개봉|발매|출시|공연|티켓|운행|휴무|영업시간)")
+_PERSONAL = re.compile(r"(내|제|우리|나의|저의)\s*(일정|스케줄)")
+
+NO_SEARCH = ("[검색을 쓸 수 없음] 확인된 자료가 없다. 날짜·시간·상대·점수·가격 같은 구체적인 사실을 "
+             "하나도 만들어 내지 말고, 지금은 확인할 수 없다고 솔직히 말해. 공식 사이트에서 확인하라고 안내해도 좋다.")
+GROUNDED = ("위 자료에 실제로 있는 내용만 써서 다시 답해. 자료에 없는 날짜·시간·상대·점수·숫자는 "
+            "절대 만들어 내지 마. 자료가 질문에 답하지 못하면 그렇다고 말해. 출처를 짧게 밝혀.")
+
+
+def needs_live_facts(text: str) -> bool:
+    return bool(_LIVE_FACT.search(text)) and not _PERSONAL.search(text)
 
 
 def _client():
@@ -119,18 +139,29 @@ def respond(sb, agent: dict, user_text: str) -> dict:
 
     out = _ask(messages)
 
-    # 검색이 필요하다고 하면 한 번 찾아보고 다시 묻는다
+    # 검색: 모델이 원하거나, 바뀌는 바깥 사실을 묻는 말이면 강제
     wanted = [a for a in out["actions"] if a.get("kind") == "search"]
-    if wanted and search.available():
-        q = str((wanted[0].get("args") or {}).get("query", ""))[:200]
-        act.propose(sb, "search", {"query": q}, wanted[0].get("reason", ""))
-        try:
-            ctx = search.to_context(search.brave(q))
-        except Exception:
-            ctx = "[검색 실패 — 모른다고 솔직히 말할 것]"
+    own_work = any(a.get("kind") in ("note", "reminder", "draft") for a in out["actions"])
+    forced = not wanted and not own_work and needs_live_facts(text)
+    searched = False
+    if wanted or forced:
+        q = str((wanted[0].get("args") or {}).get("query", "")) if wanted else text
+        q = q.strip()[:200]
+        if search.available() and q:
+            act.propose(sb, "search", {"query": q},
+                        "바뀌는 사실이라 확인" if forced else (wanted[0].get("reason", "")))
+            try:
+                found = search.brave(q)
+                ctx = (search.to_context(found) + "\n\n" + GROUNDED) if found else \
+                      ("[검색 결과 없음]\n" + NO_SEARCH)
+                searched = bool(found)
+            except Exception:
+                ctx = "[검색 실패]\n" + NO_SEARCH
+        else:
+            ctx = NO_SEARCH
+        # 첫 답은 버리고(지어낸 내용이 들어 있을 수 있다) 자료를 근거로 다시 답하게 한다
         messages.append({"role": "assistant", "content": json.dumps(out, ensure_ascii=False)})
-        messages.append({"role": "user", "content":
-                         ctx + "\n\n위 자료를 참고해 다시 답해. 출처가 있으면 짧게 밝혀."})
+        messages.append({"role": "user", "content": ctx})
         out = _ask(messages)
     out["actions"] = [a for a in out["actions"] if a.get("kind") != "search"]
 
@@ -157,6 +188,6 @@ def respond(sb, agent: dict, user_text: str) -> dict:
     absorbed = absorb(sb, out["user_facts"], text, reply, agent["name"])
     sb.table("audit").insert({"kind": "turn", "detail": {
         "actions": [d.get("kind") for d in done], "absorbed": absorbed,
-        "searched": bool(wanted)}}).execute()
+        "searched": searched, "forced_search": forced}}).execute()
 
     return {"reply": reply, "actions": done, "answered_tasks": answered}
