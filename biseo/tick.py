@@ -1,6 +1,10 @@
 """
 tick.py — pg_cron 이 10분마다 깨우면, 사람마다 한 걸음씩.
 
+틱은 두 종류
+  1분 틱  (?only=due)  시각이 된 알림만. LLM 을 안 불러서 싸고 빠르다
+  10분 틱              아래 전부
+
 순서 (사람마다)
   1. due      예약한 알림 시각이 됐으면 보낸다
   2. task     열린 과제 하나를 한 걸음 진행한다 ← 대화 밖에서 일하는 부분
@@ -44,7 +48,7 @@ def _say(sb, agent: dict, rule: str, body: str, title: str, force=False) -> bool
     return bool(res.get("ok"))
 
 
-def step_user(sb, agent: dict, ask_llm, allow_task=True) -> dict:
+def step_user(sb, agent: dict, ask_llm, allow_task=True, only_due=False) -> dict:
     name = agent.get("name") or "비서"
     now = datetime.now(timezone.utc)
     out = {"due": 0, "task": None, "waiting": 0}
@@ -58,6 +62,9 @@ def step_user(sb, agent: dict, ask_llm, allow_task=True) -> dict:
         sb.table("actions").update({"status": "done", "done_at": now.isoformat()}
                                    ).eq("id", row["id"]).execute()
         out["due"] += 1
+
+    if only_due:          # 1분 틱: 알림만 보고 끝 (LLM 안 부름)
+        return out
 
     # 2. 과제 한 걸음
     if allow_task:
@@ -81,7 +88,7 @@ def step_user(sb, agent: dict, ask_llm, allow_task=True) -> dict:
     return out
 
 
-def run(raw_sb, ask_llm) -> dict:
+def run(raw_sb, ask_llm, only_due=False) -> dict:
     started = time.monotonic()
     agents = (raw_sb.table("agents").select("user_id,name,ntfy_topic")
               .not_.is_("name", "null").execute().data) or []
@@ -92,7 +99,7 @@ def run(raw_sb, ask_llm) -> dict:
             sb = Scoped(raw_sb, a["user_id"])
             # 시간이 모자라면 알림만 처리하고 과제 걸음은 다음 틱으로 미룬다
             allow = time.monotonic() - started < TIME_BUDGET
-            report[key] = step_user(sb, a, ask_llm, allow_task=allow)
+            report[key] = step_user(sb, a, ask_llm, allow_task=allow, only_due=only_due)
         except Exception as e:  # 한 사람이 실패해도 다른 사람은 계속
             report[key] = {"error": str(e)[:160]}
     return report
