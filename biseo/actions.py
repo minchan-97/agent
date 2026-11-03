@@ -21,6 +21,7 @@ PROMOTE_AT = 5
 KINDS = {
     "search":       {"tier": 1, "label": "검색"},
     "start_task":   {"tier": 2, "label": "과제 시작"},
+    "create_skill": {"tier": 3, "label": "기능 만들기"},
     "draft":        {"tier": 2, "label": "초안"},
     "note":         {"tier": 3, "label": "메모 저장"},
     "reminder":     {"tier": 3, "label": "알림 예약"},
@@ -98,8 +99,14 @@ def execute(sb, row: dict) -> dict:
             patch = {"status": "done", "done_at": _now()}
         elif kind == "start_task":
             from .tasks import create
-            t = create(sb, str(args.get("goal", "")))
+            t = create(sb, str(args.get("goal", "")), skill_id=args.get("skill_id"))
             patch = {"status": "done", "done_at": _now(), "result": {"task_id": t["id"]}}
+        elif kind == "create_skill":
+            from . import skills
+            sk = skills.create(sb, args.get("name"), args.get("description"),
+                               args.get("instructions"), args.get("tools"),
+                               origin="agent" if row.get("origin") == "self" else "user")
+            patch = {"status": "done", "done_at": _now(), "result": {"skill_id": sk["id"]}}
         else:
             raise ValueError("실행할 방법이 없는 종류")
     except Exception as e:
@@ -143,6 +150,9 @@ def undo(sb, action_id: int) -> dict:
     mem = (row.get("result") or {}).get("memory_id")
     if mem:
         sb.table("task_memory").delete().eq("id", mem).execute()
+    sk = (row.get("result") or {}).get("skill_id")
+    if sk:
+        sb.table("skills").delete().eq("id", sk).execute()
     if row.get("auto_executed") and row["tier"] == 3:
         _save_trust(sb, row["kind"], 0, promoted=False)
     return sb.table("actions").update({"status": "undone", "decided_at": _now()}
