@@ -20,6 +20,7 @@ PROMOTE_AT = 5
 
 KINDS = {
     "search":       {"tier": 1, "label": "검색"},
+    "start_task":   {"tier": 2, "label": "과제 시작"},
     "draft":        {"tier": 2, "label": "초안"},
     "note":         {"tier": 3, "label": "메모 저장"},
     "reminder":     {"tier": 3, "label": "알림 예약"},
@@ -39,12 +40,13 @@ def _trust(sb, kind: str) -> dict:
 
 
 def _save_trust(sb, kind: str, clean: int, promoted: bool):
-    # user_id 를 명시해야 upsert 의 충돌 판정(기본키)이 확실하다
-    sb.table("action_trust").upsert({"user_id": sb.uid, "kind": kind, "clean": clean,
+    # Scoped 가 user_id 를 넣어 주므로 기본키(user_id, kind) 충돌 판정이 확실하다
+    sb.table("action_trust").upsert({"kind": kind, "clean": clean,
                                      "promoted": promoted, "updated_at": _now()}).execute()
 
 
-def propose(sb, kind: str, args: dict, reason: str = "", origin: str = "user") -> dict:
+def propose(sb, kind: str, args: dict, reason: str = "", origin: str = "user",
+            task_id: int | None = None) -> dict:
     """LLM 이 하자고 한 일을 등급에 따라 실행하거나 확인함에 넣는다."""
     if kind in FORBIDDEN or kind not in KINDS:
         return {"kind": kind, "status": "blocked", "why": "하지 않는 일"}
@@ -52,20 +54,22 @@ def propose(sb, kind: str, args: dict, reason: str = "", origin: str = "user") -
     tier = 4 if origin == "external" else spec["tier"]
 
     if tier == 4 and not spec.get("enabled", True):
-        row = _insert(sb, kind, tier, origin, args, reason, "blocked")
+        row = _insert(sb, kind, tier, origin, args, reason, "blocked", task_id=task_id)
         return {**row, "why": "아직 이 비서가 할 수 없는 일"}
 
     auto = tier in (1, 2) or (tier == 3 and _trust(sb, kind).get("promoted"))
     if not auto:
-        return _insert(sb, kind, tier, origin, args, reason, "proposed")
+        return _insert(sb, kind, tier, origin, args, reason, "proposed", task_id=task_id)
 
-    row = _insert(sb, kind, tier, origin, args, reason, "proposed", auto=True)
+    row = _insert(sb, kind, tier, origin, args, reason, "proposed", auto=True, task_id=task_id)
     return execute(sb, row)
 
 
-def _insert(sb, kind, tier, origin, args, reason, status, auto=False) -> dict:
+def _insert(sb, kind, tier, origin, args, reason, status, auto=False, task_id=None) -> dict:
     data = {"kind": kind, "tier": tier, "origin": origin, "args": args or {},
             "reason": (reason or "")[:300], "status": status, "auto_executed": auto}
+    if task_id:
+        data["task_id"] = task_id
     return sb.table("actions").insert(data).execute().data[0]
 
 
@@ -92,6 +96,10 @@ def execute(sb, row: dict) -> dict:
             patch = {"status": "scheduled", "due_at": when.isoformat()}
         elif kind == "search":
             patch = {"status": "done", "done_at": _now()}
+        elif kind == "start_task":
+            from .tasks import create
+            t = create(sb, str(args.get("goal", "")))
+            patch = {"status": "done", "done_at": _now(), "result": {"task_id": t["id"]}}
         else:
             raise ValueError("실행할 방법이 없는 종류")
     except Exception as e:
@@ -110,6 +118,7 @@ def approve(sb, action_id: int) -> dict:
         t = _trust(sb, row["kind"])
         clean = t.get("clean", 0) + 1
         _save_trust(sb, row["kind"], clean, promoted=clean >= PROMOTE_AT)
+    _resume_task(sb, row, "승인됨 → " + done["status"])
     return done
 
 
@@ -119,6 +128,7 @@ def reject(sb, action_id: int) -> dict:
         return {"error": "거절할 수 있는 상태가 아님"}
     if row["tier"] == 3:
         _save_trust(sb, row["kind"], 0, promoted=False)
+    _resume_task(sb, row, "사용자가 하지 않기로 함")
     return sb.table("actions").update({"status": "rejected", "decided_at": _now()}
                                       ).eq("id", action_id).execute().data[0]
 
@@ -137,6 +147,13 @@ def undo(sb, action_id: int) -> dict:
         _save_trust(sb, row["kind"], 0, promoted=False)
     return sb.table("actions").update({"status": "undone", "decided_at": _now()}
                                       ).eq("id", action_id).execute().data[0]
+
+
+def _resume_task(sb, row: dict, outcome: str):
+    """과제 안에서 나온 행동이 결정되면, 그 과제를 다시 움직이게 한다."""
+    if row.get("task_id"):
+        from .tasks import resume_after_decision
+        resume_after_decision(sb, row["task_id"], row, outcome)
 
 
 def _get(sb, action_id: int):
