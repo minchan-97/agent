@@ -67,6 +67,15 @@ header.top button{background:none;border:0;color:var(--muted);cursor:pointer;fon
 .item .detail{color:var(--muted);font-size:.9rem;margin:2px 0 8px;white-space:pre-wrap}
 .item .row .btn{padding:7px 14px;font-size:.9rem}
 
+.task{background:var(--surface);border-left:3px solid var(--accent);border-radius:4px 10px 10px 4px;padding:10px 12px;margin-bottom:8px}
+.task.ask{background:var(--wait-bg);border-left-color:var(--wait)}
+.task.ended{border-left-color:var(--line)}
+.task .goal{font-weight:600}
+.task .state{color:var(--muted);font-size:.85rem}
+.task .body{margin:4px 0 8px;white-space:pre-wrap}
+.task .next{color:var(--muted);font-size:.85rem;margin-bottom:8px}
+.task .row input{flex:1;min-width:0;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.task .row .btn{padding:7px 14px;font-size:.9rem}
 .log{flex:1;overflow-y:auto;padding:14px 0 8px;display:flex;flex-direction:column;gap:10px}
 .bubble{max-width:85%;padding:10px 14px;border-radius:14px;white-space:pre-wrap;word-break:break-word}
 .bubble.agent{background:var(--surface);align-self:flex-start;border-bottom-left-radius:4px}
@@ -131,6 +140,11 @@ dialog code{display:block;background:var(--bg);padding:8px 10px;border-radius:8p
     <div class="tray" id="recentTray" hidden>
       <h2 style="color:var(--muted)">묻지 않고 해 둔 일</h2>
       <div id="recentList"></div>
+    </div>
+
+    <div class="tray" id="taskTray" hidden>
+      <h2 style="color:var(--accent)">맡은 일</h2>
+      <div id="taskList"></div>
     </div>
 
     <div class="log" id="log" aria-live="polite"></div>
@@ -202,7 +216,7 @@ async function enter() {
   if (!me.name) { show("naming"); $("nameInput").focus(); return; }
   setName(me.name);
   show("main");
-  await Promise.all([loadHistory(), loadActions()]);
+  await Promise.all([loadHistory(), refresh()]);
 }
 
 function setName(n) {
@@ -223,8 +237,8 @@ $("saveName").addEventListener("click", async () => {
     const { name } = await api("/api/name", { method: "POST", body: JSON.stringify({ name: $("nameInput").value.trim() }) });
     setName(name);
     show("main");
-    addBubble("agent", `${name}예요. 기억해 둘 일, 알림, 글 초안 같은 걸 부탁해 주세요.\n남에게 닿는 일은 꼭 먼저 여쭤볼게요.`);
-    loadActions();
+    addBubble("agent", `${name}예요. 기억해 둘 일, 알림, 글 초안 같은 걸 부탁해 주세요.\n여러 걸음이 필요한 일은 맡아 두었다가 틈틈이 진행할게요.\n남에게 닿는 일은 꼭 먼저 여쭤볼게요.`);
+    refresh();
   } catch (e) { $("nameMsg").textContent = e.message; }
 });
 
@@ -261,7 +275,7 @@ $("compose").addEventListener("submit", async (e) => {
     const res = await api("/api/chat", { method: "POST", body: JSON.stringify({ text }) });
     wait.classList.remove("thinking");
     wait.textContent = res.reply;
-    await loadActions();
+    await refresh();
   } catch (err) {
     wait.textContent = err.message;
   } finally { $("send").disabled = false; $("text").focus(); }
@@ -296,7 +310,7 @@ function itemEl(a, buttons) {
       b.disabled = true;
       try { await api(`/api/actions/${a.id}/${verb}`, { method: "POST" }); }
       catch (e) { alert(e.message); }
-      loadActions();
+      refresh();
     });
     d.querySelector(".row").appendChild(b);
   }
@@ -311,6 +325,68 @@ async function loadActions() {
   $("recentTray").hidden = !recent.length;
   $("recentList").replaceChildren(...recent.map((a) => itemEl(a, a.tier === 3 ? ["undo"] : [])));
 }
+
+/* ---------- 맡은 일 ---------- */
+const TASK_STATE = {
+  open: "진행 중", waiting_user: "답을 기다려요", waiting_approval: "확인을 기다려요",
+  done: "끝났어요", stopped: "멈췄어요",
+};
+
+function btn(label, ghost, onClick) {
+  const b = document.createElement("button");
+  b.className = "btn" + (ghost ? " ghost" : "");
+  b.textContent = label;
+  b.addEventListener("click", async () => {
+    b.disabled = true;
+    try { await onClick(); } catch (e) { alert(e.message); }
+    await refresh();
+  });
+  return b;
+}
+
+function taskEl(t) {
+  const d = document.createElement("div");
+  const ended = t.status === "done" || t.status === "stopped";
+  d.className = "task" + (t.status === "waiting_user" ? " ask" : "") + (ended ? " ended" : "");
+  const goal = document.createElement("div"); goal.className = "goal"; goal.textContent = t.goal;
+  const state = document.createElement("div"); state.className = "state";
+  state.textContent = `${TASK_STATE[t.status] || t.status} · ${t.steps}걸음`;
+  const body = document.createElement("div"); body.className = "body";
+  body.textContent = t.status === "waiting_user" ? t.question
+    : t.status === "done" ? t.result
+    : t.status === "waiting_approval" ? "위의 확인함에서 결정해 주시면 이어서 할게요."
+    : t.last_thought || "곧 시작할게요.";
+  d.append(goal, state, body);
+  if (t.next_step && !ended) {
+    const n = document.createElement("div"); n.className = "next";
+    n.textContent = `다음: ${t.next_step}`; d.append(n);
+  }
+  const row = document.createElement("div"); row.className = "row";
+  if (t.status === "waiting_user") {
+    const input = document.createElement("input");
+    input.placeholder = "답을 적어 주세요"; input.setAttribute("aria-label", "과제 질문에 답하기");
+    row.append(input, btn("답하기", false, () => {
+      const text = input.value.trim();
+      if (!text) throw new Error("답을 적어 주세요");
+      return api(`/api/tasks/${t.id}/answer`, { method: "POST", body: JSON.stringify({ text }) });
+    }));
+  }
+  if (t.status === "open") {
+    row.append(btn("지금 한 걸음", false, () => api(`/api/tasks/${t.id}/step`, { method: "POST" })));
+  }
+  if (!ended) row.append(btn("그만두기", true, () => api(`/api/tasks/${t.id}/cancel`, { method: "POST" })));
+  if (row.children.length) d.append(row);
+  return d;
+}
+
+async function loadTasks() {
+  const { live, ended } = await api("/api/tasks");
+  const all = [...live, ...ended];
+  $("taskTray").hidden = !all.length;
+  $("taskList").replaceChildren(...all.map(taskEl));
+}
+
+async function refresh() { await Promise.all([loadActions(), loadTasks()]); }
 
 /* ---------- 설정 ---------- */
 $("openSettings").addEventListener("click", () => $("settings").showModal());
