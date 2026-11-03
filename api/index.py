@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field  # noqa: E402
 
 from biseo import actions as act  # noqa: E402
 from biseo import brain, db, tick  # noqa: E402
+from biseo import tasks as tk  # noqa: E402
 
 app = FastAPI(title="biseojin")
 
@@ -66,9 +67,8 @@ def _session(authorization: str | None):
     uid = db.user_id_from_token(token)
     if not uid:
         raise HTTPException(401, "로그인이 만료됐어요")
-    sb = db.for_user(token)
-    sb.uid = uid
-    return sb
+    # 사용자 토큰(RLS) + Scoped(user_id 자동) 이중으로 막는다
+    return db.Scoped(db.for_user(token), uid)
 
 
 def _agent(sb) -> dict:
@@ -107,8 +107,7 @@ def set_name(body: NameIn, authorization: str | None = Header(None)):
     if not name:
         raise HTTPException(400, "이름을 한 글자 이상 적어 주세요")
     sb.table("agents").update({"name": name,
-                               "updated_at": datetime.now(timezone.utc).isoformat()}
-                              ).eq("user_id", sb.uid).execute()
+                               "updated_at": datetime.now(timezone.utc).isoformat()}).execute()
     sb.table("audit").insert({"kind": "named", "detail": {"name": name}}).execute()
     return {"name": name}
 
@@ -161,6 +160,66 @@ def decide(action_id: int, verb: str, authorization: str | None = Header(None)):
     return res
 
 
+# ---------- 과제 ----------
+@app.get("/api/tasks")
+def list_tasks(authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    cols = "id,goal,status,next_step,question,result,steps,max_steps,log,updated_at"
+    live = (sb.table("tasks").select(cols)
+            .in_("status", ["open", "waiting_user", "waiting_approval"])
+            .order("id", desc=True).limit(10).execute().data) or []
+    since = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
+    ended = (sb.table("tasks").select(cols).in_("status", ["done", "stopped"])
+             .gte("updated_at", since).order("id", desc=True).limit(5).execute().data) or []
+    for t in live + ended:          # 화면에는 마지막 생각 하나만
+        log = t.pop("log") or []
+        last = next((e for e in reversed(log) if e.get("by") != "user"), {})
+        t["last_thought"] = last.get("thought", "")
+    return {"live": live, "ended": ended}
+
+
+class GoalIn(BaseModel):
+    goal: str = Field(min_length=2, max_length=500)
+
+
+@app.post("/api/tasks")
+def new_task(body: GoalIn, authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    return tk.create(sb, body.goal)
+
+
+class AnswerIn(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)
+
+
+@app.post("/api/tasks/{task_id}/answer")
+def task_answer(task_id: int, body: AnswerIn, authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    try:
+        return tk.answer(sb, task_id, body.text)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+
+
+@app.post("/api/tasks/{task_id}/cancel")
+def task_cancel(task_id: int, authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    try:
+        return tk.cancel(sb, task_id)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+
+
+@app.post("/api/tasks/{task_id}/step")
+def task_step(task_id: int, authorization: str | None = Header(None)):
+    """크론을 기다리지 않고 지금 한 걸음. 등급 규칙은 똑같이 적용된다."""
+    sb = _session(authorization)
+    res = tk.step(sb, _agent(sb), task_id, brain._ask)
+    if not res["task"]:
+        raise HTTPException(404, "없는 과제")
+    return res["task"]
+
+
 # ---------- 크론 ----------
 @app.get("/api/cron/tick")
 def cron_tick(authorization: str | None = Header(None)):
@@ -168,7 +227,7 @@ def cron_tick(authorization: str | None = Header(None)):
     given = (authorization or "").removeprefix("Bearer ")
     if not secret or not hmac.compare_digest(given, secret):
         raise HTTPException(401, "unauthorized")
-    return {"ok": True, "report": tick.run(db.for_cron())}
+    return {"ok": True, "report": tick.run(db.for_cron(), brain._ask)}
 
 
 # ---------- 진단 ----------
