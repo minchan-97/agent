@@ -11,17 +11,18 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="비서">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#E9EFEB" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#121A1A" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F3F6FA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0C1520" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <style>
 :root{
-  --bg:#E9EFEB; --surface:#F6F9F7; --ink:#1D2A2B; --muted:#5B6B69; --line:#C7D3CE;
-  --accent:#2C6A64; --accent-ink:#F4FAF8; --wait:#A8741A; --wait-bg:#F4E9D2;
-  --mine:#D9E7E2;
+  /* 아이콘의 남색(#004880)을 중심으로. 확인 대기만 따뜻한 호박색으로 따로 둔다 */
+  --bg:#F3F6FA; --surface:#FFFFFF; --ink:#13263A; --muted:#5A6B7D; --line:#D4DDE7;
+  --accent:#004880; --accent-ink:#FFFFFF; --wait:#8C5300; --wait-bg:#FFF3E0;
+  --mine:#E2ECF6;
   --serif:"Gowun Batang", "Noto Serif KR", serif;
   --sans:"Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", sans-serif;
   color-scheme: light;
@@ -29,8 +30,8 @@
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
 }
 @media (prefers-color-scheme: dark){
-  :root{ --bg:#121A1A; --surface:#1A2424; --ink:#E1EBE8; --muted:#97A9A5; --line:#2B3A39;
-    --accent:#72B5AC; --accent-ink:#0F1A19; --wait:#E2B256; --wait-bg:#2E2717; --mine:#22322F;
+  :root{ --bg:#0C1520; --surface:#14202D; --ink:#E3EBF3; --muted:#93A4B6; --line:#253445;
+    --accent:#7AB0E0; --accent-ink:#0C1520; --wait:#E8B04A; --wait-bg:#2D2414; --mine:#1A2D42;
     color-scheme: dark; }
 }
 *,*::before,*::after{box-sizing:inherit}
