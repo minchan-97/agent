@@ -22,13 +22,36 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fastapi import FastAPI, Header, HTTPException  # noqa: E402
+from fastapi import FastAPI, Header, HTTPException, Request  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
 from biseo import actions as act  # noqa: E402
 from biseo import brain, db, tick  # noqa: E402
 
 app = FastAPI(title="biseojin")
+
+
+class _FixPath:
+    """
+    Vercel 이 함수에 넘기는 경로가 설정·버전에 따라 다르다.
+    '/api/config' 로 올 수도, '/config' 로 올 수도, '/api/index/config' 로 올 수도 있다.
+    어느 쪽이든 '/api/...' 로 맞춰서 라우트가 찾을 수 있게 한다.
+    """
+    def __init__(self, inner):
+        self.inner = inner
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http":
+            p = scope.get("path") or "/"
+            for pre in ("/api/index.py", "/api/index"):
+                if p.startswith(pre):
+                    p = p[len(pre):] or "/"
+                    break
+            if not p.startswith("/api/") and p != "/api":
+                p = "/api" + (p if p.startswith("/") else "/" + p)
+            scope = {**scope, "path": p, "raw_path": p.encode(), "_orig_path": scope.get("path")}
+        await self.inner(scope, receive, send)
 
 
 # ---------- 인증 ----------
@@ -142,3 +165,18 @@ def cron_tick(authorization: str | None = Header(None)):
     if not secret or not hmac.compare_digest(given, secret):
         raise HTTPException(401, "unauthorized")
     return {"ok": True, "report": tick.run(db.for_cron())}
+
+
+# ---------- 진단 ----------
+@app.api_route("/api/{rest:path}", methods=["GET", "POST"])
+def not_found(rest: str, request: Request):
+    """맞는 길이 없을 때, 함수가 실제로 받은 경로를 보여 준다 (원인 찾기용)."""
+    hints = {k: v for k, v in request.headers.items()
+             if any(w in k for w in ("path", "url", "uri", "matched")) and "auth" not in k}
+    return JSONResponse(status_code=404, content={
+        "detail": "Not Found", "path_seen": request.scope.get("path"),
+        "original_path": request.scope.get("_orig_path"), "headers": hints})
+
+
+_inner_app = app
+app = _FixPath(_inner_app)
