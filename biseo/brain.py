@@ -19,6 +19,7 @@ from datetime import datetime, timedelta, timezone
 from . import actions as act
 from . import search
 from . import tasks as tk
+from . import skills as sk
 from .absorb import absorb
 from .identity import system_prompt
 from .privacy import mask
@@ -39,10 +40,15 @@ actions 에 쓸 수 있는 kind 와 args
   note          {"text": "남길 내용"}        사용자가 기록해 달라고 할 때
   reminder      {"text": "알릴 말", "due_at": "2026-11-03T15:00:00+09:00"}
   draft         {"to": "받는 사람", "text": "초안"}   글을 대신 써 달라고 할 때
-  start_task    {"goal": "과제 목표 한 문장"}
+  start_task    {"goal": "과제 목표 한 문장", "skill_id": 숫자 또는 null}
+                아래 추가 기능 중 딱 맞는 게 있으면 skill_id 를 넣어.
                 여러 걸음이 필요한 일(조사하고 비교하기, 준비 목록 만들기, 계획 세우기 등)일 때.
                 과제로 맡으면 대화 밖에서도 한 걸음씩 진행하고, 묻거나 끝나면 알려 준다.
                 그 자리에서 바로 답할 수 있는 간단한 일은 과제로 만들지 마.
+  create_skill  {"name": "짧은 이름", "description": "한 줄 설명",
+                 "instructions": "이 일을 할 때 따를 방식", "tools": ["search","note","reminder","draft" 중 필요한 것]}
+                사용자가 "~하는 기능 만들어 줘"라고 하거나, 같은 종류의 부탁이 대화 기록에서
+                여러 번 반복된 게 보일 때만. 기본 도구로 할 수 없는 일은 기능으로 만들지 마.
   send_message  아직 못 하는 일. 보내 달라고 하면 draft 로 대신 만들고 그렇다고 말해.
 
 규칙
@@ -102,6 +108,7 @@ def respond(sb, agent: dict, user_text: str) -> dict:
         extra += "\n\n[진행 중인 과제]\n" + "\n".join(
             f"#{o['id']} {o['goal']} ({o['status']})" for o in open_tasks)
 
+    extra += sk.for_prompt(sb)
     messages = [{"role": "system",
                  "content": system_prompt(agent["name"], facts, notes, now) + extra
                  + "\n\n" + CONTRACT}]
