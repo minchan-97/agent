@@ -222,12 +222,12 @@ def task_step(task_id: int, authorization: str | None = Header(None)):
 
 # ---------- 크론 ----------
 @app.get("/api/cron/tick")
-def cron_tick(authorization: str | None = Header(None)):
+def cron_tick(only: str = "", authorization: str | None = Header(None)):
     secret = os.environ.get("CRON_SECRET", "")
     given = (authorization or "").removeprefix("Bearer ")
     if not secret or not hmac.compare_digest(given, secret):
         raise HTTPException(401, "unauthorized")
-    return {"ok": True, "report": tick.run(db.for_cron(), brain._ask)}
+    return {"ok": True, "report": tick.run(db.for_cron(), brain._ask, only_due=(only == "due"))}
 
 
 # ---------- 진단 ----------
