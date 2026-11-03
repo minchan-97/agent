@@ -30,6 +30,7 @@ from pydantic import BaseModel, Field  # noqa: E402
 from biseo import actions as act  # noqa: E402
 from biseo import brain, db, tick  # noqa: E402
 from biseo import tasks as tk  # noqa: E402
+from biseo import skills as sk  # noqa: E402
 
 app = FastAPI(title="biseojin")
 
@@ -218,6 +219,40 @@ def task_step(task_id: int, authorization: str | None = Header(None)):
     if not res["task"]:
         raise HTTPException(404, "없는 과제")
     return res["task"]
+
+
+# ---------- 기능 (사이드바) ----------
+@app.get("/api/skills")
+def list_skills(authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    custom = sk.list_custom(sb)
+    for c in custom:
+        c["tool_labels"] = [sk.TOOL_LABEL.get(t, t) for t in c.get("tools") or []]
+    return {"builtin": sk.BUILTIN, "custom": custom}
+
+
+class RunIn(BaseModel):
+    text: str = Field(default="", max_length=500)
+
+
+@app.post("/api/skills/{skill_id}/run")
+def run_skill(skill_id: int, body: RunIn, authorization: str | None = Header(None)):
+    """기능 실행 = 그 기능의 방식을 품은 과제를 만든다."""
+    sb = _session(authorization)
+    s = sk.get(sb, skill_id)
+    if not s:
+        raise HTTPException(404, "없는 기능이에요")
+    goal = f"[{s['name']}] {body.text.strip()}" if body.text.strip() else f"[{s['name']}] 실행"
+    return tk.create(sb, goal, skill_id=skill_id)
+
+
+@app.post("/api/skills/{skill_id}/remove")
+def remove_skill(skill_id: int, authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    try:
+        return sk.remove(sb, skill_id)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
 
 
 # ---------- 크론 ----------
