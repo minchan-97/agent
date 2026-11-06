@@ -94,6 +94,7 @@ button,input,textarea,select{font:inherit;color:inherit}
 .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px 10px}
 .app-icon{display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:0;cursor:pointer;padding:0;position:relative}
 .app-icon .tile{width:62px;height:62px;border-radius:17px;background:var(--tile);color:var(--tile-ink);display:grid;place-items:center;box-shadow:0 1px 2px rgb(0 0 0 / .08)}
+.pin-tile svg{width:28px;height:28px;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .app-icon .tile svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .app-icon span{font-size:.8rem}
 .badge{position:absolute;top:-5px;right:calc(50% - 38px);min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--wait);color:#fff;font-size:.72rem;font-weight:700;display:grid;place-items:center}
@@ -403,15 +404,9 @@ function paintHome(h) {
     b.onclick = () => runInChat(msg);
     quick.append(b);
   }
-  for (const pin of (h.pins || [])) {           // 홈에 올린 기능·단축 버튼
-    const b = el("button", "sc"); b.append(miniIcon(pin.icon || "bolt", pin.tint || "amber"), el("span", "", pin.label));
-    const ep = pin.skill ? `/api/skills/${pin.id}/run` : `/api/shortcuts/${pin.id}/run`;
-    b.onclick = async () => { await post(ep, {}); await openApp("tasks"); };
-    quick.append(b);
-  }
   w.append(quick);
 
-  $("grid").replaceChildren(...APPS.map(([key, label]) => {
+  const tiles = APPS.map(([key, label]) => {
     const b = el("button", "app-icon");
     b.innerHTML = `<div class="tile"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[key]}</svg></div>`;
     b.append(el("span", "", label));
@@ -419,7 +414,35 @@ function paintHome(h) {
     if (key === "tasks" && h.asking) b.append(el("div", "badge", String(h.asking)));
     b.onclick = () => openApp(key);
     return b;
-  }));
+  });
+  // 홈에 올린 기능·단축 버튼도 같은 격자에 타일로 (색 있는 아이콘)
+  for (const pin of (h.pins || [])) {
+    const b = el("button", "app-icon");
+    const tile = el("div", "tile pin-tile");
+    tile.style.background = TINT[pin.tint] || TINT.indigo;
+    tile.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[pin.icon] || ICON.bolt}</svg>`;
+    b.append(tile, el("span", "", pin.label));
+    b.onclick = () => runPin(pin);
+    tiles.push(b);
+  }
+  $("grid").replaceChildren(...tiles);
+}
+
+// 홈 타일을 누르면: 무엇에 쓸지 적는 작은 창. 비우고 실행하면 그냥 실행.
+function runPin(pin) {
+  const ep = pin.skill ? `/api/skills/${pin.id}/run` : `/api/shortcuts/${pin.id}/run`;
+  openSheet(pin.label, (s) => {
+    const inp = input("text", "", { placeholder: "무엇에 쓸지 적어 주세요 (비워도 돼요)" });
+    s.append(field("요청 내용", inp));
+    s.append(el("p", "muted", "적은 내용으로 과제를 시작해요. 비워 두면 기본 동작으로 실행돼요."));
+    const foot = el("div", "actions");
+    foot.append(el("span"), button("실행", "", async () => {
+      await post(ep, { text: inp.value.trim() });
+      closeSheet(); await openApp("tasks");
+    }));
+    s.append(foot);
+    setTimeout(() => inp.focus(), 50);
+  });
 }
 
 /* ---------- 앱 열기 ---------- */
