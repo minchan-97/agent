@@ -25,7 +25,7 @@ from . import search
 from .identity import VALUES
 from .privacy import mask
 
-TOOLS = ("search", "note", "reminder", "draft")
+TOOLS = ("search", "note", "reminder", "draft", "event")
 LOG_KEEP = 14          # 판단에 넣는 최근 기록 수
 SNIPPET = 500          # 검색 결과를 기록에 남길 때 최대 글자
 
@@ -94,7 +94,7 @@ STEP_CONTRACT = """
 반드시 JSON 객체 하나로만 답해.
 {
   "thought": "지금 상황 판단 한두 문장",
-  "action": {"kind": "search|note|reminder|draft", "args": {...}} 또는 null,
+  "action": {"kind": "search|note|reminder|draft|event", "args": {...}} 또는 null,
   "status": "continue" | "ask_user" | "done",
   "question": "ask_user 일 때 사용자에게 물을 것 (짧게)",
   "result": "done 일 때 사용자에게 줄 결과 정리",
@@ -106,6 +106,7 @@ STEP_CONTRACT = """
   note      {"text": "..."}                   중간 결과를 사용자 메모로 남길 때
   reminder  {"text": "...", "due_at": "2026-11-03T15:00:00+09:00"}
   draft     {"to": "...", "text": "..."}       글 초안
+  event     {"title": "...", "starts_at": "2026-11-05T15:00:00+09:00", "place": "...", "remind_before_min": 30}
 
 규칙
 - 한 걸음에 행동은 하나까지.
