@@ -121,6 +121,9 @@ button,input,textarea,select{font:inherit;color:inherit}
 .bubble.thinking{color:var(--muted)}
 .links{align-self:flex-start;display:flex;gap:6px;flex-wrap:wrap;margin-top:-4px}
 .links button{border:1px solid var(--line);background:var(--surface);color:var(--accent);border-radius:999px;padding:4px 10px;font-size:.82rem;cursor:pointer}
+.links button.suggest{border-color:var(--accent);font-weight:600}
+.links button.suggest.done{border-color:var(--line);color:var(--muted);font-weight:400}
+.links button:disabled{opacity:.6;cursor:default}
 form.compose{display:flex;gap:8px;padding:10px 0 14px;border-top:1px solid var(--line)}
 form.compose textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface);max-height:140px}
 
@@ -341,6 +344,20 @@ function paintHome(h) {
   if (h.asking) { const c = el("button", "chip", `답을 기다리는 질문 ${h.asking}`); c.onclick = () => openApp("tasks"); chips.append(c); }
   if (chips.children.length) w.append(chips);
 
+  // 빠른 실행: 자주 하는 지시를 버튼 한 번으로. 채팅 앱을 열고 그 말을 바로 보낸다.
+  const quick = el("div", "shortcuts"); quick.style.margin = "4px 0 20px";
+  const QUICK = [
+    ["오늘 브리핑", "오늘 일정과 할 일을 짧게 브리핑해줘"],
+    ["이번 주 정리", "이번 주 해야 할 일을 정리해줘"],
+    ["안 끝난 일", "아직 안 끝난 과제와 확인할 일을 알려줘"],
+  ];
+  for (const [label, msg] of QUICK) {
+    const b = el("button", "sc"); b.append(miniIcon("bolt", "blue"), el("span", "", label));
+    b.onclick = () => runInChat(msg);
+    quick.append(b);
+  }
+  w.append(quick);
+
   $("grid").replaceChildren(...APPS.map(([key, label]) => {
     const b = el("button", "app-icon");
     b.innerHTML = `<div class="tile"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[key]}</svg></div>`;
@@ -438,7 +455,9 @@ async function editEvent(id) {
     const start = input("datetime-local", toLocalInput(ev.starts_at));
     const end = input("datetime-local", toLocalInput(ev.ends_at));
     const place = input("text", ev.place, { placeholder: "장소 (선택)" });
-    s.append(field("이름", title), field("시작", start), field("끝 (선택)", end), field("장소", place));
+    s.append(field("이름", title), field("시작", start));
+    s.append(quickTimes((d) => { start.value = toLocalInput(d.toISOString()); }));
+    s.append(field("끝 (선택)", end), field("장소", place));
     let remindNew = null;
     if (!id) {
       remindNew = el("select");
@@ -524,11 +543,28 @@ SCREENS.reminders = {
   add: () => editReminder({ text: "", due_at: inHour(1) }),
 };
 
+function quickTimes(setIso) {
+  const wrap = el("div", "shortcuts");
+  const opts = [
+    ["30분 뒤", () => { const d = new Date(); d.setMinutes(d.getMinutes() + 30); return d; }],
+    ["1시간 뒤", () => { const d = new Date(); d.setHours(d.getHours() + 1); return d; }],
+    ["3시간 뒤", () => { const d = new Date(); d.setHours(d.getHours() + 3); return d; }],
+    ["오늘 저녁 7시", () => { const d = new Date(); d.setHours(19, 0, 0, 0); return d; }],
+    ["내일 아침 8시", () => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(8, 0, 0, 0); return d; }],
+  ];
+  for (const [label, fn] of opts) {
+    const b = el("button", "sc"); b.textContent = label;
+    b.onclick = (e) => { e.preventDefault(); setIso(fn()); };
+    wrap.append(b);
+  }
+  return wrap;
+}
 function editReminder(r) {
   openSheet(r.id ? "알림" : "새 알림", (s) => {
     const text = input("text", r.text, { placeholder: "무엇을 알려 드릴까요?" });
     const due = input("datetime-local", toLocalInput(r.due_at));
     s.append(field("내용", text), field("시각", due));
+    s.append(quickTimes((d) => { due.value = toLocalInput(d.toISOString()); }));
     if (r.event_id) s.append(el("p", "muted", "일정에 붙은 알림이에요. 시각을 직접 바꾸면 일정과 따로 움직여요."));
     s.append(sheetActions(async () => {
       const data = { text: text.value, due_at: fromLocalInput(due.value) };
@@ -792,6 +828,25 @@ function bubble(role, text, extra = "") {
   const b = el("div", `bubble ${role} new ${extra}`, text); log.append(b);
   $("screenBody").scrollTop = $("screenBody").scrollHeight; return b;
 }
+function suggestChips(suggest) {
+  if (!suggest || !suggest.length) return;
+  const wrap = el("div", "links");
+  for (const sg of suggest) {
+    const c = el("button", "suggest");
+    c.textContent = "+ " + (sg.label || sg.kind);
+    c.onclick = async () => {
+      c.disabled = true;
+      try {
+        const r = await post("/api/suggest/accept", { kind: sg.kind, args: sg.args || {} });
+        c.textContent = "✓ " + (sg.label || "완료");
+        c.classList.add("done");
+        if (r?.status === "proposed") c.textContent = "확인함에서 결정하기", c.onclick = () => openApp("inbox"), c.disabled = false, c.classList.remove("done");
+      } catch (e) { c.disabled = false; alert(e.message); }
+    };
+    wrap.append(c);
+  }
+  $("log").append(wrap); $("screenBody").scrollTop = $("screenBody").scrollHeight;
+}
 function linkChips(actions) {
   const wrap = el("div", "links");
   for (const a of actions) {
@@ -816,12 +871,18 @@ $("compose").addEventListener("submit", async (e) => {
     const res = await post("/api/chat", { text });
     wait.classList.remove("thinking"); wait.textContent = res.reply;
     linkChips(res.actions || []);
+    suggestChips(res.suggest || []);
   } catch (err) { wait.textContent = err.message; }
   finally { $("send").disabled = false; $("text").focus(); }
 });
 $("text").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("compose").requestSubmit(); }
 });
+async function runInChat(message) {
+  await openApp("chat");
+  $("text").value = message;
+  $("compose").requestSubmit();
+}
 
 /* ===================== 로그인·이름 ===================== */
 async function auth(kind) {
