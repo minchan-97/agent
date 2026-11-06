@@ -22,6 +22,7 @@ from . import notify
 from . import push
 from . import observe
 from . import growth
+from . import heir
 from . import tasks as tk
 from .db import Scoped
 
@@ -89,8 +90,10 @@ def _grow_once(sb, agent: dict, ask_llm):
     if len(msgs) < 2:
         return
     try:
-        growth.grow(sb, [{"role": m["role"], "text": m["text"]} for m in msgs],
-                    ask_llm, deep=bool(agent.get("heir")))
+        conv = [{"role": m["role"], "text": m["text"]} for m in msgs]
+        growth.grow(sb, conv, ask_llm, deep=bool(agent.get("heir")))
+        if agent.get("heir"):
+            heir.evolve(sb, agent, conv, growth.load(sb), ask_llm)
         # 하루 한 번 표시 (알림은 아님 → notified=False 로 기록만)
         sb.table("outbox").insert({"rule": "grew", "body": "", "notified": False}).execute()
     except Exception:
