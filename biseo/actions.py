@@ -25,6 +25,7 @@ KINDS = {
     "draft":        {"tier": 2, "label": "초안"},
     "note":         {"tier": 3, "label": "메모 저장"},
     "reminder":     {"tier": 3, "label": "알림 예약"},
+    "event":        {"tier": 3, "label": "일정 추가"},
     "send_message": {"tier": 4, "label": "메시지 보내기", "enabled": False},
 }
 
@@ -90,11 +91,16 @@ def execute(sb, row: dict) -> dict:
             patch = {"status": "done", "done_at": _now(),
                      "result": {"memory_id": m["id"], "to": args.get("to", "")}}
         elif kind == "reminder":
-            due = args.get("due_at")
-            when = datetime.fromisoformat(str(due))  # 형식이 틀리면 여기서 실패로 남는다
-            if when.tzinfo is None:
-                raise ValueError("시간대가 없는 시각")
-            patch = {"status": "scheduled", "due_at": when.isoformat()}
+            from . import apps
+            r = apps.create_reminder(sb, {"text": args.get("text") or "알림",
+                                          "due_at": args.get("due_at")},
+                                     by="agent" if row.get("origin") == "self" else "user")
+            patch = {"status": "done", "done_at": _now(), "due_at": r["due_at"],
+                     "result": {"reminder_id": r["id"]}}
+        elif kind == "event":
+            from . import apps
+            ev = apps.create_event(sb, args, by="agent" if row.get("origin") == "self" else "user")
+            patch = {"status": "done", "done_at": _now(), "result": {"event_id": ev["id"]}}
         elif kind == "search":
             patch = {"status": "done", "done_at": _now()}
         elif kind == "start_task":
@@ -150,9 +156,13 @@ def undo(sb, action_id: int) -> dict:
     mem = (row.get("result") or {}).get("memory_id")
     if mem:
         sb.table("task_memory").delete().eq("id", mem).execute()
-    sk = (row.get("result") or {}).get("skill_id")
-    if sk:
-        sb.table("skills").delete().eq("id", sk).execute()
+    res = row.get("result") or {}
+    if res.get("skill_id"):
+        sb.table("skills").delete().eq("id", res["skill_id"]).execute()
+    if res.get("reminder_id"):
+        sb.table("reminders").delete().eq("id", res["reminder_id"]).eq("status", "scheduled").execute()
+    if res.get("event_id"):
+        sb.table("events").delete().eq("id", res["event_id"]).execute()
     if row.get("auto_executed") and row["tier"] == 3:
         _save_trust(sb, row["kind"], 0, promoted=False)
     return sb.table("actions").update({"status": "undone", "decided_at": _now()}
