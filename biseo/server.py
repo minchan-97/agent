@@ -130,6 +130,26 @@ def config():
             "anon_key": os.environ.get("SUPABASE_ANON_KEY", "")}
 
 
+# ---------- 몰랑이의 자식 (heir) 토글 — 본인만 ----------
+@app.get("/api/heir")
+def heir_get(authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    a = _agent(sb)
+    return {"heir": bool(a.get("heir")), "persona": a.get("persona") or ""}
+
+
+class HeirIn(BaseModel):
+    on: bool
+
+
+@app.post("/api/heir")
+def heir_set(body: HeirIn, authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    _agent(sb)
+    sb.table("agents").update({"heir": bool(body.on)}).eq("user_id", sb.uid).execute()
+    return {"heir": bool(body.on)}
+
+
 # ---------- 비서 ----------
 @app.get("/api/me")
 def me(authorization: str | None = Header(None)):
@@ -584,4 +604,3 @@ class _BootGuard:
 
 
 app.add_middleware(_BootGuard)
-
