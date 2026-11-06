@@ -303,7 +303,7 @@ const CACHE_TOUCH = [
   [/\/api\/(drafts)\b/, ["drafts"]],
   [/\/api\/(tasks)\b/, ["tasks", "home"]],
   [/\/api\/(actions|skills)\b.*\/(approve|reject|undo|run|remove|pin|unpin)/, ["actions", "tasks", "skills", "home", "events", "reminders", "notes", "drafts"]],
-  [/\/api\/(shortcuts|search)\b/, ["tasks", "home"]],
+  [/\/api\/(shortcuts|search|apps\/[a-z]+\/skills)\b/, ["tasks", "home"]],
   [/\/api\/(chat)\b/, ["history", "actions", "tasks", "home", "events", "reminders", "notes", "drafts", "skills"]],
   [/\/api\/(name)\b/, ["home"]],
 ];
@@ -518,13 +518,14 @@ SCREENS.events = {
   cacheKey: "events",
   async render(body, data) {
     const { items } = data || await cache.get("events");
+    const bar = await appSkillBar("events");
     const nodes = []; let last = "";
     for (const e of items) {
       const day = md(e.starts_at);
       if (day !== last) { nodes.push(el("div", "group", day)); last = day; }
       nodes.push(itemBtn(`${hm(e.starts_at)} · ${e.title}`, e.place || "", () => editEvent(e.id)));
     }
-    listOrEmpty(body, nodes, "다가오는 일정이 없어요.\n+ 를 누르거나 채팅에서 \u201c목요일 3시 회의, 30분 전에 알려 줘\u201d처럼 말해 보세요.");
+    body.replaceChildren(bar, ...(nodes.length ? nodes : [el("div", "empty-state", "다가오는 일정이 없어요.")]));
   },
   add: () => editEvent(null),
 };
@@ -586,9 +587,11 @@ SCREENS.notes = {
   cacheKey: "notes",
   async render(body, data) {
     const { items } = data || await cache.get("notes");
-    listOrEmpty(body, items.map((n) => itemBtn(n.title || n.content.split("\n")[0].slice(0, 40),
+    const bar = await appSkillBar("notes");
+    const nodes = items.map((n) => itemBtn(n.title || n.content.split("\n")[0].slice(0, 40),
       `${md(n.updated_at)}${n.event_id ? " · 일정에 붙음" : ""}\n${n.title ? n.content : n.content.split("\n").slice(1).join(" ")}`.trim(),
-      () => editNote(n.id, n))), "메모가 없어요.");
+      () => editNote(n.id, n)));
+    body.replaceChildren(bar, ...(nodes.length ? nodes : [el("div", "empty-state", "메모가 없어요.")]));
   },
   add: () => editNote(null, { content: "" }),
 };
@@ -616,10 +619,11 @@ SCREENS.reminders = {
   async render(body, data) {
     const { items } = showPastReminders ? await api("/api/reminders?past=1")
                                         : (data || await cache.get("reminders"));
+    const bar = await appSkillBar("reminders");
     const t = button(showPastReminders ? "다가올 알림 보기" : "지난 알림 보기", "ghost small toggle", async () => { showPastReminders = !showPastReminders; await render(); });
     const nodes = items.map((r) => itemBtn(r.text, `${when(r.due_at)}${r.event_id ? " · 일정에 붙음" : ""}${r.status === "sent" ? " · 보냄" : ""}`,
       () => (r.status === "scheduled" ? editReminder(r) : null)));
-    body.replaceChildren(t, ...(nodes.length ? nodes : [el("div", "empty-state", showPastReminders ? "지난 알림이 없어요." : "예약된 알림이 없어요.")]));
+    body.replaceChildren(bar, t, ...(nodes.length ? nodes : [el("div", "empty-state", showPastReminders ? "지난 알림이 없어요." : "예약된 알림이 없어요.")]));
   },
   add: () => editReminder({ text: "", due_at: inHour(1) }),
 };
@@ -659,8 +663,9 @@ SCREENS.drafts = {
   cacheKey: "drafts",
   async render(body, data) {
     const { items } = data || await cache.get("drafts");
-    listOrEmpty(body, items.map((d) => itemBtn(d.content.split("\n")[0].slice(0, 40), md(d.updated_at), () => editDraft(d))),
-      "초안이 없어요.\n채팅에서 \u201c학부모님께 보낼 안내 문자 써 줘\u201d처럼 부탁해 보세요.");
+    const bar = await appSkillBar("drafts");
+    const nodes = items.map((d) => itemBtn(d.content.split("\n")[0].slice(0, 40), md(d.updated_at), () => editDraft(d)));
+    body.replaceChildren(bar, ...(nodes.length ? nodes : [el("div", "empty-state", "초안이 없어요.")]));
   },
 };
 function editDraft(d) {
@@ -796,6 +801,59 @@ async function shortcutBar(app) {
   add.onclick = () => newShortcut(app);
   wrap.append(add);
   return wrap;
+}
+
+// 이 앱에서 자란 기능들 + "이 앱에 기능 추가"
+async function appSkillBar(app) {
+  const wrap = el("div", "shortcuts");
+  let items = [];
+  try { ({ items } = await api(`/api/apps/${app}/skills`)); } catch { items = []; }
+  for (const s of items) {
+    const b = el("button", "sc");
+    b.append(miniIcon(s.icon || "bolt", s.tint || "indigo"), el("span", "", s.name));
+    b.onclick = () => runAppSkill(s);
+    const x = el("span", "x", "×");
+    x.onclick = async (e) => { e.stopPropagation(); if (confirm(`'${s.name}' 기능을 지울까요?`)) { await post(`/api/skills/${s.id}/remove`); await render(); } };
+    b.append(x);
+    wrap.append(b);
+  }
+  const add = el("button", "sc add"); add.textContent = "✨ 이 앱에 기능 추가";
+  add.onclick = () => addAppSkill(app);
+  wrap.append(add);
+  return wrap;
+}
+
+function runAppSkill(s) {
+  openSheet(s.name, (sheet) => {
+    if (s.description) sheet.append(el("p", "muted", s.description));
+    const inp = input("text", "", { placeholder: "무엇에 쓸지 (비워도 돼요)" });
+    sheet.append(field("요청 내용", inp));
+    const foot = el("div", "actions");
+    foot.append(el("span"), button("실행", "", async () => {
+      await post(`/api/skills/${s.id}/run`, { text: inp.value.trim() });
+      closeSheet(); await openApp("tasks");
+    }));
+    sheet.append(foot);
+  });
+}
+
+function addAppSkill(app) {
+  const appLabel = APPS.find((a) => a[0] === app)?.[1] || app;
+  openSheet(`${appLabel}에 기능 추가`, (s) => {
+    const req = input("textarea", "", { placeholder: "예: 이 앱에 매주 월요일 할 일을 정리해 주는 기능을 넣어줘" });
+    s.append(el("p", "muted", "원하는 기능을 말로 적으면, 도리가 지금 있는 도구(검색·메모·알림·초안·일정)를 엮어 이 앱에 만들어 줘요."), field("원하는 기능", req));
+    const msg = el("div", "msg");
+    const foot = el("div", "actions");
+    foot.append(el("span"), button("만들기", "", async () => {
+      msg.textContent = "도리가 기능을 설계하는 중…";
+      try {
+        const sk = await post(`/api/apps/${app}/skills/add`, { request: req.value.trim() });
+        closeSheet(); await render();
+        setTimeout(() => alert(`'${sk.name}' 기능이 ${appLabel} 앱에 생겼어요.`), 50);
+      } catch (e) { msg.textContent = e.message; }
+    }));
+    s.append(msg, foot);
+  });
 }
 
 function newShortcut(app) {
