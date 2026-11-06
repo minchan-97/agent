@@ -143,6 +143,9 @@ button,input,textarea,select{font:inherit;color:inherit}
 .links button:disabled{opacity:.6;cursor:default}
 form.compose{display:flex;gap:8px;padding:10px 0 14px;border-top:1px solid var(--line)}
 form.compose textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface);max-height:140px}
+.mic{flex:none;width:44px;border:1px solid var(--line);border-radius:12px;background:var(--surface);cursor:pointer;font-size:1.2rem;line-height:1}
+.mic.on{background:var(--accent);border-color:var(--accent);animation:micpulse 1s infinite}
+@keyframes micpulse{0%,100%{opacity:1}50%{opacity:.55}}
 
 /* 맡은 일·확인함 카드 */
 .card{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:4px 14px 14px 4px;padding:11px 14px;margin-bottom:8px}
@@ -246,6 +249,7 @@ code.topic{display:block;background:var(--surface);border:1px solid var(--line);
     </header>
     <div class="body" id="screenBody"></div>
     <form class="compose" id="compose" hidden>
+      <button type="button" class="mic" id="mic" aria-label="음성으로 말하기" hidden>🎤</button>
       <textarea id="text" rows="1" placeholder="부탁할 일을 적어 주세요"></textarea>
       <button class="btn" id="send">보내기</button>
     </form>
@@ -1033,6 +1037,30 @@ $("compose").addEventListener("submit", async (e) => {
 $("text").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("compose").requestSubmit(); }
 });
+/* ---------- 음성 입력 (브라우저 내장, 외부 API 없음) ---------- */
+(function setupMic() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;                     // 지원 안 하는 기기면 버튼을 숨긴 채 둔다
+  const mic = $("mic"); if (!mic) return;
+  mic.hidden = false;
+  let rec = null, listening = false, base = "";
+  mic.addEventListener("click", () => {
+    if (listening) { rec && rec.stop(); return; }
+    rec = new SR();
+    rec.lang = "ko-KR"; rec.interimResults = true; rec.continuous = false;
+    base = $("text").value ? $("text").value + " " : "";
+    rec.onstart = () => { listening = true; mic.classList.add("on"); };
+    rec.onresult = (e) => {
+      let txt = "";
+      for (let i = 0; i < e.results.length; i++) txt += e.results[i][0].transcript;
+      $("text").value = base + txt;
+    };
+    rec.onerror = (e) => { if (e.error === "not-allowed") alert("마이크 권한을 허용해 주세요."); };
+    rec.onend = () => { listening = false; mic.classList.remove("on"); $("text").focus(); };
+    try { rec.start(); } catch { /* 이미 돌고 있으면 무시 */ }
+  });
+})();
+
 async function runInChat(message) {
   await openApp("chat");
   $("text").value = message;
