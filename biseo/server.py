@@ -170,6 +170,7 @@ def chat(body: ChatIn, authorization: str | None = Header(None)):
 
 class SuggestIn(BaseModel):
     kind: str
+    label: str = ""
     args: dict = {}
 
 
@@ -177,12 +178,15 @@ class SuggestIn(BaseModel):
 def suggest_accept(body: SuggestIn, authorization: str | None = Header(None)):
     """채팅 답변 아래 버튼으로 제안을 수락하면, 그 행동을 바로 실행(등급 규칙 적용)."""
     sb = _session(authorization)
-    a = _agent(sb)
-    if body.kind == "start_task":
-        return _run(tk.create, sb, str(body.args.get("goal", "")))
-    if body.kind not in ("note", "reminder", "draft", "event"):
-        raise HTTPException(400, "지원하지 않는 제안")
-    return act.propose(sb, body.kind, body.args or {}, "채팅 제안 수락", origin="user")
+    _agent(sb)
+    g = body.args or {}
+    # 과제로 맡기는 제안: start_task, 또는 모델이 멋대로 붙인 '만들기/쓰기'류 이름
+    if body.kind == "start_task" or body.kind not in ("note", "reminder", "draft", "event"):
+        goal = str(g.get("goal") or g.get("text") or g.get("title") or body.label or "").strip()
+        if len(goal) < 2:
+            raise HTTPException(400, "맡길 내용이 비어 있어요")
+        return _run(tk.create, sb, goal)
+    return act.propose(sb, body.kind, g, "채팅 제안 수락", origin="user")
 
 
 @app.get("/api/history")
