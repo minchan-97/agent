@@ -56,8 +56,29 @@ def get(sb, skill_id):
 
 
 def list_custom(sb) -> list:
-    return sb.table("skills").select("id,name,description,tools,origin,uses,created_at") \
+    return sb.table("skills").select("id,name,description,tools,origin,uses,pinned,icon,tint,created_at") \
              .order("id", desc=False).execute().data or []
+
+
+def list_pinned(sb) -> list:
+    return [s for s in list_custom(sb) if s.get("pinned")]
+
+
+def set_pinned(sb, skill_id: int, on: bool) -> dict:
+    if not get(sb, skill_id):
+        raise ValueError("없는 기능이에요")
+    sb.table("skills").update({"pinned": bool(on)}).eq("id", skill_id).execute()
+    return {"id": skill_id, "pinned": bool(on)}
+
+
+def run(sb, skill_id: int, text: str = ""):
+    """기능 실행 = 그 기능의 방식을 품은 과제를 만든다 (홈 아이콘에서도 이걸 부른다)."""
+    from . import tasks as tk
+    sk = get(sb, skill_id)
+    if not sk:
+        raise ValueError("없는 기능이에요")
+    goal = f"[{sk['name']}] {text.strip()}" if text.strip() else f"[{sk['name']}] 실행"
+    return tk.create(sb, goal, skill_id=skill_id)
 
 
 def remove(sb, skill_id: int) -> dict:
