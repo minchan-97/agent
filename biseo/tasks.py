@@ -21,6 +21,7 @@ import json
 from datetime import datetime, timedelta, timezone
 
 from . import actions as act
+from . import observe
 from . import search
 from . import explore as ex
 from .identity import VALUES
@@ -66,7 +67,12 @@ def create(sb, goal: str, skill_id=None, icon=None, tint=None) -> dict:
     if sk:
         row["skill_id"] = sk["id"]
         skills.mark_used(sb, sk)
-    return sb.table("tasks").insert(row).execute().data[0]
+    created = sb.table("tasks").insert(row).execute().data[0]
+    try:
+        observe.note(sb, "tasks", goal)
+    except Exception:
+        pass
+    return created
 
 
 def get(sb, task_id: int):
