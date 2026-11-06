@@ -36,12 +36,32 @@ def _now():
 
 
 # ---------- 만들기·읽기 ----------
-def create(sb, goal: str, skill_id=None) -> dict:
+ICONS = {
+    "search":  ("search",  "indigo", ("찾아", "검색", "알아봐", "조사", "리서치", "동향", "비교")),
+    "write":   ("pen",     "amber",  ("초안", "써", "작성", "메일", "문자", "편지", "안내문", "공지")),
+    "plan":    ("list",    "green",  ("계획", "준비", "정리", "목록", "체크리스트", "일정")),
+    "watch":   ("eye",     "teal",   ("지켜", "모니터", "추적", "변하면", "올라오면", "뜨면")),
+    "school":  ("book",    "rose",   ("수업", "학생", "학부모", "평가", "단원", "차시", "학년")),
+}
+DEFAULT_ICON = ("dot", "blue")
+
+
+def pick_icon(goal: str):
+    for _key, (icon, tint, words) in ICONS.items():
+        if any(w in goal for w in words):
+            return icon, tint
+    return DEFAULT_ICON
+
+
+def create(sb, goal: str, skill_id=None, icon=None, tint=None) -> dict:
     from . import skills
     goal = mask(goal.strip())[:500]
     if len(goal) < 2:
         raise ValueError("과제 목표가 너무 짧음")
-    row = {"goal": goal, "status": "open", "next_step": "어떻게 할지 정하기"}
+    if not icon or not tint:
+        icon, tint = pick_icon(goal)
+    row = {"goal": goal, "status": "open", "next_step": "어떻게 할지 정하기",
+           "icon": icon, "tint": tint}
     sk = skills.get(sb, skill_id) if skill_id else None
     if sk:
         row["skill_id"] = sk["id"]
