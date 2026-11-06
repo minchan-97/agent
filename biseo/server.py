@@ -530,6 +530,34 @@ def shortcuts_remove(sid: int, authorization: str | None = Header(None)):
     return _run(sc.remove, sb, sid)
 
 
+# ---------- 앱 안에서 자라는 기능 ----------
+@app.get("/api/apps/{app}/skills")
+def app_skills(app: str, authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    if app not in sk.APP_NAMES:
+        raise HTTPException(400, "기능을 둘 수 없는 앱")
+    items = sk.list_for_app(sb, app)
+    for c in items:
+        c["tool_labels"] = [sk.TOOL_LABEL.get(t, t) for t in c.get("tools") or []]
+    return {"items": items}
+
+
+class AppSkillIn(BaseModel):
+    request: str = Field(min_length=2, max_length=300)
+
+
+@app.post("/api/apps/{app}/skills/add")
+def app_skill_add(app: str, body: AppSkillIn, authorization: str | None = Header(None)):
+    """앱 안에서 말로 요구 → AI가 그 앱에 맞는 기능을 설계해 추가 (자가 코드 없음)."""
+    sb = _session(authorization)
+    if app not in sk.APP_NAMES:
+        raise HTTPException(400, "기능을 둘 수 없는 앱")
+    try:
+        return sk.design_from_request(sb, app, body.request, brain._ask)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
 # ---------- 기능 (사이드바) ----------
 @app.get("/api/skills")
 def list_skills(authorization: str | None = Header(None)):
