@@ -33,17 +33,23 @@ def _clean_tools(tools) -> list:
     return sorted({str(t) for t in tools if str(t) in ALLOWED_TOOLS})
 
 
-def create(sb, name: str, description: str, instructions: str, tools, origin="user") -> dict:
+APP_NAMES = ("events", "notes", "reminders", "drafts", "search", "tasks")
+
+
+def create(sb, name: str, description: str, instructions: str, tools, origin="user", app=None) -> dict:
     name = mask(str(name or "")).strip()[:20]
     instructions = mask(str(instructions or "")).strip()[:1500]
     if not name or len(instructions) < 5:
         raise ValueError("기능 이름과 하는 일을 적어 주세요")
     if sb.table("skills").select("id").eq("name", name).limit(1).execute().data:
         raise ValueError(f"'{name}' 이름의 기능이 이미 있어요")
-    return sb.table("skills").insert({
+    row = {
         "name": name, "description": mask(str(description or "")).strip()[:200],
         "instructions": instructions, "tools": _clean_tools(tools),
-        "origin": origin}).execute().data[0]
+        "origin": origin}
+    if app in APP_NAMES:
+        row["app"] = app
+    return sb.table("skills").insert(row).execute().data[0]
 
 
 def get(sb, skill_id):
@@ -55,8 +61,13 @@ def get(sb, skill_id):
     return rows[0] if rows else None
 
 
+def list_for_app(sb, app: str) -> list:
+    return sb.table("skills").select("id,name,description,tools,uses,icon,tint") \
+             .eq("app", app).order("id", desc=False).execute().data or []
+
+
 def list_custom(sb) -> list:
-    return sb.table("skills").select("id,name,description,tools,origin,uses,pinned,icon,tint,created_at") \
+    return sb.table("skills").select("id,name,description,tools,origin,uses,pinned,icon,tint,app,created_at") \
              .order("id", desc=False).execute().data or []
 
 
@@ -90,6 +101,38 @@ def remove(sb, skill_id: int) -> dict:
 
 def mark_used(sb, skill: dict):
     sb.table("skills").update({"uses": (skill.get("uses") or 0) + 1}).eq("id", skill["id"]).execute()
+
+
+DESIGN = """
+너는 한 앱 안에 새 '기능'을 설계한다. 기능은 코드가 아니라 '지시문 + 쓸 도구'의 조합이다.
+쓸 수 있는 도구는 이것뿐이다: search(검색), note(메모), reminder(알림), draft(초안), event(일정).
+이 도구들의 조합으로 할 수 있는 일만 설계해라. 그 밖의 일(코드 실행, 외부 전송 등)은 설계하지 마라.
+JSON 하나로만.
+{
+  "ok": true/false,            // 이 도구들로 만들 수 있으면 true
+  "name": "짧은 기능 이름(최대 12자)",
+  "description": "한 줄 설명",
+  "instructions": "이 기능을 실행할 때 비서가 따를 방식 (구체적으로)",
+  "tools": ["필요한 도구만"],
+  "why_not": "ok=false 일 때, 왜 이 도구들로는 안 되는지 한 줄"
+}
+이 기능은 '{app}' 앱에 들어간다. 그 앱의 맥락(예: 일정이면 일정·알림 중심)에 맞게 설계해라.
+"""
+
+
+def design_from_request(sb, app: str, request: str, ask_llm) -> dict:
+    """사용자가 앱 안에서 말로 요구한 것을 기능으로 설계해 만든다 (자가 코드 없음)."""
+    if app not in APP_NAMES:
+        raise ValueError("이 앱에는 기능을 추가할 수 없어요")
+    req = mask(str(request or "")).strip()[:300]
+    if len(req) < 2:
+        raise ValueError("어떤 기능을 원하는지 적어 주세요")
+    out = ask_llm([{"role": "system", "content": DESIGN.replace("{app}", app)},
+                   {"role": "user", "content": f"원하는 기능: {req}"}])
+    if not out.get("ok"):
+        raise ValueError(out.get("why_not") or "그 기능은 지금 도구로는 만들 수 없어요")
+    return create(sb, out.get("name"), out.get("description"), out.get("instructions"),
+                  out.get("tools"), origin="user", app=app)
 
 
 def for_prompt(sb) -> str:
