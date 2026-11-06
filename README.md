@@ -6,7 +6,8 @@ GitHub → Vercel 자동 배포, 상태는 Supabase, 주기 실행은 Supabase p
 ## 구조
 
 ```
-api/index.py        Vercel 에서 도는 FastAPI 창구
+pyproject.toml      의존성 + Vercel 진입점 지정 (biseo.server:app)
+biseo/server.py     API 창구 본체 (Vercel 진입점)
 biseo/
   identity.py       정체성 주입 (몰랑이 identity_core 원리)
   absorb.py         사용자 사실 흡수 관문 (몰랑이 molang_store 원리)
@@ -122,6 +123,13 @@ pg_cron 이 깨울 때마다 사람당 과제 하나를 한 걸음 진행한다.
 - 메일·캘린더 연결 (들어오는 내용은 `origin='external'`)
 - 사기 메시지 감지, 가족 공유 일정, 관리자 운영 화면
 - 검역소·미확신 사실을 사람이 승인하는 화면 (몰랑이 `/pending`, `/approve` 에 해당)
+
+## Vercel 배포 방식
+
+Vercel 의 FastAPI 프로젝트 방식(zero-config)을 쓴다. `vercel.json` 이 필요 없다.
+- `pyproject.toml` 이 가리키는 `biseo/server.py` 의 `app` 을 Vercel 이 하나의 함수로 띄운다
+- `public/` 의 파일(index.html, 아이콘, manifest)은 Vercel 이 직접 내준다
+- 함수는 원래 주소(`/api/config` 등)를 그대로 받는다
 
 ## 알아 둘 점
 
