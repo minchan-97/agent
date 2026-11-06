@@ -44,6 +44,7 @@ try:
     from biseo import skills as sk  # noqa: E402
     from biseo import apps  # noqa: E402
     from biseo import push  # noqa: E402
+    from biseo import shortcuts as sc  # noqa: E402
 except Exception:  # noqa: BLE001
     _lines = traceback.format_exc().strip().splitlines()
     _BOOT_ERROR = {"detail": "서버 본체를 불러오지 못했어요",
@@ -206,7 +207,7 @@ def decide(action_id: int, verb: str, authorization: str | None = Header(None)):
 @app.get("/api/tasks")
 def list_tasks(authorization: str | None = Header(None)):
     sb = _session(authorization)
-    cols = "id,goal,status,next_step,question,result,steps,max_steps,log,updated_at"
+    cols = "id,goal,status,next_step,question,result,steps,max_steps,log,updated_at,icon,tint"
     live = (sb.table("tasks").select(cols)
             .in_("status", ["open", "waiting_user", "waiting_approval"])
             .order("id", desc=True).limit(10).execute().data) or []
@@ -222,12 +223,14 @@ def list_tasks(authorization: str | None = Header(None)):
 
 class GoalIn(BaseModel):
     goal: str = Field(min_length=2, max_length=500)
+    icon: str | None = None
+    tint: str | None = None
 
 
 @app.post("/api/tasks")
 def new_task(body: GoalIn, authorization: str | None = Header(None)):
     sb = _session(authorization)
-    return tk.create(sb, body.goal)
+    return tk.create(sb, body.goal, icon=body.icon, tint=body.tint)
 
 
 class AnswerIn(BaseModel):
@@ -250,6 +253,17 @@ def task_cancel(task_id: int, authorization: str | None = Header(None)):
         return tk.cancel(sb, task_id)
     except ValueError as e:
         raise HTTPException(409, str(e))
+
+
+class SearchIn(BaseModel):
+    query: str = Field(min_length=1, max_length=200)
+
+
+@app.post("/api/search/run")
+def search_run(body: SearchIn, authorization: str | None = Header(None)):
+    """검색 앱의 '찾기' 버튼: 채팅 없이 바로 탐색 과제를 만든다."""
+    sb = _session(authorization)
+    return tk.create(sb, f"{body.query.strip()} — 최신 정보를 찾아 핵심만 정리", icon="search", tint="indigo")
 
 
 @app.post("/api/tasks/{task_id}/resume")
@@ -402,6 +416,39 @@ def push_test(authorization: str | None = Header(None)):
     if not res["devices"]:
         raise HTTPException(409, "이 계정에 알림을 켠 기기가 없어요")
     return res
+
+
+# ---------- 내가 만드는 명령 버튼 ----------
+@app.get("/api/shortcuts")
+def shortcuts_list(app: str = "", authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    if app not in sc.APPS:
+        raise HTTPException(400, "검색 또는 맡은 일 앱만 돼요")
+    return {"items": sc.list_for(sb, app)}
+
+
+class ShortcutIn(BaseModel):
+    app: str
+    label: str = Field(min_length=1, max_length=20)
+    text: str = Field(min_length=2, max_length=300)
+
+
+@app.post("/api/shortcuts/new")
+def shortcuts_new(body: ShortcutIn, authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    return _run(sc.create, sb, body.app, body.label, body.text)
+
+
+@app.post("/api/shortcuts/{sid}/run")
+def shortcuts_run(sid: int, authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    return _run(sc.run, sb, sid)
+
+
+@app.post("/api/shortcuts/{sid}/remove")
+def shortcuts_remove(sid: int, authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    return _run(sc.remove, sb, sid)
 
 
 # ---------- 기능 (사이드바) ----------
