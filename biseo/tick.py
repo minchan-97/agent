@@ -20,6 +20,7 @@ from datetime import datetime, timedelta, timezone
 
 from . import notify
 from . import push
+from . import observe
 from . import tasks as tk
 from .db import Scoped
 
@@ -100,7 +101,14 @@ def step_user(sb, agent: dict, ask_llm, allow_task=True, only_due=False) -> dict
             if res.get("notify"):
                 _say(sb, agent, "task", res["notify"], f"{name} · 맡은 일", "/?open=tasks")
 
-    # 3. 오래 기다리는 확인 — 하루 한 번
+    # 3. 버튼 제안 — 자주 쓰는 명령이 있으면 하나 올린다 (확인함으로)
+    if allow_task:
+        try:
+            observe.maybe_suggest(sb)
+        except Exception:
+            pass
+
+    # 4. 오래 기다리는 확인 — 하루 한 번
     cutoff = (now - timedelta(hours=WAIT_HOURS)).isoformat()
     waiting = (sb.table("actions").select("id", count="exact").eq("status", "proposed")
                .lte("created_at", cutoff).execute())
