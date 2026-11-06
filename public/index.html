@@ -892,10 +892,11 @@ function suggestChips(suggest) {
     c.onclick = async () => {
       c.disabled = true;
       try {
-        const r = await post("/api/suggest/accept", { kind: sg.kind, args: sg.args || {} });
+        const r = await post("/api/suggest/accept", { kind: sg.kind, label: sg.label || "", args: sg.args || {} });
         c.textContent = "✓ " + (sg.label || "완료");
         c.classList.add("done");
-        if (r?.status === "proposed") c.textContent = "확인함에서 결정하기", c.onclick = () => openApp("inbox"), c.disabled = false, c.classList.remove("done");
+        if (r?.status === "proposed") { c.textContent = "확인함에서 결정하기"; c.onclick = () => openApp("inbox"); c.disabled = false; c.classList.remove("done"); }
+        else if (r?.id && r?.goal !== undefined) { c.textContent = "✓ 맡은 일로"; c.onclick = () => openApp("tasks"); c.disabled = false; }
       } catch (e) { c.disabled = false; alert(e.message); }
     };
     wrap.append(c);
