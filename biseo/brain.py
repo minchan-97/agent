@@ -19,6 +19,7 @@ from datetime import datetime, timedelta, timezone
 
 from . import actions as act
 from . import search
+from . import explore as ex
 from . import tasks as tk
 from . import skills as sk
 from .absorb import absorb
@@ -152,26 +153,31 @@ def respond(sb, agent: dict, user_text: str) -> dict:
 
     # 검색: 모델이 원하거나, 바뀌는 바깥 사실을 묻는 말이면 강제
     wanted = [a for a in out["actions"] if a.get("kind") == "search"]
-    own_work = any(a.get("kind") in ("note", "reminder", "draft") for a in out["actions"])
+    own_work = any(a.get("kind") in ("note", "reminder", "draft", "event") for a in out["actions"])
     forced = not wanted and not own_work and needs_live_facts(text)
     searched = False
+    trail = []
     if wanted or forced:
         q = str((wanted[0].get("args") or {}).get("query", "")) if wanted else text
         q = q.strip()[:200]
-        today_only = search.wants_today(text) or search.wants_today(q)
         if search.available() and q:
             act.propose(sb, "search", {"query": q},
                         "바뀌는 사실이라 확인" if forced else (wanted[0].get("reason", "")))
+            today_only = search.wants_today(text) or search.wants_today(q)
             try:
-                got = search.find(q, today_only)
-                found = got["results"]
+                found_pack = ex.explore(q, today_only, _ask)   # 스스로 각도를 바꿔 파고든다
+                found = found_pack["results"]
+                trail = found_pack["trail"]
+                searched = found_pack["found"]
                 if found:
-                    ctx = search.to_context(found, today_only) + "\n\n" + GROUNDED
+                    ctx = search.to_context(found, found_pack["today_only"]) + "\n\n" + GROUNDED
+                    note = ex.trail_text(trail)
+                    if note:
+                        ctx += "\n\n[참고: 네가 거친 " + note + "\n답 끝에 어떻게 찾았는지 한 줄로 덧붙여도 좋다.]"
                 elif today_only:
-                    ctx = NO_TODAY
+                    ctx = NO_TODAY + "\n\n" + ex.trail_text(trail)
                 else:
-                    ctx = "[검색 결과 없음]\n" + NO_SEARCH
-                searched = bool(found)
+                    ctx = "[검색 결과 없음]\n" + NO_SEARCH + "\n\n" + ex.trail_text(trail)
             except Exception:
                 ctx = "[검색 실패]\n" + NO_SEARCH
         else:
@@ -205,6 +211,7 @@ def respond(sb, agent: dict, user_text: str) -> dict:
     absorbed = absorb(sb, out["user_facts"], text, reply, agent["name"])
     sb.table("audit").insert({"kind": "turn", "detail": {
         "actions": [d.get("kind") for d in done], "absorbed": absorbed,
-        "searched": searched, "forced_search": forced}}).execute()
+        "searched": searched, "forced_search": forced,
+        "search_tries": len(trail)}}).execute()
 
     return {"reply": reply, "actions": done, "answered_tasks": answered}
