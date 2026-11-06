@@ -94,6 +94,7 @@ def _grow_once(sb, agent: dict, ask_llm):
         growth.grow(sb, conv, ask_llm, deep=bool(agent.get("heir")))
         if agent.get("heir"):
             heir.evolve(sb, agent, conv, growth.load(sb), ask_llm)
+            heir.maybe_propose(sb, agent, conv, ask_llm)
         # 하루 한 번 표시 (알림은 아님 → notified=False 로 기록만)
         sb.table("outbox").insert({"rule": "grew", "body": "", "notified": False}).execute()
     except Exception:
