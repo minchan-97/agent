@@ -224,7 +224,7 @@ def decide(action_id: int, verb: str, authorization: str | None = Header(None)):
 @app.get("/api/tasks")
 def list_tasks(authorization: str | None = Header(None)):
     sb = _session(authorization)
-    cols = "id,goal,status,next_step,question,result,steps,max_steps,log,updated_at,icon,tint"
+    cols = "id,goal,status,next_step,question,result,steps,max_steps,log,updated_at,icon,tint,reflection,quality"
     live = (sb.table("tasks").select(cols)
             .in_("status", ["open", "waiting_user", "waiting_approval"])
             .order("id", desc=True).limit(10).execute().data) or []
@@ -317,7 +317,16 @@ def _run(fn, *a):
 
 @app.get("/api/home")
 def home(authorization: str | None = Header(None)):
-    return apps.today(_session(authorization))
+    sb = _session(authorization)
+    data = apps.today(sb)
+    # 홈에 고정된 단축 버튼
+    pins = []
+    for app_name in ("search", "tasks"):
+        for s0 in sc.list_for(sb, app_name):
+            if s0.get("pinned"):
+                pins.append({"id": s0["id"], "label": s0["label"], "icon": s0.get("icon"), "tint": s0.get("tint")})
+    data["pins"] = pins
+    return data
 
 
 @app.get("/api/events")
