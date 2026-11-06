@@ -19,6 +19,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from . import notify
+from . import push
 from . import tasks as tk
 from .db import Scoped
 
@@ -38,14 +39,40 @@ def _sent_today(sb) -> int:
     return r.count or 0
 
 
-def _say(sb, agent: dict, rule: str, body: str, title: str, force=False) -> bool:
+def _say(sb, agent: dict, rule: str, body: str, title: str, url: str = "/", force=False) -> bool:
+    """
+    앱 자체 알림이 먼저. 알림을 켠 기기가 하나도 없을 때만 ntfy 로 보낸다.
+    sb 는 Scoped(service role) 이고, push 는 그 안의 raw 클라이언트로 그 사람 기기만 찾는다.
+    """
     if not force and _sent_today(sb) >= MAX_PER_DAY:
         sb.table("outbox").insert({"rule": rule, "body": body, "notified": False}).execute()
         return False
-    res = notify.send(agent.get("ntfy_topic") or "", title, body)
-    sb.table("outbox").insert({"rule": rule, "body": body,
-                               "notified": bool(res.get("ok"))}).execute()
-    return bool(res.get("ok"))
+    ok = False
+    try:
+        res = push.send(sb.raw, sb.uid, title, body, url)
+        ok = res.get("sent", 0) > 0
+        no_device = res.get("devices", 0) == 0
+    except Exception:
+        no_device = True
+    if not ok and no_device and agent.get("ntfy_topic"):
+        ok = bool(notify.send(agent["ntfy_topic"], title, body).get("ok"))
+    sb.table("outbox").insert({"rule": rule, "body": body, "notified": ok}).execute()
+    return ok
+
+
+def _waiting_text(sb, count: int) -> str:
+    """'확인할 일 n개'가 아니라 무엇인지 보이게: 첫 항목 이름 + 나머지 수."""
+    from . import actions as act
+    rows = sb.table("actions").select("kind,args").eq("status", "proposed") \
+             .order("id", desc=False).limit(1).execute().data or []
+    if not rows:
+        return f"확인을 기다리는 일이 {count}개 있어요."
+    r = rows[0]
+    g = r.get("args") or {}
+    what = act.KINDS.get(r["kind"], {}).get("label", r["kind"])
+    detail = g.get("title") or g.get("name") or g.get("text") or g.get("goal") or ""
+    head = f"{what} ‘{str(detail)[:24]}’" if detail else what
+    return head + (f" 외 {count - 1}개가 확인을 기다려요." if count > 1 else "이(가) 확인을 기다려요.")
 
 
 def step_user(sb, agent: dict, ask_llm, allow_task=True, only_due=False) -> dict:
@@ -56,7 +83,8 @@ def step_user(sb, agent: dict, ask_llm, allow_task=True, only_due=False) -> dict
     # 1. 시각이 된 알림 — 가져가기(claim)에 성공한 것만 보낸다. 틱이 겹쳐도 한 번만 간다
     from . import apps
     for r in apps.claim_due(sb, now.isoformat()):
-        _say(sb, agent, "due", r["text"], f"{name}의 알림", force=True)
+        url = f"/?open=events:{r['event_id']}" if r.get("event_id") else "/?open=reminders"
+        _say(sb, agent, "due", r["text"], f"{name} · 알림", url, force=True)
         apps.mark_sent(sb, r["id"])
         out["due"] += 1
 
@@ -70,7 +98,7 @@ def step_user(sb, agent: dict, ask_llm, allow_task=True, only_due=False) -> dict
             res = tk.step(sb, agent, tid, ask_llm)
             out["task"] = {"id": tid, "status": (res["task"] or {}).get("status")}
             if res.get("notify"):
-                _say(sb, agent, "task", res["notify"], name)
+                _say(sb, agent, "task", res["notify"], f"{name} · 맡은 일", "/?open=tasks")
 
     # 3. 오래 기다리는 확인 — 하루 한 번
     cutoff = (now - timedelta(hours=WAIT_HOURS)).isoformat()
@@ -80,7 +108,7 @@ def step_user(sb, agent: dict, ask_llm, allow_task=True, only_due=False) -> dict
         already = (sb.table("outbox").select("id").eq("rule", "waiting")
                    .gte("created_at", _today_start()).limit(1).execute().data)
         if not already:
-            _say(sb, agent, "waiting", f"확인을 기다리는 일이 {waiting.count}개 있어요.", name)
+            _say(sb, agent, "waiting", _waiting_text(sb, waiting.count), f"{name} · 확인함", "/?open=inbox")
             out["waiting"] = waiting.count
     return out
 
