@@ -659,9 +659,12 @@ SCREENS.tasks = {
       const lead = el("div", "lead");
       lead.append(miniIcon(t.icon || "dot", t.tint || "blue"), el("div", "t", t.goal));
       d.append(lead, el("div", "s", `${TASK_STATE[t.status] || t.status} · ${t.steps}걸음`));
-      d.append(el("div", "b", t.status === "waiting_user" ? t.question : t.status === "done" ? t.result
-        : t.status === "waiting_approval" ? "확인함에서 결정해 주시면 이어서 할게요." : (t.last_thought || "곧 시작할게요.")));
+      const preview = t.status === "waiting_user" ? t.question
+        : t.status === "done" ? (t.result || "").split("\n").slice(0, 3).join("\n")
+        : t.status === "waiting_approval" ? "확인함에서 결정해 주시면 이어서 할게요." : (t.last_thought || "곧 시작할게요.");
+      d.append(el("div", "b", preview + (t.status === "done" && (t.result || "").split("\n").length > 3 ? " …" : "")));
       const row = el("div", "row");
+      if (t.status === "done" && t.result) row.append(button("결과 보기", "small", () => openResult(t.id)));
       if (t.status === "waiting_user") {
         const a = input("text", "", { placeholder: "답을 적어 주세요" }); row.append(a,
           button("답하기", "small", async () => { await post(`/api/tasks/${t.id}/answer`, { text: a.value }); await render(); }));
@@ -675,6 +678,51 @@ SCREENS.tasks = {
     body.replaceChildren(head, ...(nodes.length ? nodes : [el("div", "empty-state", "맡은 일이 없어요.\n위에 적어서 바로 맡기거나, 자주 쓰는 일은 버튼으로 저장해 두세요.")]));
   },
 };
+
+
+/* ===================== 과제 결과 보기 ===================== */
+function splitResult(text) {
+  // ```lang ... ``` 코드블록을 분리해 [{type:'text'|'code', lang, body}] 로
+  const parts = []; const re = /```([\w+-]*)\n?([\s\S]*?)```/g;
+  let last = 0, m;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push({ type: "text", body: text.slice(last, m.index).trim() });
+    parts.push({ type: "code", lang: m[1] || "", body: m[2].replace(/\n$/, "") });
+    last = re.lastIndex;
+  }
+  if (last < text.length) parts.push({ type: "text", body: text.slice(last).trim() });
+  return parts.filter((p) => p.body);
+}
+async function openResult(taskId) {
+  let t;
+  try { t = await api(`/api/tasks/${taskId}`); } catch (e) { return alert(e.message); }
+  const result = t.result || "";
+  openSheet(t.goal || "결과", (s) => {
+    s.classList.add("result-sheet");
+    if (t.reflection) s.append(el("p", "muted", "비서 메모: " + t.reflection + (t.quality ? ` (자평 ${t.quality}/5)` : "")));
+    for (const part of splitResult(result)) {
+      if (part.type === "code") {
+        const box = el("div", "codebox");
+        const bar = el("div", "codebar");
+        bar.append(el("span", "lang", part.lang || "code"),
+          button("복사", "ghost small", async () => { await navigator.clipboard.writeText(part.body); alert("복사했어요."); }));
+        const pre = el("pre"); pre.textContent = part.body;
+        box.append(bar, pre); s.append(box);
+      } else {
+        const p2 = el("div", "resulttext"); p2.textContent = part.body; s.append(p2);
+      }
+    }
+    const foot = el("div", "actions");
+    foot.append(button("전체 복사", "ghost", async () => { await navigator.clipboard.writeText(result); alert("전체 복사했어요."); }),
+      button("파일로 저장", "", () => {
+        const blob = new Blob([result], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob); const a = el("a");
+        a.href = url; a.download = (t.goal || "결과").slice(0, 30).replace(/[^\w가-힣-]/g, "_") + ".txt";
+        a.click(); URL.revokeObjectURL(url);
+      }));
+    s.append(foot);
+  });
+}
 
 /* ===================== 검색 ===================== */
 SCREENS.search = {
