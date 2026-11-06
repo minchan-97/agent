@@ -545,14 +545,66 @@ SCREENS.skills = {
 };
 
 /* ===================== 설정 ===================== */
+const isStandalone = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent);
+const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+function urlB64ToBytes(b64) {
+  const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+  const raw = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+async function currentSub() {
+  if (!pushSupported()) return null;
+  const reg = await navigator.serviceWorker.getRegistration();
+  return reg ? reg.pushManager.getSubscription() : null;
+}
+async function enablePush() {
+  if (isIOS() && !isStandalone()) throw new Error("아이폰은 홈 화면에 추가한 앱에서만 알림을 켤 수 있어요.\n사파리 공유 버튼 → 홈 화면에 추가 → 그 아이콘으로 열어서 다시 눌러 주세요.");
+  if (!pushSupported()) throw new Error("이 브라우저는 앱 알림을 지원하지 않아요.");
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") throw new Error("알림이 허용되지 않았어요. 기기 설정에서 이 앱의 알림을 허용해 주세요.");
+  const reg = await navigator.serviceWorker.register("/sw.js");
+  await navigator.serviceWorker.ready;
+  const { key } = await api("/api/push/key");
+  const sub = (await reg.pushManager.getSubscription()) ||
+    await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToBytes(key) });
+  const device = isIOS() ? "아이폰" : /Android/.test(navigator.userAgent) ? "안드로이드" : "컴퓨터";
+  await post("/api/push/subscribe", { subscription: sub.toJSON(), device });
+}
+async function disablePush() {
+  const sub = await currentSub();
+  if (sub) { await post("/api/push/unsubscribe", { endpoint: sub.endpoint }); await sub.unsubscribe(); }
+}
+
 SCREENS.settings = {
   async render(body) {
     const me = await api("/api/me");
     const name = input("text", agentName, { maxLength: 12 });
     const box = el("div");
     box.append(field("비서 이름", name), button("이름 바꾸기", "ghost small", async () => { const r = await post("/api/name", { name: name.value.trim() }); agentName = r.name; alert("바꿨어요."); }));
-    const t = el("div", "sub"); t.style.marginTop = "22px";
-    t.append(el("p", "", "폰 알림: ntfy 앱에서 아래 주제를 구독하세요. 주제가 곧 비밀번호라 남에게 알려 주지 마세요."), el("code", "topic", me.ntfy_topic || ""));
+
+    // 앱 알림
+    const p = el("div", "sub"); p.style.marginTop = "22px";
+    p.append(el("h3", "", "알림"));
+    const sub = await currentSub().catch(() => null);
+    const { devices } = await api("/api/push/status").catch(() => ({ devices: [] }));
+    const state = el("p", "", sub ? "이 기기에서 알림을 받고 있어요." : "이 기기는 아직 알림이 꺼져 있어요.");
+    p.append(state);
+    if (devices.length) p.append(el("p", "muted", `알림을 켠 기기: ${devices.map((d) => d.device || "기기").join(", ")}`));
+    const row = el("div", "row");
+    if (sub) {
+      row.append(button("테스트 알림 보내기", "small", async () => { const r = await post("/api/push/test"); alert(`${r.sent}/${r.devices}개 기기로 보냈어요.`); }),
+                 button("이 기기 알림 끄기", "ghost small", async () => { await disablePush(); await render(); }));
+    } else {
+      row.append(button("이 기기에서 알림 켜기", "small", async () => { await enablePush(); await render(); }));
+    }
+    p.append(row);
+    if (isIOS() && !isStandalone()) p.append(el("p", "muted", "아이폰은 홈 화면에 추가한 앱에서 열어야 알림을 켤 수 있어요."));
+    box.append(p);
+
+    // ntfy 는 예비 수단으로만
+    const t = el("div", "sub");
+    t.append(el("h3", "", "예비: ntfy"), el("p", "muted", "알림을 켠 기기가 하나도 없을 때만 ntfy 로 보내요."), el("code", "topic", me.ntfy_topic || ""));
     box.append(t, el("div", "sub"));
     box.append(button("로그아웃", "danger", async () => { await sb.auth.signOut(); location.reload(); }));
     body.replaceChildren(box);
@@ -619,12 +671,29 @@ async function auth(kind) {
     $("authMsg").textContent = e.message === "Invalid login credentials" ? "이메일이나 비밀번호가 맞지 않아요." : e.message;
   }
 }
+async function openTarget(target) {
+  if (!target) return false;
+  const [app, id] = target.split(":");
+  if (!SCREENS[app]) return false;
+  await openApp(app);
+  if (app === "events" && id) await editEvent(Number(id));
+  return true;
+}
 async function enter() {
   const me = await api("/api/me");
   if (!me.name) { show("naming"); $("nameInput").focus(); return; }
   agentName = me.name; document.title = me.name;
+  const target = new URLSearchParams(location.search).get("open");
   history.replaceState(null, "", location.pathname);
   await goHome();
+  if (target) { history.replaceState(null, "", location.pathname); await openTarget(target); }
+  // 알림 서비스 워커가 있으면 연결해 두고, 알림을 누르면 화면을 바꾼다
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    navigator.serviceWorker.addEventListener("message", (e) => {
+      if (e.data?.type === "open") openTarget(new URL(e.data.url).searchParams.get("open"));
+    });
+  }
 }
 $("nameInput").addEventListener("input", (e) => {
   const v = e.target.value.trim(); $("saveName").disabled = !v;
