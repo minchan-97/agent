@@ -22,6 +22,7 @@ KINDS = {
     "search":       {"tier": 1, "label": "검색"},
     "start_task":   {"tier": 2, "label": "과제 시작"},
     "create_skill": {"tier": 3, "label": "기능 만들기"},
+    "suggest_shortcut": {"tier": 3, "label": "버튼 만들기"},
     "draft":        {"tier": 2, "label": "초안"},
     "note":         {"tier": 3, "label": "메모 저장"},
     "reminder":     {"tier": 3, "label": "알림 예약"},
@@ -107,6 +108,10 @@ def execute(sb, row: dict) -> dict:
             from .tasks import create
             t = create(sb, str(args.get("goal", "")), skill_id=args.get("skill_id"))
             patch = {"status": "done", "done_at": _now(), "result": {"task_id": t["id"]}}
+        elif kind == "suggest_shortcut":
+            from . import shortcuts
+            sk = shortcuts.create(sb, args.get("app"), args.get("label"), args.get("text"))
+            patch = {"status": "done", "done_at": _now(), "result": {"shortcut_id": sk["id"]}}
         elif kind == "create_skill":
             from . import skills
             sk = skills.create(sb, args.get("name"), args.get("description"),
@@ -141,6 +146,10 @@ def reject(sb, action_id: int) -> dict:
         return {"error": "거절할 수 있는 상태가 아님"}
     if row["tier"] == 3:
         _save_trust(sb, row["kind"], 0, promoted=False)
+    if row["kind"] == "suggest_shortcut":
+        pid = (row.get("args") or {}).get("pattern_id")
+        if pid:
+            sb.table("usage_patterns").update({"dismissed": True}).eq("id", pid).execute()
     _resume_task(sb, row, "사용자가 하지 않기로 함")
     return sb.table("actions").update({"status": "rejected", "decided_at": _now()}
                                       ).eq("id", action_id).execute().data[0]
@@ -159,6 +168,8 @@ def undo(sb, action_id: int) -> dict:
     res = row.get("result") or {}
     if res.get("skill_id"):
         sb.table("skills").delete().eq("id", res["skill_id"]).execute()
+    if res.get("shortcut_id"):
+        sb.table("shortcuts").delete().eq("id", res["shortcut_id"]).execute()
     if res.get("reminder_id"):
         sb.table("reminders").delete().eq("id", res["reminder_id"]).eq("status", "scheduled").execute()
     if res.get("event_id"):
