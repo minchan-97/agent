@@ -1,0 +1,15 @@
+[project]
+name = "biseojin"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.110",
+    "openai>=1.40",
+    "supabase>=2.4",
+    "requests>=2.31",
+]
+
+# Vercel 이 다른 파일을 진입점으로 착각하지 않도록 못 박는다.
+# app.py 의 app 을 쓴다 (본체를 못 불러오면 원인을 보여 주는 입구).
+[tool.vercel]
+entrypoint = "app:app"
