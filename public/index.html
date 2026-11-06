@@ -692,6 +692,7 @@ function describe(a) {
   if (a.kind === "event") return `${g.title || ""}${g.starts_at ? " · " + when(g.starts_at) : ""}${g.remind_before_min ? ` · ${g.remind_before_min}분 전 알림` : ""}`;
   if (a.kind === "reminder") return `${g.due_at ? when(g.due_at) : ""} · ${g.text || ""}`;
   if (a.kind === "create_skill") return `\u2018${g.name || ""}\u2019 — ${g.description || ""}\n${a.reason || ""}`.trim();
+  if (a.kind === "suggest_shortcut") return `${a.reason || ""}\n만들면: ${g.app === "search" ? "검색" : "맡은 일"} 앱에 \u2018${g.label || ""}\u2019 버튼`.trim();
   if (a.kind === "draft") return `${g.to ? g.to + "에게 · " : ""}${g.text || ""}`;
   return g.text || g.query || a.reason || "";
 }
