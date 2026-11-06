@@ -22,6 +22,7 @@ from datetime import datetime, timedelta, timezone
 
 from . import actions as act
 from . import search
+from . import explore as ex
 from .identity import VALUES
 from .privacy import mask
 
@@ -209,17 +210,18 @@ def step(sb, agent: dict, task_id: int, ask_llm) -> dict:
         if kind == "search":
             q = str(args.get("query", ""))[:200]
             act.propose(sb, "search", {"query": q}, thought, origin="self", task_id=task_id)
+            today_only = search.wants_today(q) or search.wants_today(t["goal"])
             if search.available():
                 try:
-                    today_only = search.wants_today(q) or search.wants_today(t["goal"])
-                    got = search.find(q, today_only, count=4)
-                    if got["results"]:
+                    pack = ex.explore(q, today_only, ask_llm, max_tries=4)
+                    if pack["results"]:
                         entry["outcome"] = "[외부 자료] " + " | ".join(
                             f"({r.get('published') or '작성 시각 모름'}) {r['title']}: {r['snippet']} ({r['url']})"
-                            for r in got["results"])[:SNIPPET]
+                            for r in pack["results"])[:SNIPPET]
                     else:
                         entry["outcome"] = ("오늘 작성된 자료를 찾지 못함 — 예전 자료를 오늘 것으로 쓰지 말 것"
-                                            if today_only else "검색 결과 없음")
+                                            if today_only else "검색으로 찾지 못함") + " / " + ex.trail_text(pack["trail"])
+                    entry["search_trail"] = pack["trail"]
                 except Exception as e:
                     entry["outcome"] = f"검색 실패: {str(e)[:80]}"
             else:
