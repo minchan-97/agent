@@ -20,6 +20,7 @@ from datetime import datetime, timedelta, timezone
 from . import actions as act
 from . import search
 from . import explore as ex
+from . import observe
 from . import tasks as tk
 from . import skills as sk
 from .absorb import absorb
@@ -171,6 +172,7 @@ def respond(sb, agent: dict, user_text: str) -> dict:
                         "바뀌는 사실이라 확인" if forced else (wanted[0].get("reason", "")))
             today_only = search.wants_today(text) or search.wants_today(q)
             try:
+                observe.note(sb, "search", q)
                 found_pack = ex.explore(q, today_only, _ask)   # 스스로 각도를 바꿔 파고든다
                 found = found_pack["results"]
                 trail = found_pack["trail"]
