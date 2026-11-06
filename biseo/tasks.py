@@ -127,6 +127,19 @@ def resume_after_decision(sb, task_id: int, action_row: dict, outcome: str):
 
 
 # ---------- 한 걸음 ----------
+REFLECT = """
+너는 방금 과제를 끝내려 한다. 결과를 네가 냉정하게 점검해라. JSON 하나로만.
+{
+  "verdict": "done" | "more",
+  "quality": 1~5,              // 목표를 얼마나 잘 이뤘나 (정직하게)
+  "gap": "부족하거나 빠진 점 한 문장 (없으면 빈 문자열)",
+  "next": "more 일 때, 더 할 한 걸음",
+  "result": "done 일 때, 사용자에게 줄 최종 정리 (gap 이 있으면 그 한계도 솔직히 적어)"
+}
+점검 기준: 목표에 실제로 답했나? 근거(자료)가 있나? 지어낸 수치·날짜는 없나?
+어설프게 끝내지 마라. 하지만 걸음 한도가 가까우면 완벽을 고집하지 말고 한계를 밝히며 done.
+"""
+
 STEP_CONTRACT = """
 반드시 JSON 객체 하나로만 답해.
 {
@@ -264,9 +277,21 @@ def step(sb, agent: dict, task_id: int, ask_llm) -> dict:
         patch.update(status="waiting_user", question=q)
         notify = f"질문이 있어요: {q}"
     elif status == "done":
-        res = str(out.get("result") or thought or "정리했어요.")[:3000]
-        patch.update(status="done", result=res, next_step=None)
-        notify = f"'{t['goal'][:30]}' 끝났어요."
+        # 몰랑이식 자기 평가: 끝내기 전에 결과를 스스로 점검한다
+        near_limit = t["steps"] + 1 >= t["max_steps"]
+        rf = _reflect(agent, t, out, ask_llm)
+        if rf.get("verdict") == "more" and not near_limit:
+            # 아직 부족하다고 스스로 판단 → 끝내지 않고 한 걸음 더
+            patch.update(status="open", next_step=str(rf.get("next", ""))[:200] or "보완하기")
+            entry["reflection"] = rf.get("gap", "")
+            status = "continue"
+        else:
+            res = str(rf.get("result") or out.get("result") or thought or "정리했어요.")[:3000]
+            patch.update(status="done", result=res, next_step=None,
+                         reflection=str(rf.get("gap", ""))[:500] or None,
+                         quality=rf.get("quality") if isinstance(rf.get("quality"), int) else None)
+            gap = str(rf.get("gap", "")).strip()
+            notify = f"'{t['goal'][:30]}' 끝났어요." + (" (한계 있음)" if gap else "")
     elif status == "waiting_approval":
         patch["status"] = "waiting_approval"
 
@@ -275,6 +300,22 @@ def step(sb, agent: dict, task_id: int, ask_llm) -> dict:
     sb.table("audit").insert({"kind": "task_step", "detail": {
         "task": task_id, "status": t["status"], "action": (action or {}).get("kind")}}).execute()
     return {"task": t, "notify": notify}
+
+
+def _reflect(agent, t, out, ask_llm) -> dict:
+    log = (t.get("log") or [])[-LOG_KEEP:]
+    facts = "\n".join(
+        f"- {e.get('outcome','')}" for e in log if e.get("outcome"))[:1500]
+    draft_result = str(out.get("result") or "")[:1500]
+    msgs = [{"role": "system", "content": REFLECT},
+            {"role": "user", "content":
+             f"과제 목표: {t['goal']}\n걸음 {t['steps']}/{t['max_steps']}\n\n"
+             f"지금까지 모은 것:\n{facts or '(기록 적음)'}\n\n"
+             f"끝내며 내려던 결과:\n{draft_result or '(없음)'}\n\n이 결과를 점검해라."}]
+    rf = ask_llm(msgs)
+    if rf.get("verdict") not in ("done", "more"):
+        rf["verdict"] = "done"
+    return rf
 
 
 def pick_next(sb):
