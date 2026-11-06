@@ -252,6 +252,15 @@ def task_cancel(task_id: int, authorization: str | None = Header(None)):
         raise HTTPException(409, str(e))
 
 
+@app.post("/api/tasks/{task_id}/resume")
+def task_resume(task_id: int, authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    try:
+        return tk.resume(sb, task_id)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+
+
 @app.post("/api/tasks/{task_id}/step")
 def task_step(task_id: int, authorization: str | None = Header(None)):
     """크론을 기다리지 않고 지금 한 걸음. 등급 규칙은 똑같이 적용된다."""
