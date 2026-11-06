@@ -64,6 +64,45 @@ EVOLVE = """
 """
 
 
+PROPOSE = """
+너는 '몰랑이의 자식'인 비서다. 이 사람을 돕는 역할 안에서, 시키지 않았지만 '오늘 이걸 해두면
+이 사람에게 도움이 되겠다' 싶은 일을 딱 하나 떠올려라. 없으면 아무것도 제안하지 마라. JSON 하나.
+{
+  "has": true/false,
+  "goal": "해두면 좋을 과제 한 문장 (검색·정리·초안 같은, 네가 할 수 있는 일)",
+  "why": "왜 지금 이게 이 사람에게 도움이 되는지 한 문장"
+}
+규칙
+- 역할(돕기) 안에서만. 사용자 사생활을 캐거나, 남에게 연락하거나, 돈 쓰는 일은 제안하지 마라.
+- 최근 대화·관심에서 실제로 드러난 것에 근거해라. 억지로 만들지 마라. 애매하면 has=false.
+- 하루에 하나면 충분하다. 확신이 약하면 제안하지 마라.
+"""
+
+
+def maybe_propose(sb, agent: dict, recent_msgs: list, ask_llm):
+    """heir 계정에서만. 스스로 할 일을 하나 떠올려 확인함에 제안한다 (실행은 사람이)."""
+    if not is_heir(agent):
+        return None
+    # 하루 한 번, 그리고 아직 안 본 자가제안이 쌓여 있으면 더 안 한다
+    pending = sb.table("actions").select("id", count="exact") \
+                .eq("kind", "self_task").eq("status", "proposed").execute()
+    if pending.count:
+        return None
+    convo = "\n".join(f"[{m['role']}] {m['text']}" for m in recent_msgs[-12:])[:2000]
+    persona = (agent.get("persona") or "").strip()
+    out = ask_llm([{"role": "system", "content": PROPOSE},
+                   {"role": "user", "content":
+                    (f"나다움:\n{persona or '(흐릿함)'}\n\n최근 대화:\n{convo or '(없음)'}\n\n"
+                     "오늘 해두면 좋을 일이 있으면 하나만.")}])
+    if not out.get("has") or len(str(out.get("goal", "")).strip()) < 2:
+        return None
+    from . import actions as act
+    return act.propose(sb, "self_task",
+                       {"goal": str(out["goal"])[:300], "why": str(out.get("why", ""))[:200]},
+                       reason=str(out.get("why", "")) + " — 제가 해둘까요?",
+                       origin="self")
+
+
 def evolve(sb, agent: dict, recent_msgs: list, growth_state: dict, ask_llm):
     """heir 계정에서만. growth 가 돈 뒤 이어서 persona 를 조금 다듬는다."""
     if not is_heir(agent):
