@@ -46,6 +46,16 @@ ICONS = {
 }
 DEFAULT_ICON = ("dot", "blue")
 
+# 글쓰기류: 자료를 조금만 모으고 바로 작성으로 넘어가야 하는 과제
+WRITING_WORDS = ("초록", "요약", "써", "작성", "글", "에세이", "서론", "본론", "결론",
+                 "소개글", "자기소개", "소개서", "지원서", "편지", "메일", "문자", "안내문",
+                 "공지", "보고서", "리뷰", "감상", "대본", "스크립트", "카피", "문구")
+WRITING_SEARCH_CAP = 3       # 글쓰기 과제는 검색 이만큼만, 그 뒤엔 가진 자료로 작성
+
+
+def is_writing(goal: str) -> bool:
+    return any(w in goal for w in WRITING_WORDS)
+
 
 def pick_icon(goal: str):
     for _key, (icon, tint, words) in ICONS.items():
@@ -226,7 +236,22 @@ def step(sb, agent: dict, task_id: int, ask_llm) -> dict:
     from . import skills
     skill = skills.get(sb, t.get("skill_id"))
     allowed = set(skill.get("tools") or []) if skill else set(TOOLS)
-    out = ask_llm(_messages(agent.get("name") or "비서", t, skill))
+
+    # 글쓰기류 과제: 자료를 어느 정도 모았으면 검색을 닫고 작성으로 넘어가게 한다
+    writing = is_writing(t["goal"])
+    done_searches = sum(1 for e in (t.get("log") or [])
+                        if e.get("action", {}).get("kind") == "search")
+    if writing and done_searches >= WRITING_SEARCH_CAP:
+        allowed = allowed - {"search"}
+    msgs = _messages(agent.get("name") or "비서", t, skill)
+    if writing and done_searches >= WRITING_SEARCH_CAP:
+        msgs[-1]["content"] += ("\n\n[중요] 자료는 충분히 모였다. 더 검색하지 말고, 지금 있는 것으로 "
+                                "결과물을 직접 작성해라. 자료가 부족한 부분은 일반적 지식으로 메우되 지어낸 "
+                                "구체 수치는 넣지 마라. 이번에 바로 써서 done 으로 끝내라.")
+    elif writing:
+        msgs[-1]["content"] += (f"\n\n[참고] 이건 글쓰기 과제다. 검색은 최대 {WRITING_SEARCH_CAP}번까지만 "
+                                "하고(지금까지 " + str(done_searches) + "번), 그 뒤엔 바로 작성해라.")
+    out = ask_llm(msgs)
     thought = str(out.get("thought", ""))[:300]
     status = out.get("status") if out.get("status") in ("continue", "ask_user", "done") else "continue"
     action = out.get("action") if isinstance(out.get("action"), dict) else None
@@ -280,8 +305,9 @@ def step(sb, agent: dict, task_id: int, ask_llm) -> dict:
     elif status == "done":
         # 몰랑이식 자기 평가: 끝내기 전에 결과를 스스로 점검한다
         near_limit = t["steps"] + 1 >= t["max_steps"]
+        writing_long = writing and t["steps"] + 1 >= 8   # 글쓰기인데 길어지면 그만 끝낸다
         rf = _reflect(agent, t, out, ask_llm)
-        if rf.get("verdict") == "more" and not near_limit:
+        if rf.get("verdict") == "more" and not near_limit and not writing_long:
             # 아직 부족하다고 스스로 판단 → 끝내지 않고 한 걸음 더
             patch.update(status="open", next_step=str(rf.get("next", ""))[:200] or "보완하기")
             entry["reflection"] = rf.get("gap", "")
