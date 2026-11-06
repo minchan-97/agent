@@ -43,6 +43,7 @@ try:
     from biseo import tasks as tk  # noqa: E402
     from biseo import skills as sk  # noqa: E402
     from biseo import apps  # noqa: E402
+    from biseo import push  # noqa: E402
 except Exception:  # noqa: BLE001
     _lines = traceback.format_exc().strip().splitlines()
     _BOOT_ERROR = {"detail": "서버 본체를 불러오지 못했어요",
@@ -328,6 +329,56 @@ async def event_remind(item_id: int, request: Request, authorization: str | None
     body = await request.json()
     ev = _run(apps.get_event, sb, item_id)
     return _run(apps.add_event_reminder, sb, ev, int(body.get("minutes", 30)))
+
+
+# ---------- 앱 자체 알림 ----------
+@app.get("/api/push/key")
+def push_key():
+    """브라우저가 구독할 때 쓰는 공개키. 비밀이 아니다."""
+    return {"key": push.keys(db.for_cron())["public"]}
+
+
+@app.post("/api/push/subscribe")
+async def push_subscribe(request: Request, authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    body = await request.json()
+    sub = body.get("subscription") or {}
+    k = sub.get("keys") or {}
+    if not (str(sub.get("endpoint", "")).startswith("https://") and k.get("p256dh") and k.get("auth")):
+        raise HTTPException(400, "구독 정보가 올바르지 않아요")
+    svc = db.for_cron()
+    # 같은 기기(endpoint)가 다시 켜면 주인을 지금 사용자로 바꿔 덮어쓴다
+    svc.table("push_subscriptions").delete().eq("endpoint", sub["endpoint"]).execute()
+    svc.table("push_subscriptions").insert({
+        "user_id": sb.uid, "endpoint": sub["endpoint"], "p256dh": k["p256dh"], "auth": k["auth"],
+        "device": str(body.get("device", ""))[:80]}).execute()
+    return {"ok": True}
+
+
+@app.post("/api/push/unsubscribe")
+async def push_unsubscribe(request: Request, authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    endpoint = (await request.json()).get("endpoint", "")
+    sb.table("push_subscriptions").delete().eq("endpoint", endpoint).execute()
+    return {"ok": True}
+
+
+@app.get("/api/push/status")
+def push_status(authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    rows = sb.table("push_subscriptions").select("id,device,created_at").execute().data or []
+    return {"devices": rows}
+
+
+@app.post("/api/push/test")
+def push_test(authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    a = _agent(sb)
+    res = push.send(db.for_cron(), sb.uid, a.get("name") or "비서",
+                    "알림이 잘 와요. 눌러 보면 확인함이 열려요.", "/?open=inbox")
+    if not res["devices"]:
+        raise HTTPException(409, "이 계정에 알림을 켠 기기가 없어요")
+    return res
 
 
 # ---------- 기능 (사이드바) ----------
