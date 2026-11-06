@@ -53,14 +53,11 @@ def step_user(sb, agent: dict, ask_llm, allow_task=True, only_due=False) -> dict
     now = datetime.now(timezone.utc)
     out = {"due": 0, "task": None, "waiting": 0}
 
-    # 1. 시각이 된 알림
-    due = (sb.table("actions").select("id,args").eq("status", "scheduled")
-           .lte("due_at", now.isoformat()).limit(5).execute().data) or []
-    for row in due:
-        text = str((row.get("args") or {}).get("text", "")) or "예약해 둔 알림이에요."
-        _say(sb, agent, "due", text, f"{name}의 알림", force=True)
-        sb.table("actions").update({"status": "done", "done_at": now.isoformat()}
-                                   ).eq("id", row["id"]).execute()
+    # 1. 시각이 된 알림 — 가져가기(claim)에 성공한 것만 보낸다. 틱이 겹쳐도 한 번만 간다
+    from . import apps
+    for r in apps.claim_due(sb, now.isoformat()):
+        _say(sb, agent, "due", r["text"], f"{name}의 알림", force=True)
+        apps.mark_sent(sb, r["id"])
         out["due"] += 1
 
     if only_due:          # 1분 틱: 알림만 보고 끝 (LLM 안 부름)
