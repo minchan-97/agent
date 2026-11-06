@@ -24,6 +24,7 @@ KINDS = {
     "create_skill": {"tier": 3, "label": "기능 만들기"},
     "suggest_shortcut": {"tier": 3, "label": "버튼 만들기"},
     "pin_shortcut": {"tier": 3, "label": "홈에 버튼 두기"},
+    "self_task": {"tier": 3, "label": "비서가 제안한 일"},
     "draft":        {"tier": 2, "label": "초안"},
     "note":         {"tier": 3, "label": "메모 저장"},
     "reminder":     {"tier": 3, "label": "알림 예약"},
@@ -108,6 +109,10 @@ def execute(sb, row: dict) -> dict:
         elif kind == "start_task":
             from .tasks import create
             t = create(sb, str(args.get("goal", "")), skill_id=args.get("skill_id"))
+            patch = {"status": "done", "done_at": _now(), "result": {"task_id": t["id"]}}
+        elif kind == "self_task":
+            from .tasks import create
+            t = create(sb, str(args.get("goal", "")))
             patch = {"status": "done", "done_at": _now(), "result": {"task_id": t["id"]}}
         elif kind == "pin_shortcut":
             sid = args.get("shortcut_id")
