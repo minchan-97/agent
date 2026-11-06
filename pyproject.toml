@@ -7,6 +7,7 @@ dependencies = [
     "openai>=1.40",
     "supabase>=2.4",
     "requests>=2.31",
+    "cryptography>=42",
 ]
 
 # Vercel 이 다른 파일을 진입점으로 착각하지 않도록 못 박는다.
