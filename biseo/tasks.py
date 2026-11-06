@@ -80,6 +80,16 @@ def cancel(sb, task_id: int) -> dict:
                                "log": _append(t, {"by": "user", "outcome": "그만두기"})})
 
 
+def resume(sb, task_id: int, extra: int = 6) -> dict:
+    """멈춘 과제를 다시 연다. 한도를 '지금 걸음 + extra' 로 늘린다 (무한히 돌지 않게 조금씩)."""
+    t = get(sb, task_id)
+    if not t or t["status"] != "stopped":
+        raise ValueError("멈춘 과제만 이어서 할 수 있어요")
+    return _save(sb, task_id, {
+        "status": "open", "max_steps": t["steps"] + max(1, min(12, int(extra))),
+        "log": _append(t, {"by": "user", "outcome": f"이어서 하기 (+{extra}걸음)"})})
+
+
 def resume_after_decision(sb, task_id: int, action_row: dict, outcome: str):
     t = get(sb, task_id)
     if not t or t["status"] != "waiting_approval":
