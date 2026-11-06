@@ -80,6 +80,20 @@ class _FixPath:
         await self.inner(scope, receive, send)
 
 
+# ---------- 예상 못 한 오류도 이유를 돌려준다 ----------
+@app.exception_handler(Exception)
+async def _any_error(request: Request, exc: Exception):
+    """화면에 '요청에 실패했어요 (500)'만 뜨지 않게, 오류 종류와 위치를 짧게 돌려준다.
+    자세한 전체 기록은 Vercel Logs 에 남긴다."""
+    tb = traceback.extract_tb(exc.__traceback__)
+    mine = [f for f in tb if "/biseo/" in f.filename]
+    where = f"{mine[-1].filename.split('/biseo/')[-1]}:{mine[-1].lineno}" if mine else ""
+    msg = str(exc).replace("\n", " ")[:200]
+    print("ERROR", request.url.path, "".join(traceback.format_exception(exc)))
+    return JSONResponse(status_code=500, content={
+        "detail": f"서버 오류 ({type(exc).__name__}{' · ' + where if where else ''}): {msg}"})
+
+
 # ---------- 인증 ----------
 def _session(authorization: str | None):
     if not authorization or not authorization.startswith("Bearer "):
