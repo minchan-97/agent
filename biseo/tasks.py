@@ -162,6 +162,7 @@ STEP_CONTRACT = """
 - 한 걸음에 행동은 하나까지.
 - 사용자만 아는 정보(취향, 날짜, 예산 등)가 꼭 필요하면 추측하지 말고 ask_user.
 - 충분히 모였으면 미루지 말고 done. result 는 사용자가 바로 쓸 수 있게 정리.
+- 코드·스크립트·문법 정의 등 긴 결과물은 result 에 통째로 담아라(줄바꿈 유지). 코드는 ```언어 … ``` 코드블록으로 감싸라. 설명은 그 앞뒤에 짧게.
 - 경기 일정·결과, 날씨, 가격, 뉴스처럼 바뀌는 바깥 사실은 기록의 [외부 자료]에 있는 것만 쓴다.
   자료마다 앞에 붙은 작성 시각을 보고, 시각이 다른 자료의 숫자를 섞지 말고, result 에 기준 시각과 출처를 밝혀.
   자료가 없으면 먼저 search 하고, 검색을 쓸 수 없으면 지어내지 말고 result 에 확인할 수 없었다고 적어.
@@ -286,7 +287,7 @@ def step(sb, agent: dict, task_id: int, ask_llm) -> dict:
             entry["reflection"] = rf.get("gap", "")
             status = "continue"
         else:
-            res = str(rf.get("result") or out.get("result") or thought or "정리했어요.")[:3000]
+            res = str(rf.get("result") or out.get("result") or thought or "정리했어요.")[:16000]
             patch.update(status="done", result=res, next_step=None,
                          reflection=str(rf.get("gap", ""))[:500] or None,
                          quality=rf.get("quality") if isinstance(rf.get("quality"), int) else None)
@@ -306,7 +307,7 @@ def _reflect(agent, t, out, ask_llm) -> dict:
     log = (t.get("log") or [])[-LOG_KEEP:]
     facts = "\n".join(
         f"- {e.get('outcome','')}" for e in log if e.get("outcome"))[:1500]
-    draft_result = str(out.get("result") or "")[:1500]
+    draft_result = str(out.get("result") or "")[:4000]
     msgs = [{"role": "system", "content": REFLECT},
             {"role": "user", "content":
              f"과제 목표: {t['goal']}\n걸음 {t['steps']}/{t['max_steps']}\n\n"
