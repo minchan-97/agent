@@ -484,6 +484,7 @@ SCREENS.tasks = {
           button("답하기", "small", async () => { await post(`/api/tasks/${t.id}/answer`, { text: a.value }); await render(); }));
       }
       if (t.status === "open") row.append(button("지금 한 걸음", "small", async () => { await post(`/api/tasks/${t.id}/step`); await render(); }));
+      if (t.status === "stopped") row.append(button("이어서 하기", "small", async () => { await post(`/api/tasks/${t.id}/resume`); await post(`/api/tasks/${t.id}/step`); await render(); }));
       if (!ended) row.append(button("그만두기", "ghost small", async () => { await post(`/api/tasks/${t.id}/cancel`); await render(); }));
       if (row.children.length) d.append(row);
       return d;
