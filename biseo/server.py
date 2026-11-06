@@ -26,13 +26,29 @@ from fastapi import FastAPI, Header, HTTPException, Request  # noqa: E402
 from fastapi.responses import JSONResponse  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
-from . import actions as act  # noqa: E402
-from . import brain, db, tick  # noqa: E402
-from . import tasks as tk  # noqa: E402
-from . import skills as sk  # noqa: E402
-from . import apps  # noqa: E402
+import traceback  # noqa: E402
+
+# Vercel 은 이 파일을 패키지 안의 모듈로 부를 수도, 파일 하나로 부를 수도 있다.
+# 파일 하나로 부르면 'from . import' 가 실패해서 함수가 통째로 죽는다.
+# 그래서 저장소 맨 위를 경로에 넣고, 절대 경로(biseo.xxx)로 불러온다.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 app = FastAPI(title="biseojin")
+
+# 본체 모듈을 못 불러와도 함수가 죽지 않고, 무엇이 실패했는지 돌려준다
+_BOOT_ERROR = None
+try:
+    from biseo import actions as act  # noqa: E402
+    from biseo import brain, db, tick  # noqa: E402
+    from biseo import tasks as tk  # noqa: E402
+    from biseo import skills as sk  # noqa: E402
+    from biseo import apps  # noqa: E402
+except Exception:  # noqa: BLE001
+    _lines = traceback.format_exc().strip().splitlines()
+    _BOOT_ERROR = {"detail": "서버 본체를 불러오지 못했어요",
+                   "error": _lines[-1] if _lines else "알 수 없음",
+                   "where": [l.strip() for l in _lines if l.strip().startswith("File ")][-3:],
+                   "python": sys.version.split()[0]}
 
 
 class _FixPath:
@@ -272,36 +288,37 @@ def drafts_list(authorization: str | None = Header(None)):
     return {"items": apps.list_memory(_session(authorization), "draft")}
 
 
-_CRUD = {
-    "events":    (apps.create_event, apps.update_event, apps.delete_event),
-    "reminders": (apps.create_reminder, apps.update_reminder, apps.delete_reminder),
-    "notes":     (apps.create_note, apps.update_memory, apps.delete_memory),
-    "drafts":    (None, apps.update_memory, apps.delete_memory),
-}
+def _crud():
+    return {
+        "events":    (apps.create_event, apps.update_event, apps.delete_event),
+        "reminders": (apps.create_reminder, apps.update_reminder, apps.delete_reminder),
+        "notes":     (apps.create_note, apps.update_memory, apps.delete_memory),
+        "drafts":    (None, apps.update_memory, apps.delete_memory),
+    }
 
 
 @app.post("/api/{kind}/new")
 async def item_new(kind: str, request: Request, authorization: str | None = Header(None)):
-    if kind not in _CRUD or not _CRUD[kind][0]:
+    if kind not in _crud() or not _crud()[kind][0]:
         raise HTTPException(404, "없는 앱")
     sb = _session(authorization)
-    return _run(_CRUD[kind][0], sb, await request.json())
+    return _run(_crud()[kind][0], sb, await request.json())
 
 
 @app.post("/api/{kind}/{item_id}/update")
 async def item_update(kind: str, item_id: int, request: Request,
                       authorization: str | None = Header(None)):
-    if kind not in _CRUD:
+    if kind not in _crud():
         raise HTTPException(404, "없는 앱")
     sb = _session(authorization)
-    return _run(_CRUD[kind][1], sb, item_id, await request.json())
+    return _run(_crud()[kind][1], sb, item_id, await request.json())
 
 
 @app.post("/api/{kind}/{item_id}/delete")
 def item_delete(kind: str, item_id: int, authorization: str | None = Header(None)):
-    if kind not in _CRUD:
+    if kind not in _crud():
         raise HTTPException(404, "없는 앱")
-    return _run(_CRUD[kind][2], _session(authorization), item_id)
+    return _run(_crud()[kind][2], _session(authorization), item_id)
 
 
 @app.post("/api/events/{item_id}/remind")
@@ -371,3 +388,22 @@ def not_found(rest: str, request: Request):
 # app 은 FastAPI 그대로 두고, 경로 보정은 미들웨어로 끼운다.
 # (Vercel 이 FastAPI 프로젝트로 인식하면 app 이 FastAPI 객체이길 기대한다)
 app.add_middleware(_FixPath)
+
+
+class _BootGuard:
+    """본체를 못 불러왔으면 모든 요청에 그 이유를 돌려준다."""
+    def __init__(self, app):
+        self.inner = app
+
+    async def __call__(self, scope, receive, send):
+        if _BOOT_ERROR and scope.get("type") == "http":
+            import json
+            body = json.dumps(_BOOT_ERROR, ensure_ascii=False).encode()
+            await send({"type": "http.response.start", "status": 500,
+                        "headers": [(b"content-type", b"application/json; charset=utf-8")]})
+            await send({"type": "http.response.body", "body": body})
+            return
+        await self.inner(scope, receive, send)
+
+
+app.add_middleware(_BootGuard)
