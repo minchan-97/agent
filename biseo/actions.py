@@ -23,6 +23,7 @@ KINDS = {
     "start_task":   {"tier": 2, "label": "과제 시작"},
     "create_skill": {"tier": 3, "label": "기능 만들기"},
     "suggest_shortcut": {"tier": 3, "label": "버튼 만들기"},
+    "pin_shortcut": {"tier": 3, "label": "홈에 버튼 두기"},
     "draft":        {"tier": 2, "label": "초안"},
     "note":         {"tier": 3, "label": "메모 저장"},
     "reminder":     {"tier": 3, "label": "알림 예약"},
@@ -108,6 +109,10 @@ def execute(sb, row: dict) -> dict:
             from .tasks import create
             t = create(sb, str(args.get("goal", "")), skill_id=args.get("skill_id"))
             patch = {"status": "done", "done_at": _now(), "result": {"task_id": t["id"]}}
+        elif kind == "pin_shortcut":
+            sid = args.get("shortcut_id")
+            sb.table("shortcuts").update({"pinned": True}).eq("id", sid).execute()
+            patch = {"status": "done", "done_at": _now(), "result": {"pinned_shortcut": sid}}
         elif kind == "suggest_shortcut":
             from . import shortcuts
             sk = shortcuts.create(sb, args.get("app"), args.get("label"), args.get("text"))
@@ -170,6 +175,8 @@ def undo(sb, action_id: int) -> dict:
         sb.table("skills").delete().eq("id", res["skill_id"]).execute()
     if res.get("shortcut_id"):
         sb.table("shortcuts").delete().eq("id", res["shortcut_id"]).execute()
+    if res.get("pinned_shortcut"):
+        sb.table("shortcuts").update({"pinned": False}).eq("id", res["pinned_shortcut"]).execute()
     if res.get("reminder_id"):
         sb.table("reminders").delete().eq("id", res["reminder_id"]).eq("status", "scheduled").execute()
     if res.get("event_id"):
