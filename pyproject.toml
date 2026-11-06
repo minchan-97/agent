@@ -10,6 +10,6 @@ dependencies = [
 ]
 
 # Vercel 이 다른 파일을 진입점으로 착각하지 않도록 못 박는다.
-# app.py 의 app 을 쓴다 (본체를 못 불러오면 원인을 보여 주는 입구).
+# Vercel 이 찾은 그대로: biseo/server.py 의 app.
 [tool.vercel]
-entrypoint = "app:app"
+entrypoint = "biseo.server:app"
