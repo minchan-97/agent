@@ -73,13 +73,20 @@ actions 에 쓸 수 있는 kind 와 args
 # 모델이 검색을 안 하겠다고 해도 시스템이 검색을 강제한다.
 _LIVE_FACT = re.compile(
     r"(일정|경기|대진|라인업|결과|스코어|점수|순위|중계|날씨|기온|강수|미세먼지|"
-    r"가격|시세|환율|주가|뉴스|속보|개봉|발매|출시|공연|티켓|운행|휴무|영업시간)")
+    r"가격|시세|환율|주가|지수|코스피|코스닥|나스닥|증시|장중|비트코인|금값|유가|"
+    r"뉴스|속보|개봉|발매|출시|공연|티켓|운행|휴무|영업시간)")
 _PERSONAL = re.compile(r"(내|제|우리|나의|저의)\s*(일정|스케줄)")
 
 NO_SEARCH = ("[검색을 쓸 수 없음] 확인된 자료가 없다. 날짜·시간·상대·점수·가격 같은 구체적인 사실을 "
              "하나도 만들어 내지 말고, 지금은 확인할 수 없다고 솔직히 말해. 공식 사이트에서 확인하라고 안내해도 좋다.")
 GROUNDED = ("위 자료에 실제로 있는 내용만 써서 다시 답해. 자료에 없는 날짜·시간·상대·점수·숫자는 "
-            "절대 만들어 내지 마. 자료가 질문에 답하지 못하면 그렇다고 말해. 출처를 짧게 밝혀.")
+            "절대 만들어 내지 마. 자료가 질문에 답하지 못하면 그렇다고 말해.\n"
+            "- 각 자료의 '작성' 시각을 보고, 그 숫자가 언제 기준인지 답에 밝혀 (예: \"오후 3시 30분 마감 기준\").\n"
+            "- 작성 시각이 다른 자료의 숫자를 한 답 안에 섞지 마. 가장 최근 자료 하나를 기준으로 삼아.\n"
+            "- 답 끝에 \"출처: 매체 이름, 작성 시각\"을 한 줄로 붙여.")
+NO_TODAY = ("[오늘 작성된 자료를 찾지 못함] 검색은 했지만 오늘 날짜 자료가 없었다. 예전 자료의 숫자를 "
+            "오늘 것처럼 말하지 말고, 오늘 자료를 찾지 못했다고 솔직히 말해. 원하면 가장 최근 자료가 "
+            "언제 것인지 밝히고 다시 찾아보겠다고 해도 된다.")
 
 
 def needs_live_facts(text: str) -> bool:
@@ -151,13 +158,19 @@ def respond(sb, agent: dict, user_text: str) -> dict:
     if wanted or forced:
         q = str((wanted[0].get("args") or {}).get("query", "")) if wanted else text
         q = q.strip()[:200]
+        today_only = search.wants_today(text) or search.wants_today(q)
         if search.available() and q:
             act.propose(sb, "search", {"query": q},
                         "바뀌는 사실이라 확인" if forced else (wanted[0].get("reason", "")))
             try:
-                found = search.brave(q)
-                ctx = (search.to_context(found) + "\n\n" + GROUNDED) if found else \
-                      ("[검색 결과 없음]\n" + NO_SEARCH)
+                got = search.find(q, today_only)
+                found = got["results"]
+                if found:
+                    ctx = search.to_context(found, today_only) + "\n\n" + GROUNDED
+                elif today_only:
+                    ctx = NO_TODAY
+                else:
+                    ctx = "[검색 결과 없음]\n" + NO_SEARCH
                 searched = bool(found)
             except Exception:
                 ctx = "[검색 실패]\n" + NO_SEARCH
