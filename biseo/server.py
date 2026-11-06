@@ -584,3 +584,4 @@ class _BootGuard:
 
 
 app.add_middleware(_BootGuard)
+
