@@ -14,120 +14,122 @@
 <meta name="theme-color" content="#F3F6FA" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0C1520" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <style>
 :root{
-  /* 아이콘의 남색(#004880)을 중심으로. 확인 대기만 따뜻한 호박색으로 따로 둔다 */
+  /* 아이콘의 남색(#004880)이 중심. 확인 대기만 호박색으로 따로 */
   --bg:#F3F6FA; --surface:#FFFFFF; --ink:#13263A; --muted:#5A6B7D; --line:#D4DDE7;
-  --accent:#004880; --accent-ink:#FFFFFF; --wait:#8C5300; --wait-bg:#FFF3E0;
-  --mine:#E2ECF6;
-  --serif:"Gowun Batang", "Noto Serif KR", serif;
+  --accent:#004880; --accent-ink:#FFFFFF; --wait:#8C5300; --wait-bg:#FFF3E0; --mine:#E2ECF6;
+  --tile:#004880; --tile-ink:#FFFFFF; --danger:#B3261E;
   --sans:"Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", sans-serif;
-  color-scheme: light;
-  box-sizing:border-box;
+  color-scheme: light; box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
 }
 @media (prefers-color-scheme: dark){
   :root{ --bg:#0C1520; --surface:#14202D; --ink:#E3EBF3; --muted:#93A4B6; --line:#253445;
     --accent:#7AB0E0; --accent-ink:#0C1520; --wait:#E8B04A; --wait-bg:#2D2414; --mine:#1A2D42;
-    color-scheme: dark; }
+    --tile:#1E4E7E; --tile-ink:#EAF3FC; --danger:#F2B8B5; color-scheme: dark; }
 }
 *,*::before,*::after{box-sizing:inherit}
 html,body{height:100%;margin:0}
-body{background:var(--bg);color:var(--ink);font:16px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
-button,input,textarea{font:inherit;color:inherit}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
+button,input,textarea,select{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.wrap{max-width:640px;margin:0 auto;padding:0 18px;height:100%;display:flex;flex-direction:column}
-.wrap.wide{max-width:1040px}
-
-/* 앱 틀: 사이드바 + 대화 */
-.app{display:flex;gap:24px;height:100%}
-.chat{flex:1;min-width:0;display:flex;flex-direction:column;height:100%}
-.side{width:260px;flex:none;overflow-y:auto;padding:18px 18px 18px 0;border-right:1px solid var(--line)}
-.side h2{font-size:.95rem;font-weight:600;margin:0 0 8px}
-.side h2 + .hint{margin-top:-4px}
-.side section + section{margin-top:22px}
-.side .hint{color:var(--muted);font-size:.85rem;margin:0 0 10px}
-.feat{padding:9px 0;border-bottom:1px solid var(--line)}
-.feat:last-child{border-bottom:0}
-.feat .fname{font-weight:600}
-.feat .fname small{font-weight:400;color:var(--muted);margin-left:6px}
-.feat .fdesc{color:var(--muted);font-size:.88rem}
-.feat .ftools{color:var(--muted);font-size:.8rem;margin-top:2px}
-.feat .row{margin-top:8px}
-.feat .row input{flex:1 1 100%;min-width:0;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
-.feat .row .btn{padding:6px 12px;font-size:.85rem}
-.menuBtn{display:none;background:none;border:1px solid var(--line);border-radius:8px;color:var(--accent);padding:5px 10px;margin-right:10px;cursor:pointer;font-size:.9rem}
-.scrim{position:fixed;inset:0;background:rgb(0 0 0 / .3);z-index:15}
-@media (max-width: 899px){
-  .side{position:fixed;inset:0 auto 0 0;width:min(84vw,310px);background:var(--surface);z-index:20;
-        padding:calc(18px + env(safe-area-inset-top,0px)) 18px 18px;transform:translateX(-102%);border-right:1px solid var(--line)}
-  .side.open{transform:none}
-  .menuBtn{display:inline-block}
-}
-@media (min-width: 900px){ .scrim{display:none!important} }
-@media (prefers-reduced-motion: no-preference){ .side{transition:transform .2s ease-out} }
 [hidden]{display:none!important}
+.wrap{max-width:480px;margin:0 auto;padding:0 18px;height:100%;display:flex;flex-direction:column}
 
-/* 로그인 */
-.auth{margin:auto 0;padding:32px 0}
-.auth h1{font:700 1.5rem/1.3 var(--serif);margin:0 0 6px}
-.auth p{color:var(--muted);margin:0 0 24px;white-space:pre-wrap}
-.field{display:block;margin-bottom:12px}
-.field input{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
-.row{display:flex;gap:10px;flex-wrap:wrap}
-.btn{border:0;border-radius:10px;padding:11px 18px;cursor:pointer;background:var(--accent);color:var(--accent-ink);font-weight:600}
+/* 공통 */
+.btn{border:0;border-radius:10px;padding:10px 16px;cursor:pointer;background:var(--accent);color:var(--accent-ink);font-weight:600}
 .btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+.btn.danger{background:transparent;color:var(--danger);border:1px solid var(--line)}
+.btn.small{padding:6px 12px;font-size:.88rem}
 .btn:disabled{opacity:.5;cursor:default}
-.msg{min-height:1.4em;color:var(--muted);font-size:.9rem;margin-top:10px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.muted{color:var(--muted)}
+.field{display:block;margin-bottom:12px}
+.field span{display:block;font-size:.85rem;color:var(--muted);margin-bottom:4px}
+.field input,.field textarea,.field select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.field textarea{min-height:120px;resize:vertical}
+.msg{min-height:1.4em;color:var(--muted);font-size:.9rem;margin-top:10px;white-space:pre-wrap}
 
-/* 이름 짓기 — 이 화면의 주인공은 이름 하나 */
+/* 시작·로그인·이름 */
+.auth{margin:auto 0;padding:32px 0}
+.auth h1{font-size:1.5rem;font-weight:700;margin:0 0 6px}
+.auth p{color:var(--muted);margin:0 0 24px;white-space:pre-wrap}
 .naming{margin:auto 0;padding:40px 0}
 .naming .lead{color:var(--muted);margin:0 0 28px}
-.naming .say{font:400 clamp(1.6rem,6vw,2.4rem)/1.35 var(--serif);margin:0}
-.naming .say input{
-  font:700 1em/1.2 var(--serif);color:var(--accent);background:transparent;border:0;
-  border-bottom:2px solid var(--accent);width:6.5em;padding:0 .1em;text-align:center}
+.naming .say{font-size:clamp(1.6rem,6vw,2.2rem);line-height:1.35;margin:0;font-weight:500}
+.naming .say input{font-weight:800;color:var(--accent);background:transparent;border:0;border-bottom:2px solid var(--accent);width:6.5em;text-align:center}
 .naming .say input::placeholder{color:var(--line)}
 .naming .note{color:var(--muted);font-size:.9rem;margin:20px 0 28px}
 
-/* 대화 */
-header.top{display:flex;align-items:center;justify-content:space-between;padding:18px 0 10px;border-bottom:1px solid var(--line)}
-header.top h1{font:700 1.7rem/1.1 var(--serif);margin:0;color:var(--accent)}
-header.top button{background:none;border:0;color:var(--muted);cursor:pointer;font-size:.9rem;padding:6px}
+/* 홈 화면 */
+.home{padding:20px 0 28px;overflow-y:auto;height:100%}
+.home .date{color:var(--muted);font-size:.95rem}
+.home h1{font-size:2rem;font-weight:800;margin:2px 0 18px;color:var(--accent);letter-spacing:-.01em}
+.widget{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px 16px;margin-bottom:22px}
+.widget h2{font-size:.9rem;font-weight:700;margin:0 0 8px;color:var(--muted)}
+.widget .ev{display:flex;gap:10px;padding:4px 0;cursor:pointer;background:none;border:0;width:100%;text-align:left}
+.widget .ev b{font-variant-numeric:tabular-nums;min-width:3.4em;color:var(--accent)}
+.widget .empty{color:var(--muted);font-size:.92rem}
+.widget .next{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:.92rem}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.chip{border:0;border-radius:999px;padding:6px 12px;font-size:.85rem;font-weight:600;cursor:pointer;background:var(--wait-bg);color:var(--wait)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px 10px}
+.app-icon{display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:0;cursor:pointer;padding:0;position:relative}
+.app-icon .tile{width:62px;height:62px;border-radius:17px;background:var(--tile);color:var(--tile-ink);display:grid;place-items:center;box-shadow:0 1px 2px rgb(0 0 0 / .08)}
+.app-icon .tile svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.app-icon span{font-size:.8rem}
+.badge{position:absolute;top:-5px;right:calc(50% - 38px);min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--wait);color:#fff;font-size:.72rem;font-weight:700;display:grid;place-items:center}
 
-.tray{margin:14px 0 4px}
-.tray h2{font-size:.95rem;font-weight:600;margin:0 0 8px;color:var(--wait)}
-.item{background:var(--wait-bg);border-left:3px solid var(--wait);border-radius:4px 10px 10px 4px;padding:10px 12px;margin-bottom:8px}
-.item.done{background:var(--surface);border-left-color:var(--line)}
-.item .what{font-weight:600}
-.item .detail{color:var(--muted);font-size:.9rem;margin:2px 0 8px;white-space:pre-wrap}
-.item .row .btn{padding:7px 14px;font-size:.9rem}
+/* 앱 화면 */
+.screen{display:flex;flex-direction:column;height:100%}
+.screen header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 0 10px;border-bottom:1px solid var(--line)}
+.screen header h1{font-size:1.15rem;font-weight:700;margin:0;flex:1;text-align:center}
+.back,.add{background:none;border:0;color:var(--accent);font-weight:600;cursor:pointer;padding:6px 4px;min-width:64px}
+.add{text-align:right;font-size:1.5rem;line-height:1}
+.back{text-align:left}
+.body{flex:1;overflow-y:auto;padding:12px 0 18px}
+.group{font-size:.82rem;font-weight:700;color:var(--muted);margin:14px 0 6px}
+.group:first-child{margin-top:0}
+.item{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 14px;margin-bottom:8px;cursor:pointer}
+.item .t{font-weight:600}
+.item .s{color:var(--muted);font-size:.86rem;margin-top:2px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:pre-wrap}
+.item.wait{background:var(--wait-bg);border-color:transparent;border-left:3px solid var(--wait);cursor:default}
+.empty-state{color:var(--muted);text-align:center;padding:40px 10px;white-space:pre-wrap}
+.toggle{margin-bottom:10px}
 
-.task{background:var(--surface);border-left:3px solid var(--accent);border-radius:4px 10px 10px 4px;padding:10px 12px;margin-bottom:8px}
-.task.ask{background:var(--wait-bg);border-left-color:var(--wait)}
-.task.ended{border-left-color:var(--line)}
-.task .goal{font-weight:600}
-.task .state{color:var(--muted);font-size:.85rem}
-.task .body{margin:4px 0 8px;white-space:pre-wrap}
-.task .next{color:var(--muted);font-size:.85rem;margin-bottom:8px}
-.task .row input{flex:1;min-width:0;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
-.task .row .btn{padding:7px 14px;font-size:.9rem}
+/* 채팅 */
 .log{flex:1;overflow-y:auto;padding:14px 0 8px;display:flex;flex-direction:column;gap:10px}
-.bubble{max-width:85%;padding:10px 14px;border-radius:14px;white-space:pre-wrap;word-break:break-word}
-.bubble.agent{background:var(--surface);align-self:flex-start;border-bottom-left-radius:4px}
+.bubble{max-width:85%;padding:10px 14px;border-radius:16px;white-space:pre-wrap;word-break:break-word}
+.bubble.agent{background:var(--surface);align-self:flex-start;border-bottom-left-radius:4px;border:1px solid var(--line)}
 .bubble.user{background:var(--mine);align-self:flex-end;border-bottom-right-radius:4px}
 .bubble.thinking{color:var(--muted)}
-.empty{color:var(--muted);margin:auto 0;text-align:center}
-
+.links{align-self:flex-start;display:flex;gap:6px;flex-wrap:wrap;margin-top:-4px}
+.links button{border:1px solid var(--line);background:var(--surface);color:var(--accent);border-radius:999px;padding:4px 10px;font-size:.82rem;cursor:pointer}
 form.compose{display:flex;gap:8px;padding:10px 0 14px;border-top:1px solid var(--line)}
 form.compose textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface);max-height:140px}
 
-dialog{border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);max-width:min(92vw,460px)}
-dialog::backdrop{background:rgb(0 0 0 / .35)}
-dialog code{display:block;background:var(--bg);padding:8px 10px;border-radius:8px;word-break:break-all;margin:8px 0}
+/* 맡은 일·확인함 카드 */
+.card{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:4px 14px 14px 4px;padding:11px 14px;margin-bottom:8px}
+.card.ask,.card.wait{background:var(--wait-bg);border-color:transparent;border-left-color:var(--wait)}
+.card.ended{border-left-color:var(--line)}
+.card .t{font-weight:600}
+.card .s{color:var(--muted);font-size:.85rem}
+.card .b{margin:4px 0 8px;white-space:pre-wrap}
+.card .row input{flex:1 1 100%;min-width:0;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+
+/* 시트(편집 창) */
+dialog.sheet{border:0;border-radius:20px 20px 0 0;background:var(--bg);color:var(--ink);width:100%;max-width:480px;margin:auto auto 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px));max-height:88vh;overflow-y:auto}
+dialog.sheet::backdrop{background:rgb(0 0 0 / .35)}
+.sheet h2{font-size:1.1rem;margin:0 0 14px}
+.sheet .sub{border-top:1px solid var(--line);margin-top:16px;padding-top:14px}
+.sheet .sub h3{font-size:.9rem;margin:0 0 8px;color:var(--muted)}
+.linked{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;margin-bottom:6px;font-size:.92rem}
+.linked span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.linked button{background:none;border:0;color:var(--muted);cursor:pointer;font-size:.85rem}
+.sheet .actions{display:flex;justify-content:space-between;gap:8px;margin-top:18px}
+code.topic{display:block;background:var(--surface);border:1px solid var(--line);padding:8px 10px;border-radius:8px;word-break:break-all;margin:8px 0}
 @media (prefers-reduced-motion: no-preference){
   .bubble.new{animation:rise .18s ease-out}
   @keyframes rise{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
@@ -137,13 +139,11 @@ dialog code{display:block;background:var(--bg);padding:8px 10px;border-radius:8p
 <body>
 <div class="wrap">
 
-  <!-- 0. 시작·오류 (처음엔 이것만 보인다. 빈 화면이 되지 않게) -->
   <section class="auth" id="boot">
     <h1>불러오는 중</h1>
     <p id="bootMsg">잠시만 기다려 주세요.</p>
   </section>
 
-  <!-- 1. 로그인 -->
   <section class="auth" id="auth" hidden>
     <h1>내 비서</h1>
     <p>로그인하면 나만의 비서를 만날 수 있어요.</p>
@@ -156,7 +156,6 @@ dialog code{display:block;background:var(--bg);padding:8px 10px;border-radius:8p
     <div class="msg" id="authMsg"></div>
   </section>
 
-  <!-- 2. 이름 짓기 -->
   <section class="naming" id="naming" hidden>
     <p class="lead">먼저 비서에게 이름을 지어 주세요.</p>
     <p class="say">안녕하세요, 저는<br><input id="nameInput" maxlength="12" placeholder="이름" aria-label="비서 이름">예요.</p>
@@ -165,90 +164,448 @@ dialog code{display:block;background:var(--bg);padding:8px 10px;border-radius:8p
     <div class="msg" id="nameMsg"></div>
   </section>
 
-  <!-- 3. 대화 -->
-  <section id="main" class="app" hidden>
-    <aside class="side" id="side" aria-label="기능 목록">
-      <section>
-        <h2>기본 기능</h2>
-        <p class="hint">늘 있는 기능이라 지울 수 없어요.</p>
-        <div id="builtinList"></div>
-      </section>
-      <section>
-        <h2>추가된 기능</h2>
-        <div id="customList"></div>
-      </section>
-    </aside>
+  <!-- 홈 화면 -->
+  <section class="home" id="home" hidden>
+    <div class="date" id="today"></div>
+    <h1 id="agentName"></h1>
+    <div class="widget" id="widget"></div>
+    <div class="grid" id="grid"></div>
+  </section>
 
-    <div class="chat">
-    <header class="top">
-      <div style="display:flex;align-items:center;min-width:0">
-        <button class="menuBtn" id="openSide" aria-controls="side" aria-expanded="false">기능</button>
-        <h1 id="agentName"></h1>
-      </div>
-      <button id="openSettings">설정</button>
+  <!-- 앱 화면 (하나를 돌려 쓴다) -->
+  <section class="screen" id="screen" hidden>
+    <header>
+      <button class="back" id="back">‹ 홈</button>
+      <h1 id="screenTitle"></h1>
+      <button class="add" id="addBtn" aria-label="새로 만들기">+</button>
     </header>
-
-    <div class="tray" id="pendingTray" hidden>
-      <h2 id="pendingTitle"></h2>
-      <div id="pendingList"></div>
-    </div>
-    <div class="tray" id="recentTray" hidden>
-      <h2 style="color:var(--muted)">묻지 않고 해 둔 일</h2>
-      <div id="recentList"></div>
-    </div>
-
-    <div class="tray" id="taskTray" hidden>
-      <h2 style="color:var(--accent)">맡은 일</h2>
-      <div id="taskList"></div>
-    </div>
-
-    <div class="log" id="log" aria-live="polite"></div>
-
-    <form class="compose" id="compose">
+    <div class="body" id="screenBody"></div>
+    <form class="compose" id="compose" hidden>
       <textarea id="text" rows="1" placeholder="부탁할 일을 적어 주세요"></textarea>
       <button class="btn" id="send">보내기</button>
     </form>
-    </div>
   </section>
-  <div class="scrim" id="scrim" hidden></div>
 </div>
 
-<dialog id="settings">
-  <h3 style="margin-top:0">설정</h3>
-  <label class="field">비서 이름
-    <input id="rename" maxlength="12">
-  </label>
-  <button class="btn ghost" id="saveRename">이름 바꾸기</button>
-  <p style="margin-top:20px;margin-bottom:0">폰 알림 받기: ntfy 앱에서 아래 주제를 구독하세요. 주제가 곧 비밀번호라 남에게 알려 주지 마세요.</p>
-  <code id="topic"></code>
-  <div class="row" style="justify-content:space-between;margin-top:16px">
-    <button class="btn ghost" id="logout">로그아웃</button>
-    <button class="btn" id="closeSettings">닫기</button>
-  </div>
-</dialog>
+<dialog class="sheet" id="sheet"></dialog>
 
 <script>
 const $ = (id) => document.getElementById(id);
-let sb, agentName = "";
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+let sb, agentName = "", current = null;
 
+/* ---------- 서버 ---------- */
 async function api(path, opts = {}) {
   const { data } = await sb.auth.getSession();
-  const token = data.session?.access_token;
   const res = await fetch(path, {
     ...opts,
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(opts.headers || {}) },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session?.access_token}`, ...(opts.headers || {}) },
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.detail || `요청이 실패했어요 (${res.status})`);
   return body;
 }
+const post = (path, body) => api(path, { method: "POST", body: JSON.stringify(body || {}) });
 
+/* ---------- 시각 ---------- */
+const pad = (n) => String(n).padStart(2, "0");
+function toLocalInput(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+const fromLocalInput = (v) => (v ? new Date(v).toISOString() : null);
+const hm = (iso) => new Date(iso).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" });
+const md = (iso) => new Date(iso).toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" });
+const when = (iso) => `${md(iso)} ${hm(iso)}`;
+function inHour(h = 1) { const d = new Date(); d.setMinutes(0, 0, 0); d.setHours(d.getHours() + h); return d.toISOString(); }
+
+/* ---------- 화면 전환 ---------- */
 function show(id) {
-  for (const s of ["boot", "auth", "naming", "main"]) $(s).hidden = s !== id;
-  document.querySelector(".wrap").classList.toggle("wide", id === "main");
+  for (const s of ["boot", "auth", "naming", "home", "screen"]) $(s).hidden = s !== id;
+}
+function fail(title, detail) {
+  show("boot");
+  document.querySelector("#boot h1").textContent = title;
+  $("bootMsg").textContent = detail;
 }
 
-/* ---------- 로그인 ---------- */
+/* ---------- 아이콘 ---------- */
+const ICON = {
+  chat: '<path d="M4 5h16v11H9l-5 4z"/>',
+  events: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  notes: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
+  reminders: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+  tasks: '<path d="M10 6h10M10 12h10M10 18h10"/><path d="M3.5 6l1.3 1.3L7.5 4.6M3.5 12l1.3 1.3 2.7-2.7M3.5 18l1.3 1.3 2.7-2.7"/>',
+  drafts: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>',
+  skills: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><circle cx="16.5" cy="16.5" r="3.5"/>',
+  inbox: '<path d="M4 13l3-8h10l3 8v6H4z"/><path d="M4 13h5l1 2h4l1-2h5"/>',
+  settings: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
+};
+const APPS = [
+  ["chat", "채팅"], ["events", "일정"], ["notes", "메모"], ["reminders", "알림"],
+  ["tasks", "맡은 일"], ["drafts", "초안"], ["skills", "기능"], ["inbox", "확인함"], ["settings", "설정"],
+];
+
+/* ---------- 홈 ---------- */
+async function goHome() {
+  current = null;
+  show("home");
+  $("today").textContent = new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "long" });
+  $("agentName").textContent = agentName;
+  const h = await api("/api/home").catch(() => ({ events: [], pending: 0, asking: 0 }));
+
+  const w = $("widget"); w.replaceChildren(el("h2", "", "오늘"));
+  if (!h.events.length) w.append(el("div", "empty", "오늘 일정이 없어요."));
+  for (const e of h.events) {
+    const b = el("button", "ev");
+    b.append(el("b", "", hm(e.starts_at)), el("span", "", e.title + (e.place ? ` · ${e.place}` : "")));
+    b.onclick = () => openApp("events").then(() => editEvent(e.id));
+    w.append(b);
+  }
+  if (h.next_reminder) w.append(el("div", "next", `다음 알림 · ${when(h.next_reminder.due_at)} — ${h.next_reminder.text}`));
+  const chips = el("div", "chips");
+  if (h.pending) { const c = el("button", "chip", `확인할 일 ${h.pending}`); c.onclick = () => openApp("inbox"); chips.append(c); }
+  if (h.asking) { const c = el("button", "chip", `답을 기다리는 질문 ${h.asking}`); c.onclick = () => openApp("tasks"); chips.append(c); }
+  if (chips.children.length) w.append(chips);
+
+  $("grid").replaceChildren(...APPS.map(([key, label]) => {
+    const b = el("button", "app-icon");
+    b.innerHTML = `<div class="tile"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[key]}</svg></div>`;
+    b.append(el("span", "", label));
+    if (key === "inbox" && h.pending) b.append(el("div", "badge", String(h.pending)));
+    if (key === "tasks" && h.asking) b.append(el("div", "badge", String(h.asking)));
+    b.onclick = () => openApp(key);
+    return b;
+  }));
+}
+
+/* ---------- 앱 열기 ---------- */
+const SCREENS = {};
+async function openApp(key, push = true) {
+  current = key;
+  show("screen");
+  $("screenTitle").textContent = APPS.find((a) => a[0] === key)[1];
+  $("compose").hidden = key !== "chat";
+  $("addBtn").style.visibility = SCREENS[key].add ? "visible" : "hidden";
+  $("addBtn").onclick = SCREENS[key].add || null;
+  if (push) history.pushState({ app: key }, "", "#" + key);
+  await render();
+}
+async function render() {
+  const body = $("screenBody");
+  try { await SCREENS[current].render(body); }
+  catch (e) { body.replaceChildren(el("div", "empty-state", e.message)); }
+}
+$("back").onclick = () => history.back();
+window.addEventListener("popstate", (e) => (e.state?.app ? openApp(e.state.app, false) : goHome()));
+
+function listOrEmpty(body, nodes, emptyText) {
+  body.replaceChildren(...(nodes.length ? nodes : [el("div", "empty-state", emptyText)]));
+}
+function itemBtn(title, sub, onClick) {
+  const b = el("button", "item"); b.append(el("div", "t", title));
+  if (sub) b.append(el("div", "s", sub));
+  b.onclick = onClick; return b;
+}
+
+/* ---------- 시트(편집 창) ---------- */
+function openSheet(title, build) {
+  const s = $("sheet"); s.replaceChildren(el("h2", "", title)); build(s);
+  if (!s.open) s.showModal();
+}
+const closeSheet = () => $("sheet").close();
+$("sheet").addEventListener("click", (e) => { if (e.target === $("sheet")) closeSheet(); });
+function field(label, input) { const l = el("label", "field"); l.append(el("span", "", label), input); return l; }
+function input(type, value, attrs = {}) { const i = el(type === "textarea" ? "textarea" : "input"); if (type !== "textarea") i.type = type; i.value = value ?? ""; Object.assign(i, attrs); return i; }
+function sheetActions(onSave, onDelete) {
+  const row = el("div", "actions");
+  if (onDelete) row.append(button("삭제", "danger", async () => { if (confirm("지울까요?")) { await onDelete(); closeSheet(); await render(); } }));
+  else row.append(el("span"));
+  row.append(button("저장", "", async () => { await onSave(); closeSheet(); await render(); }));
+  return row;
+}
+function button(label, kind, onClick) {
+  const b = el("button", "btn" + (kind ? " " + kind : ""), label);
+  b.onclick = async (e) => { e.preventDefault(); b.disabled = true; try { await onClick(); } catch (err) { alert(err.message); } finally { b.disabled = false; } };
+  return b;
+}
+
+/* ===================== 일정 ===================== */
+SCREENS.events = {
+  async render(body) {
+    const since = new Date(); since.setHours(0, 0, 0, 0);
+    const { items } = await api(`/api/events?start=${encodeURIComponent(since.toISOString())}`);
+    const nodes = []; let last = "";
+    for (const e of items) {
+      const day = md(e.starts_at);
+      if (day !== last) { nodes.push(el("div", "group", day)); last = day; }
+      nodes.push(itemBtn(`${hm(e.starts_at)} · ${e.title}`, e.place || "", () => editEvent(e.id)));
+    }
+    listOrEmpty(body, nodes, "다가오는 일정이 없어요.\n+ 를 누르거나 채팅에서 \u201c목요일 3시 회의, 30분 전에 알려 줘\u201d처럼 말해 보세요.");
+  },
+  add: () => editEvent(null),
+};
+
+async function editEvent(id) {
+  const ev = id ? await api(`/api/events/${id}`) : { title: "", starts_at: inHour(1), reminders: [], notes: [] };
+  openSheet(id ? "일정" : "새 일정", (s) => {
+    const title = input("text", ev.title, { placeholder: "무슨 일정인가요?" });
+    const start = input("datetime-local", toLocalInput(ev.starts_at));
+    const end = input("datetime-local", toLocalInput(ev.ends_at));
+    const place = input("text", ev.place, { placeholder: "장소 (선택)" });
+    s.append(field("이름", title), field("시작", start), field("끝 (선택)", end), field("장소", place));
+    let remindNew = null;
+    if (!id) {
+      remindNew = el("select");
+      for (const [v, t] of [["", "알림 없음"], ["10", "10분 전"], ["30", "30분 전"], ["60", "1시간 전"], ["1440", "하루 전"]]) {
+        const o = el("option", "", t); o.value = v; remindNew.append(o);
+      }
+      s.append(field("알림", remindNew));
+    }
+    if (id) {
+      // 연동: 이 일정에 붙은 알림
+      const r = el("div", "sub"); r.append(el("h3", "", "붙은 알림"));
+      for (const x of ev.reminders) {
+        const line = el("div", "linked");
+        line.append(el("span", "", `${when(x.due_at)} · ${x.status === "sent" ? "보냄" : x.text}`));
+        const del = el("button", "", "지우기");
+        del.onclick = async () => { await post(`/api/reminders/${x.id}/delete`); editEvent(id); };
+        line.append(del); r.append(line);
+      }
+      const sel = el("select"); sel.style.cssText = "flex:1;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface)";
+      for (const [v, t] of [["10", "10분 전"], ["30", "30분 전"], ["60", "1시간 전"], ["1440", "하루 전"]]) { const o = el("option", "", t); o.value = v; sel.append(o); }
+      const add = el("div", "row"); add.append(sel, button("알림 붙이기", "ghost small", async () => { await post(`/api/events/${id}/remind`, { minutes: Number(sel.value) }); editEvent(id); }));
+      r.append(add); s.append(r);
+      // 연동: 이 일정에 붙은 메모
+      const n = el("div", "sub"); n.append(el("h3", "", "붙은 메모"));
+      for (const x of ev.notes) {
+        const line = el("div", "linked"); line.append(el("span", "", x.title || x.content.split("\n")[0]));
+        const open = el("button", "", "열기"); open.onclick = () => editNote(x.id, x, id);
+        line.append(open); n.append(line);
+      }
+      const memo = input("text", "", { placeholder: "이 일정에 메모 붙이기" });
+      memo.style.cssText = "flex:1 1 100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)";
+      const addN = el("div", "row"); addN.append(memo, button("붙이기", "ghost small", async () => { await post("/api/notes/new", { content: memo.value, event_id: id }); editEvent(id); }));
+      n.append(addN); s.append(n);
+    }
+    s.append(sheetActions(async () => {
+      const data = { title: title.value, starts_at: fromLocalInput(start.value), ends_at: fromLocalInput(end.value), place: place.value };
+      if (id) await post(`/api/events/${id}/update`, data);
+      else await post("/api/events/new", { ...data, remind_before_min: remindNew.value || null });
+    }, id ? () => post(`/api/events/${id}/delete`) : null));
+  });
+}
+
+/* ===================== 메모 ===================== */
+SCREENS.notes = {
+  async render(body) {
+    const { items } = await api("/api/notes");
+    listOrEmpty(body, items.map((n) => itemBtn(n.title || n.content.split("\n")[0].slice(0, 40),
+      `${md(n.updated_at)}${n.event_id ? " · 일정에 붙음" : ""}\n${n.title ? n.content : n.content.split("\n").slice(1).join(" ")}`.trim(),
+      () => editNote(n.id, n))), "메모가 없어요.");
+  },
+  add: () => editNote(null, { content: "" }),
+};
+
+async function editNote(id, n, backToEvent) {
+  const { items: events } = await api(`/api/events?start=${encodeURIComponent(new Date(Date.now() - 30 * 864e5).toISOString())}`);
+  openSheet(id ? "메모" : "새 메모", (s) => {
+    const title = input("text", n.title, { placeholder: "제목 (선택)" });
+    const content = input("textarea", n.content, { placeholder: "내용" });
+    const link = el("select"); const none = el("option", "", "연결 안 함"); none.value = ""; link.append(none);
+    for (const e of events) { const o = el("option", "", `${md(e.starts_at)} ${e.title}`); o.value = e.id; if (e.id === (n.event_id ?? backToEvent)) o.selected = true; link.append(o); }
+    s.append(field("제목", title), field("내용", content), field("일정에 붙이기", link));
+    s.append(sheetActions(async () => {
+      const data = { title: title.value, content: content.value, event_id: link.value ? Number(link.value) : null };
+      if (id) await post(`/api/notes/${id}/update`, data); else await post("/api/notes/new", data);
+      if (backToEvent) setTimeout(() => editEvent(backToEvent), 0);
+    }, id ? () => post(`/api/notes/${id}/delete`) : null));
+  });
+}
+
+/* ===================== 알림 ===================== */
+let showPastReminders = false;
+SCREENS.reminders = {
+  async render(body) {
+    const { items } = await api(`/api/reminders?past=${showPastReminders ? 1 : 0}`);
+    const t = button(showPastReminders ? "다가올 알림 보기" : "지난 알림 보기", "ghost small toggle", async () => { showPastReminders = !showPastReminders; await render(); });
+    const nodes = items.map((r) => itemBtn(r.text, `${when(r.due_at)}${r.event_id ? " · 일정에 붙음" : ""}${r.status === "sent" ? " · 보냄" : ""}`,
+      () => (r.status === "scheduled" ? editReminder(r) : null)));
+    body.replaceChildren(t, ...(nodes.length ? nodes : [el("div", "empty-state", showPastReminders ? "지난 알림이 없어요." : "예약된 알림이 없어요.")]));
+  },
+  add: () => editReminder({ text: "", due_at: inHour(1) }),
+};
+
+function editReminder(r) {
+  openSheet(r.id ? "알림" : "새 알림", (s) => {
+    const text = input("text", r.text, { placeholder: "무엇을 알려 드릴까요?" });
+    const due = input("datetime-local", toLocalInput(r.due_at));
+    s.append(field("내용", text), field("시각", due));
+    if (r.event_id) s.append(el("p", "muted", "일정에 붙은 알림이에요. 시각을 직접 바꾸면 일정과 따로 움직여요."));
+    s.append(sheetActions(async () => {
+      const data = { text: text.value, due_at: fromLocalInput(due.value) };
+      if (r.id) await post(`/api/reminders/${r.id}/update`, data); else await post("/api/reminders/new", data);
+    }, r.id ? () => post(`/api/reminders/${r.id}/delete`) : null));
+  });
+}
+
+/* ===================== 초안 ===================== */
+SCREENS.drafts = {
+  async render(body) {
+    const { items } = await api("/api/drafts");
+    listOrEmpty(body, items.map((d) => itemBtn(d.content.split("\n")[0].slice(0, 40), md(d.updated_at), () => editDraft(d))),
+      "초안이 없어요.\n채팅에서 \u201c학부모님께 보낼 안내 문자 써 줘\u201d처럼 부탁해 보세요.");
+  },
+};
+function editDraft(d) {
+  openSheet("초안", (s) => {
+    const content = input("textarea", d.content); content.style.minHeight = "200px";
+    s.append(field("내용", content));
+    s.append(button("복사하기", "ghost small", async () => { await navigator.clipboard.writeText(content.value); alert("복사했어요."); }));
+    s.append(sheetActions(() => post(`/api/drafts/${d.id}/update`, { content: content.value }), () => post(`/api/drafts/${d.id}/delete`)));
+  });
+}
+
+/* ===================== 맡은 일 ===================== */
+const TASK_STATE = { open: "진행 중", waiting_user: "답을 기다려요", waiting_approval: "확인을 기다려요", done: "끝났어요", stopped: "멈췄어요" };
+SCREENS.tasks = {
+  async render(body) {
+    const { live, ended } = await api("/api/tasks");
+    const nodes = [...live, ...ended].map((t) => {
+      const ended = t.status === "done" || t.status === "stopped";
+      const d = el("div", "card" + (t.status === "waiting_user" ? " ask" : "") + (ended ? " ended" : ""));
+      d.append(el("div", "t", t.goal), el("div", "s", `${TASK_STATE[t.status] || t.status} · ${t.steps}걸음`));
+      d.append(el("div", "b", t.status === "waiting_user" ? t.question : t.status === "done" ? t.result
+        : t.status === "waiting_approval" ? "확인함에서 결정해 주시면 이어서 할게요." : (t.last_thought || "곧 시작할게요.")));
+      const row = el("div", "row");
+      if (t.status === "waiting_user") {
+        const a = input("text", "", { placeholder: "답을 적어 주세요" }); row.append(a,
+          button("답하기", "small", async () => { await post(`/api/tasks/${t.id}/answer`, { text: a.value }); await render(); }));
+      }
+      if (t.status === "open") row.append(button("지금 한 걸음", "small", async () => { await post(`/api/tasks/${t.id}/step`); await render(); }));
+      if (!ended) row.append(button("그만두기", "ghost small", async () => { await post(`/api/tasks/${t.id}/cancel`); await render(); }));
+      if (row.children.length) d.append(row);
+      return d;
+    });
+    listOrEmpty(body, nodes, "맡은 일이 없어요.\n여러 걸음이 필요한 일을 채팅으로 부탁하면 여기서 진행돼요.");
+  },
+};
+
+/* ===================== 확인함 ===================== */
+function describe(a) {
+  const g = a.args || {};
+  if (a.kind === "event") return `${g.title || ""}${g.starts_at ? " · " + when(g.starts_at) : ""}${g.remind_before_min ? ` · ${g.remind_before_min}분 전 알림` : ""}`;
+  if (a.kind === "reminder") return `${g.due_at ? when(g.due_at) : ""} · ${g.text || ""}`;
+  if (a.kind === "create_skill") return `\u2018${g.name || ""}\u2019 — ${g.description || ""}\n${a.reason || ""}`.trim();
+  if (a.kind === "draft") return `${g.to ? g.to + "에게 · " : ""}${g.text || ""}`;
+  return g.text || g.query || a.reason || "";
+}
+SCREENS.inbox = {
+  async render(body) {
+    const { pending, recent } = await api("/api/actions");
+    const nodes = [];
+    if (pending.length) nodes.push(el("div", "group", "확인이 필요해요"));
+    for (const a of pending) {
+      const d = el("div", "card wait"); d.append(el("div", "t", a.label), el("div", "b", describe(a)));
+      const row = el("div", "row");
+      row.append(button("하기", "small", async () => { await post(`/api/actions/${a.id}/approve`); await render(); }),
+                 button("하지 않기", "ghost small", async () => { await post(`/api/actions/${a.id}/reject`); await render(); }));
+      d.append(row); nodes.push(d);
+    }
+    if (recent.length) nodes.push(el("div", "group", "묻지 않고 해 둔 일"));
+    for (const a of recent) {
+      const d = el("div", "card ended"); d.append(el("div", "t", a.label), el("div", "b", describe(a)));
+      if (a.tier === 3) { const row = el("div", "row"); row.append(button("되돌리기", "ghost small", async () => { await post(`/api/actions/${a.id}/undo`); await render(); })); d.append(row); }
+      nodes.push(d);
+    }
+    listOrEmpty(body, nodes, "확인할 일이 없어요.");
+  },
+};
+
+/* ===================== 기능 ===================== */
+SCREENS.skills = {
+  async render(body) {
+    const { builtin, custom } = await api("/api/skills");
+    const nodes = [el("div", "group", "기본 기능 · 지울 수 없어요")];
+    for (const b of builtin) nodes.push(itemBtn(b.name, b.description, () => {}));
+    nodes.push(el("div", "group", "추가된 기능"));
+    if (!custom.length) nodes.push(el("div", "empty-state", "아직 없어요.\n채팅에서 \u201c회의 준비하는 기능 만들어 줘\u201d처럼 부탁하면, 확인을 거쳐 여기에 생겨요."));
+    for (const c of custom) {
+      const d = el("div", "card");
+      d.append(el("div", "t", c.name + (c.origin === "agent" ? " · 비서가 제안" : "")), el("div", "s", c.description),
+               el("div", "s", `쓰는 도구: ${c.tool_labels.join(", ") || "없음"} · ${c.uses}번 씀`));
+      const row = el("div", "row"); const a = input("text", "", { placeholder: "무엇에 쓸지 (선택)" });
+      row.append(a, button("실행", "small", async () => { await post(`/api/skills/${c.id}/run`, { text: a.value }); await openApp("tasks"); }),
+        button("지우기", "ghost small", async () => { if (confirm(`'${c.name}' 기능을 지울까요?`)) { await post(`/api/skills/${c.id}/remove`); await render(); } }));
+      d.append(row); nodes.push(d);
+    }
+    body.replaceChildren(...nodes);
+  },
+};
+
+/* ===================== 설정 ===================== */
+SCREENS.settings = {
+  async render(body) {
+    const me = await api("/api/me");
+    const name = input("text", agentName, { maxLength: 12 });
+    const box = el("div");
+    box.append(field("비서 이름", name), button("이름 바꾸기", "ghost small", async () => { const r = await post("/api/name", { name: name.value.trim() }); agentName = r.name; alert("바꿨어요."); }));
+    const t = el("div", "sub"); t.style.marginTop = "22px";
+    t.append(el("p", "", "폰 알림: ntfy 앱에서 아래 주제를 구독하세요. 주제가 곧 비밀번호라 남에게 알려 주지 마세요."), el("code", "topic", me.ntfy_topic || ""));
+    box.append(t, el("div", "sub"));
+    box.append(button("로그아웃", "danger", async () => { await sb.auth.signOut(); location.reload(); }));
+    body.replaceChildren(box);
+  },
+};
+
+/* ===================== 채팅 ===================== */
+const OPEN_LINK = { event_id: ["events", "일정 보기"], reminder_id: ["reminders", "알림 보기"], memory_id: ["notes", "메모 보기"], task_id: ["tasks", "맡은 일 보기"], skill_id: ["skills", "기능 보기"] };
+SCREENS.chat = {
+  async render(body) {
+    const log = el("div", "log"); log.id = "log"; body.replaceChildren(log);
+    const { items } = await api("/api/history");
+    if (!items.length) log.append(el("div", "empty-state", `${agentName}에게 부탁할 일을 적어 보세요.\n일정, 알림, 메모로 남길 일은 각 앱에 저장돼요.`));
+    for (const m of items) bubble(m.role === "user" ? "user" : "agent", m.text);
+  },
+};
+function bubble(role, text, extra = "") {
+  const log = $("log"); log.querySelector(".empty-state")?.remove();
+  const b = el("div", `bubble ${role} new ${extra}`, text); log.append(b);
+  $("screenBody").scrollTop = $("screenBody").scrollHeight; return b;
+}
+function linkChips(actions) {
+  const wrap = el("div", "links");
+  for (const a of actions) {
+    if (a.status === "proposed") { const c = el("button", "", "확인함에서 결정하기"); c.onclick = () => openApp("inbox"); wrap.append(c); continue; }
+    for (const [k, [app, label]] of Object.entries(OPEN_LINK)) {
+      if (a.result?.[k] != null) {
+        const appKey = a.kind === "draft" ? "drafts" : app;
+        const c = el("button", "", a.kind === "draft" ? "초안 보기" : label);
+        c.onclick = () => openApp(appKey).then(() => (appKey === "events" ? editEvent(a.result.event_id) : null));
+        wrap.append(c);
+      }
+    }
+  }
+  if (wrap.children.length) { $("log").append(wrap); $("screenBody").scrollTop = $("screenBody").scrollHeight; }
+}
+$("compose").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = $("text").value.trim(); if (!text) return;
+  $("text").value = ""; $("send").disabled = true;
+  bubble("user", text); const wait = bubble("agent", "생각하는 중…", "thinking");
+  try {
+    const res = await post("/api/chat", { text });
+    wait.classList.remove("thinking"); wait.textContent = res.reply;
+    linkChips(res.actions || []);
+  } catch (err) { wait.textContent = err.message; }
+  finally { $("send").disabled = false; $("text").focus(); }
+});
+$("text").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("compose").requestSubmit(); }
+});
+
+/* ===================== 로그인·이름 ===================== */
 async function auth(kind) {
   const email = $("email").value.trim(), password = $("pw").value;
   $("authMsg").textContent = "";
@@ -256,299 +613,44 @@ async function auth(kind) {
     const fn = kind === "signup" ? sb.auth.signUp : sb.auth.signInWithPassword;
     const { data, error } = await fn.call(sb.auth, { email, password });
     if (error) throw error;
-    if (kind === "signup" && !data.session) {
-      $("authMsg").textContent = "확인 메일을 보냈어요. 메일의 링크를 누른 뒤 로그인해 주세요.";
-      return;
-    }
+    if (kind === "signup" && !data.session) { $("authMsg").textContent = "확인 메일을 보냈어요. 메일의 링크를 누른 뒤 로그인해 주세요."; return; }
     await enter();
   } catch (e) {
-    $("authMsg").textContent = e.message === "Invalid login credentials"
-      ? "이메일이나 비밀번호가 맞지 않아요." : e.message;
+    $("authMsg").textContent = e.message === "Invalid login credentials" ? "이메일이나 비밀번호가 맞지 않아요." : e.message;
   }
 }
-
-/* ---------- 들어가기 ---------- */
 async function enter() {
   const me = await api("/api/me");
-  $("topic").textContent = me.ntfy_topic || "";
   if (!me.name) { show("naming"); $("nameInput").focus(); return; }
-  setName(me.name);
-  show("main");
-  await Promise.all([loadHistory(), refresh()]);
+  agentName = me.name; document.title = me.name;
+  history.replaceState(null, "", location.pathname);
+  await goHome();
 }
-
-function setName(n) {
-  agentName = n;
-  $("agentName").textContent = n;
-  $("rename").value = n;
-  document.title = n;
-}
-
-/* ---------- 이름 짓기 ---------- */
 $("nameInput").addEventListener("input", (e) => {
-  const v = e.target.value.trim();
-  $("saveName").disabled = !v;
+  const v = e.target.value.trim(); $("saveName").disabled = !v;
   e.target.style.width = Math.max(3, Math.min(12, v.length + 1.5)) + "em";
 });
 $("saveName").addEventListener("click", async () => {
-  try {
-    const { name } = await api("/api/name", { method: "POST", body: JSON.stringify({ name: $("nameInput").value.trim() }) });
-    setName(name);
-    show("main");
-    addBubble("agent", `${name}예요. 기억해 둘 일, 알림, 글 초안 같은 걸 부탁해 주세요.\n여러 걸음이 필요한 일은 맡아 두었다가 틈틈이 진행할게요.\n남에게 닿는 일은 꼭 먼저 여쭤볼게요.`);
-    refresh();
-  } catch (e) { $("nameMsg").textContent = e.message; }
+  try { const { name } = await post("/api/name", { name: $("nameInput").value.trim() }); agentName = name; await goHome(); }
+  catch (e) { $("nameMsg").textContent = e.message; }
 });
 
-/* ---------- 대화 ---------- */
-function addBubble(role, text, extra = "") {
-  const empty = $("log").querySelector(".empty");
-  if (empty) empty.remove();
-  const b = document.createElement("div");
-  b.className = `bubble ${role} new ${extra}`;
-  b.textContent = text;
-  $("log").appendChild(b);
-  $("log").scrollTop = $("log").scrollHeight;
-  return b;
-}
-
-async function loadHistory() {
-  $("log").innerHTML = "";
-  const { items } = await api("/api/history");
-  if (!items.length) {
-    $("log").innerHTML = `<p class="empty">아직 나눈 이야기가 없어요. 부탁할 일을 적어 보세요.</p>`;
-    return;
-  }
-  for (const m of items) addBubble(m.role === "user" ? "user" : "agent", m.text);
-}
-
-$("compose").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const text = $("text").value.trim();
-  if (!text) return;
-  $("text").value = ""; $("send").disabled = true;
-  addBubble("user", text);
-  const wait = addBubble("agent", "생각하는 중…", "thinking");
-  try {
-    const res = await api("/api/chat", { method: "POST", body: JSON.stringify({ text }) });
-    wait.classList.remove("thinking");
-    wait.textContent = res.reply;
-    await refresh();
-  } catch (err) {
-    wait.textContent = err.message;
-  } finally { $("send").disabled = false; $("text").focus(); }
-});
-$("text").addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("compose").requestSubmit(); }
-});
-
-/* ---------- 확인함 ---------- */
-function describe(a) {
-  const g = a.args || {};
-  if (a.kind === "reminder") {
-    const t = g.due_at ? new Date(g.due_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
-    return `${t}에 알림: ${g.text || ""}`;
-  }
-  if (a.kind === "create_skill") {
-    const tools = (g.tools || []).map((t) => ({ search: "검색", note: "메모", reminder: "알림", draft: "초안" }[t])).filter(Boolean);
-    return `‘${g.name || ""}’ — ${g.description || ""}${tools.length ? `\n쓰는 도구: ${tools.join(", ")}` : ""}\n${a.reason || ""}`.trim();
-  }
-  if (a.kind === "draft") return `${g.to ? g.to + "에게 · " : ""}${g.text || ""}`;
-  return g.text || g.query || a.reason || "";
-}
-
-function itemEl(a, buttons) {
-  const d = document.createElement("div");
-  d.className = "item" + (buttons.includes("undo") ? " done" : "");
-  d.innerHTML = `<div class="what"></div><div class="detail"></div><div class="row"></div>`;
-  d.querySelector(".what").textContent = a.label;
-  d.querySelector(".detail").textContent = describe(a);
-  const labels = { approve: "하기", reject: "하지 않기", undo: "되돌리기" };
-  for (const verb of buttons) {
-    const b = document.createElement("button");
-    b.className = "btn" + (verb === "approve" ? "" : " ghost");
-    b.textContent = labels[verb];
-    b.addEventListener("click", async () => {
-      b.disabled = true;
-      try { await api(`/api/actions/${a.id}/${verb}`, { method: "POST" }); }
-      catch (e) { alert(e.message); }
-      refresh();
-    });
-    d.querySelector(".row").appendChild(b);
-  }
-  return d;
-}
-
-async function loadActions() {
-  const { pending, recent } = await api("/api/actions");
-  $("pendingTray").hidden = !pending.length;
-  $("pendingTitle").textContent = `확인이 필요해요 (${pending.length})`;
-  $("pendingList").replaceChildren(...pending.map((a) => itemEl(a, ["approve", "reject"])));
-  $("recentTray").hidden = !recent.length;
-  $("recentList").replaceChildren(...recent.map((a) => itemEl(a, a.tier === 3 ? ["undo"] : [])));
-}
-
-/* ---------- 맡은 일 ---------- */
-const TASK_STATE = {
-  open: "진행 중", waiting_user: "답을 기다려요", waiting_approval: "확인을 기다려요",
-  done: "끝났어요", stopped: "멈췄어요",
-};
-
-function btn(label, ghost, onClick) {
-  const b = document.createElement("button");
-  b.className = "btn" + (ghost ? " ghost" : "");
-  b.textContent = label;
-  b.addEventListener("click", async () => {
-    b.disabled = true;
-    try { await onClick(); } catch (e) { alert(e.message); }
-    await refresh();
-  });
-  return b;
-}
-
-function taskEl(t) {
-  const d = document.createElement("div");
-  const ended = t.status === "done" || t.status === "stopped";
-  d.className = "task" + (t.status === "waiting_user" ? " ask" : "") + (ended ? " ended" : "");
-  const goal = document.createElement("div"); goal.className = "goal"; goal.textContent = t.goal;
-  const state = document.createElement("div"); state.className = "state";
-  state.textContent = `${TASK_STATE[t.status] || t.status} · ${t.steps}걸음`;
-  const body = document.createElement("div"); body.className = "body";
-  body.textContent = t.status === "waiting_user" ? t.question
-    : t.status === "done" ? t.result
-    : t.status === "waiting_approval" ? "위의 확인함에서 결정해 주시면 이어서 할게요."
-    : t.last_thought || "곧 시작할게요.";
-  d.append(goal, state, body);
-  if (t.next_step && !ended) {
-    const n = document.createElement("div"); n.className = "next";
-    n.textContent = `다음: ${t.next_step}`; d.append(n);
-  }
-  const row = document.createElement("div"); row.className = "row";
-  if (t.status === "waiting_user") {
-    const input = document.createElement("input");
-    input.placeholder = "답을 적어 주세요"; input.setAttribute("aria-label", "과제 질문에 답하기");
-    row.append(input, btn("답하기", false, () => {
-      const text = input.value.trim();
-      if (!text) throw new Error("답을 적어 주세요");
-      return api(`/api/tasks/${t.id}/answer`, { method: "POST", body: JSON.stringify({ text }) });
-    }));
-  }
-  if (t.status === "open") {
-    row.append(btn("지금 한 걸음", false, () => api(`/api/tasks/${t.id}/step`, { method: "POST" })));
-  }
-  if (!ended) row.append(btn("그만두기", true, () => api(`/api/tasks/${t.id}/cancel`, { method: "POST" })));
-  if (row.children.length) d.append(row);
-  return d;
-}
-
-async function loadTasks() {
-  const { live, ended } = await api("/api/tasks");
-  const all = [...live, ...ended];
-  $("taskTray").hidden = !all.length;
-  $("taskList").replaceChildren(...all.map(taskEl));
-}
-
-/* ---------- 사이드바: 기능 ---------- */
-function setSide(open) {
-  $("side").classList.toggle("open", open);
-  $("scrim").hidden = !open;
-  $("openSide").setAttribute("aria-expanded", String(open));
-}
-$("openSide").addEventListener("click", () => setSide(true));
-$("scrim").addEventListener("click", () => setSide(false));
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") setSide(false); });
-
-function featEl({ name, description, tag, tools }) {
-  const d = document.createElement("div"); d.className = "feat";
-  const n = document.createElement("div"); n.className = "fname"; n.textContent = name;
-  if (tag) { const t = document.createElement("small"); t.textContent = tag; n.append(t); }
-  const p = document.createElement("div"); p.className = "fdesc"; p.textContent = description || "";
-  d.append(n, p);
-  if (tools) { const u = document.createElement("div"); u.className = "ftools"; u.textContent = tools; d.append(u); }
-  return d;
-}
-
-function customEl(c) {
-  const d = featEl({
-    name: c.name, description: c.description,
-    tag: c.origin === "agent" ? "비서가 제안" : "",
-    tools: `쓰는 도구: ${c.tool_labels.length ? c.tool_labels.join(", ") : "없음"} · ${c.uses}번 씀`,
-  });
-  const row = document.createElement("div"); row.className = "row";
-  const input = document.createElement("input");
-  input.placeholder = "무엇에 쓸지 (선택)"; input.setAttribute("aria-label", `${c.name} 실행 내용`);
-  row.append(
-    input,
-    btn("실행", false, async () => {
-      await api(`/api/skills/${c.id}/run`, { method: "POST", body: JSON.stringify({ text: input.value.trim() }) });
-      setSide(false);
-    }),
-    btn("지우기", true, async () => {
-      if (!confirm(`'${c.name}' 기능을 지울까요? 이 기능으로 진행 중인 일은 기본 방식으로 이어져요.`)) return;
-      await api(`/api/skills/${c.id}/remove`, { method: "POST" });
-    }),
-  );
-  d.append(row);
-  return d;
-}
-
-async function loadSkills() {
-  const { builtin, custom } = await api("/api/skills");
-  $("builtinList").replaceChildren(...builtin.map((b) => featEl({ name: b.name, description: b.description })));
-  if (!custom.length) {
-    const p = document.createElement("p"); p.className = "hint";
-    p.textContent = "아직 없어요. 대화에서 “회의 준비하는 기능 만들어 줘”처럼 부탁하면, 확인을 거쳐 여기에 생겨요.";
-    $("customList").replaceChildren(p);
-  } else {
-    $("customList").replaceChildren(...custom.map(customEl));
-  }
-}
-
-async function refresh() { await Promise.all([loadActions(), loadTasks(), loadSkills()]); }
-
-/* ---------- 설정 ---------- */
-$("openSettings").addEventListener("click", () => $("settings").showModal());
-$("closeSettings").addEventListener("click", () => $("settings").close());
-$("saveRename").addEventListener("click", async () => {
-  try {
-    const { name } = await api("/api/name", { method: "POST", body: JSON.stringify({ name: $("rename").value.trim() }) });
-    setName(name); $("settings").close();
-  } catch (e) { alert(e.message); }
-});
-$("logout").addEventListener("click", async () => { await sb.auth.signOut(); location.reload(); });
-
-/* ---------- 시작 ---------- */
-function fail(title, detail) {
-  show("boot");
-  document.querySelector("#boot h1").textContent = title;
-  $("bootMsg").textContent = detail;
-}
-
+/* ===================== 시작 ===================== */
 (async () => {
   let cfg;
   try {
-    const r = await fetch("/api/config");
-    const raw = await r.text();
+    const r = await fetch("/api/config"); const raw = await r.text();
     if (!r.ok) throw new Error(`/api/config 가 ${r.status} 를 돌려줬어요.\n${raw.slice(0, 300)}`);
     cfg = JSON.parse(raw);
-  } catch (e) {
-    return fail("서버에 연결하지 못했어요",
-      e.message + "\n\nVercel 대시보드의 Logs 에서 api/index 오류를 확인해 주세요.");
-  }
-  if (!cfg.supabase_url || !cfg.anon_key) {
-    return fail("설정이 비어 있어요",
-      "Vercel 환경변수 SUPABASE_URL, SUPABASE_ANON_KEY 를 넣고 다시 배포(Redeploy)해 주세요.");
-  }
-  if (!window.supabase) {
-    return fail("로그인 도구를 불러오지 못했어요", "네트워크를 확인하고 새로고침해 주세요.");
-  }
+  } catch (e) { return fail("서버에 연결하지 못했어요", e.message + "\n\nVercel 대시보드의 Logs 에서 api/index 오류를 확인해 주세요."); }
+  if (!cfg.supabase_url || !cfg.anon_key) return fail("설정이 비어 있어요", "Vercel 환경변수 SUPABASE_URL, SUPABASE_ANON_KEY 를 넣고 다시 배포(Redeploy)해 주세요.");
+  if (!window.supabase) return fail("로그인 도구를 불러오지 못했어요", "네트워크를 확인하고 새로고침해 주세요.");
   sb = window.supabase.createClient(cfg.supabase_url, cfg.anon_key);
-  $("login").addEventListener("click", () => auth("login"));
-  $("signup").addEventListener("click", () => auth("signup"));
+  $("login").onclick = () => auth("login");
+  $("signup").onclick = () => auth("signup");
   const { data } = await sb.auth.getSession();
   if (!data.session) return show("auth");
-  try { await enter(); }
-  catch (e) { fail("비서를 불러오지 못했어요", e.message); }
+  try { await enter(); } catch (e) { fail("비서를 불러오지 못했어요", e.message); }
 })();
 </script>
 </body>
