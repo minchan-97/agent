@@ -289,6 +289,15 @@ def search_run(body: SearchIn, authorization: str | None = Header(None)):
     return tk.create(sb, f"{body.query.strip()} — 최신 정보를 찾아 핵심만 정리", icon="search", tint="indigo")
 
 
+@app.get("/api/tasks/{task_id}")
+def task_one(task_id: int, authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    rows = sb.table("tasks").select("*").eq("id", task_id).limit(1).execute().data
+    if not rows:
+        raise HTTPException(404, "없는 과제")
+    return rows[0]
+
+
 @app.post("/api/tasks/{task_id}/resume")
 def task_resume(task_id: int, authorization: str | None = Header(None)):
     sb = _session(authorization)
