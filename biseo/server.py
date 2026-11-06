@@ -168,6 +168,23 @@ def chat(body: ChatIn, authorization: str | None = Header(None)):
     return brain.respond(sb, a, body.text)
 
 
+class SuggestIn(BaseModel):
+    kind: str
+    args: dict = {}
+
+
+@app.post("/api/suggest/accept")
+def suggest_accept(body: SuggestIn, authorization: str | None = Header(None)):
+    """채팅 답변 아래 버튼으로 제안을 수락하면, 그 행동을 바로 실행(등급 규칙 적용)."""
+    sb = _session(authorization)
+    a = _agent(sb)
+    if body.kind == "start_task":
+        return _run(tk.create, sb, str(body.args.get("goal", "")))
+    if body.kind not in ("note", "reminder", "draft", "event"):
+        raise HTTPException(400, "지원하지 않는 제안")
+    return act.propose(sb, body.kind, body.args or {}, "채팅 제안 수락", origin="user")
+
+
 @app.get("/api/history")
 def history(authorization: str | None = Header(None)):
     sb = _session(authorization)
