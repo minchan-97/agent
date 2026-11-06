@@ -147,9 +147,21 @@ dialog.sheet::backdrop{background:rgb(0 0 0 / .35)}
 .linked button{background:none;border:0;color:var(--muted);cursor:pointer;font-size:.85rem}
 .sheet .actions{display:flex;justify-content:space-between;gap:8px;margin-top:18px}
 code.topic{display:block;background:var(--surface);border:1px solid var(--line);padding:8px 10px;border-radius:8px;word-break:break-all;margin:8px 0}
+/* 로딩 자리표시(스켈레톤): 빈 화면 대신 윤곽을 먼저 보여 준다 */
+.skel{background:var(--surface);border:1px solid var(--line);border-radius:14px;height:64px;margin-bottom:8px;overflow:hidden;position:relative}
+.skel::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(127,127,127,.08),transparent);transform:translateX(-100%)}
+.app-icon .tile{transition:transform .12s ease, box-shadow .12s ease}
+.app-icon:active .tile{transform:scale(.94)}
+.item,.card,.sc,.btn{transition:transform .1s ease, opacity .15s ease}
+.item:active,.card:active{transform:scale(.99)}
+.btn:active,.sc:active{transform:scale(.96)}
 @media (prefers-reduced-motion: no-preference){
   .bubble.new{animation:rise .18s ease-out}
   @keyframes rise{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .screen:not([hidden]) .body > *,.home:not([hidden]) .widget,.home:not([hidden]) .grid{animation:fade .22s ease-out}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .skel::after{animation:shimmer 1.3s infinite}
+  @keyframes shimmer{to{transform:translateX(100%)}}
 }
 </style>
 </head>
@@ -356,6 +368,11 @@ function paintHome(h) {
     b.onclick = () => runInChat(msg);
     quick.append(b);
   }
+  for (const pin of (h.pins || [])) {           // 비서가 홈에 올린 내 단축 버튼
+    const b = el("button", "sc"); b.append(miniIcon(pin.icon || "bolt", pin.tint || "amber"), el("span", "", pin.label));
+    b.onclick = async () => { await post(`/api/shortcuts/${pin.id}/run`); await openApp("tasks"); };
+    quick.append(b);
+  }
   w.append(quick);
 
   $("grid").replaceChildren(...APPS.map(([key, label]) => {
@@ -394,6 +411,7 @@ async function render(revalidate = true) {
         }).catch(() => {});
       }
     } else {
+      if (key) body.replaceChildren(el("div", "skel"), el("div", "skel"), el("div", "skel"));
       await SCREENS[current].render(body, key ? await cache.get(key) : null);
     }
   } catch (e) { body.replaceChildren(el("div", "empty-state", e.message)); }
@@ -693,6 +711,7 @@ function describe(a) {
   if (a.kind === "reminder") return `${g.due_at ? when(g.due_at) : ""} · ${g.text || ""}`;
   if (a.kind === "create_skill") return `\u2018${g.name || ""}\u2019 — ${g.description || ""}\n${a.reason || ""}`.trim();
   if (a.kind === "suggest_shortcut") return `${a.reason || ""}\n만들면: ${g.app === "search" ? "검색" : "맡은 일"} 앱에 \u2018${g.label || ""}\u2019 버튼`.trim();
+  if (a.kind === "pin_shortcut") return a.reason || `\u2018${g.label || ""}\u2019 버튼을 홈에 둘까요?`;
   if (a.kind === "draft") return `${g.to ? g.to + "에게 · " : ""}${g.text || ""}`;
   return g.text || g.query || a.reason || "";
 }
