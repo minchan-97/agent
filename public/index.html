@@ -56,6 +56,22 @@ button,input,textarea,select{font:inherit;color:inherit}
 .auth{margin:auto 0;padding:32px 0}
 .auth h1{font-size:1.5rem;font-weight:700;margin:0 0 6px}
 .auth p{color:var(--muted);margin:0 0 24px;white-space:pre-wrap}
+.brand{text-align:center;margin:8px 0 26px}
+.brand-mark{width:72px;height:72px;margin:0 auto 14px;border-radius:20px;overflow:hidden;box-shadow:0 2px 10px rgb(0 0 0 / .1)}
+.brand-mark img{width:100%;height:100%;display:block}
+.brand h1{font-size:1.6rem;font-weight:800;margin:0 0 6px;color:var(--accent)}
+.brand .tagline{color:var(--muted);margin:0}
+.tabs{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:18px}
+.tab{flex:1;border:0;background:none;color:var(--muted);font-weight:600;padding:9px;border-radius:9px;cursor:pointer}
+.tab.on{background:var(--accent);color:var(--accent-ink)}
+.pw-wrap{display:flex;gap:8px}
+.pw-wrap input{flex:1;min-width:0}
+.pw-eye{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:0 12px;color:var(--muted);cursor:pointer;font-size:.85rem}
+.btn.block{width:100%;padding:13px;margin-top:4px;font-size:1.02rem}
+.linklike{display:block;margin:14px auto 0;background:none;border:0;color:var(--accent);cursor:pointer;font-size:.9rem}
+.fineprint{color:var(--muted);font-size:.78rem;text-align:center;margin-top:22px;line-height:1.5}
+.field input.bad{border-color:var(--danger)}
+.msg.ok{color:var(--accent)}
 .naming{margin:auto 0;padding:40px 0}
 .naming .lead{color:var(--muted);margin:0 0 28px}
 .naming .say{font-size:clamp(1.6rem,6vw,2.2rem);line-height:1.35;margin:0;font-weight:500}
@@ -174,15 +190,34 @@ code.topic{display:block;background:var(--surface);border:1px solid var(--line);
   </section>
 
   <section class="auth" id="auth" hidden>
-    <h1>내 비서</h1>
-    <p>로그인하면 나만의 비서를 만날 수 있어요.</p>
-    <label class="field"><input id="email" type="email" placeholder="이메일" autocomplete="email"></label>
-    <label class="field"><input id="pw" type="password" placeholder="비밀번호 (6자 이상)" autocomplete="current-password"></label>
-    <div class="row">
-      <button class="btn" id="login">로그인</button>
-      <button class="btn ghost" id="signup">계정 만들기</button>
+    <div class="brand">
+      <div class="brand-mark"><img src="/icon-192.png" alt=""></div>
+      <h1>나만의 비서</h1>
+      <p class="tagline">일정·메모·할 일을 맡기면, 알아서 챙겨 주는 비서예요.</p>
     </div>
-    <div class="msg" id="authMsg"></div>
+
+    <div class="tabs" role="tablist">
+      <button class="tab on" id="tabLogin" role="tab">로그인</button>
+      <button class="tab" id="tabSignup" role="tab">회원가입</button>
+    </div>
+
+    <form id="authForm" novalidate>
+      <label class="field"><span>이메일</span>
+        <input id="email" type="email" placeholder="you@example.com" autocomplete="email" inputmode="email"></label>
+      <label class="field"><span>비밀번호</span>
+        <span class="pw-wrap">
+          <input id="pw" type="password" placeholder="6자 이상" autocomplete="current-password">
+          <button type="button" class="pw-eye" id="pwEye" aria-label="비밀번호 보기">보기</button>
+        </span>
+      </label>
+      <label class="field" id="pw2Field" hidden><span>비밀번호 확인</span>
+        <input id="pw2" type="password" placeholder="한 번 더" autocomplete="new-password"></label>
+      <div class="msg" id="authMsg"></div>
+      <button class="btn block" id="authSubmit" type="submit">로그인</button>
+    </form>
+
+    <button class="linklike" id="forgot">비밀번호를 잊으셨나요?</button>
+    <p class="fineprint">가입하면 서비스 이용에 동의하는 것으로 간주돼요. 기록은 본인만 볼 수 있어요.</p>
   </section>
 
   <section class="naming" id="naming" hidden>
@@ -904,19 +939,67 @@ async function runInChat(message) {
   $("compose").requestSubmit();
 }
 
-/* ===================== 로그인·이름 ===================== */
-async function auth(kind) {
-  const email = $("email").value.trim(), password = $("pw").value;
-  $("authMsg").textContent = "";
+/* ===================== 로그인·회원가입 ===================== */
+let authMode = "login";
+function setAuthMode(m) {
+  authMode = m;
+  $("tabLogin").classList.toggle("on", m === "login");
+  $("tabSignup").classList.toggle("on", m === "signup");
+  $("pw2Field").hidden = m !== "signup";
+  $("pw").setAttribute("autocomplete", m === "signup" ? "new-password" : "current-password");
+  $("authSubmit").textContent = m === "signup" ? "회원가입" : "로그인";
+  setAuthMsg("");
+}
+function setAuthMsg(text, ok = false) {
+  const m = $("authMsg"); m.textContent = text; m.classList.toggle("ok", ok);
+}
+function validEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
+
+async function submitAuth() {
+  const email = $("email").value.trim();
+  const password = $("pw").value;
+  $("email").classList.toggle("bad", !!email && !validEmail(email));
+  if (!validEmail(email)) return setAuthMsg("이메일 형식을 확인해 주세요.");
+  if (password.length < 6) return setAuthMsg("비밀번호는 6자 이상이어야 해요.");
+  if (authMode === "signup" && password !== $("pw2").value) return setAuthMsg("비밀번호가 서로 달라요.");
+
+  $("authSubmit").disabled = true;
+  setAuthMsg(authMode === "signup" ? "계정을 만드는 중…" : "로그인 중…");
   try {
-    const fn = kind === "signup" ? sb.auth.signUp : sb.auth.signInWithPassword;
-    const { data, error } = await fn.call(sb.auth, { email, password });
-    if (error) throw error;
-    if (kind === "signup" && !data.session) { $("authMsg").textContent = "확인 메일을 보냈어요. 메일의 링크를 누른 뒤 로그인해 주세요."; return; }
-    await enter();
+    if (authMode === "signup") {
+      const { data, error } = await sb.auth.signUp({
+        email, password, options: { emailRedirectTo: location.origin },
+      });
+      if (error) throw error;
+      if (!data.session) {   // 확인 메일 방식
+        setAuthMsg("확인 메일을 보냈어요. 메일의 링크를 누르면 바로 시작돼요. 메일이 안 보이면 스팸함도 확인해 주세요.", true);
+        return;
+      }
+      await enter();         // 확인 메일이 꺼져 있으면 바로 입장
+    } else {
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      await enter();
+    }
   } catch (e) {
-    $("authMsg").textContent = e.message === "Invalid login credentials" ? "이메일이나 비밀번호가 맞지 않아요." : e.message;
-  }
+    const msg = e.message || "";
+    setAuthMsg(
+      msg.includes("Invalid login") ? "이메일이나 비밀번호가 맞지 않아요." :
+      msg.includes("already registered") || msg.includes("already been") ? "이미 가입된 이메일이에요. 로그인해 주세요." :
+      msg.includes("not confirmed") ? "메일 확인이 아직 안 됐어요. 메일의 링크를 눌러 주세요." :
+      msg,
+    );
+  } finally { $("authSubmit").disabled = false; }
+}
+
+async function forgotPassword() {
+  const email = $("email").value.trim();
+  if (!validEmail(email)) return setAuthMsg("재설정 메일을 받을 이메일을 먼저 적어 주세요.");
+  try {
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin });
+    if (error) throw error;
+    setAuthMsg("비밀번호 재설정 메일을 보냈어요.", true);
+  } catch (e) { setAuthMsg(e.message); }
 }
 async function openTarget(target) {
   if (!target) return false;
@@ -963,8 +1046,30 @@ $("saveName").addEventListener("click", async () => {
   if (!cfg.supabase_url || !cfg.anon_key) return fail("설정이 비어 있어요", "Vercel 환경변수 SUPABASE_URL, SUPABASE_ANON_KEY 를 넣고 다시 배포(Redeploy)해 주세요.");
   if (!window.supabase) return fail("로그인 도구를 불러오지 못했어요", "네트워크를 확인하고 새로고침해 주세요.");
   sb = window.supabase.createClient(cfg.supabase_url, cfg.anon_key);
-  $("login").onclick = () => auth("login");
-  $("signup").onclick = () => auth("signup");
+  $("tabLogin").onclick = () => setAuthMode("login");
+  $("tabSignup").onclick = () => setAuthMode("signup");
+  $("authForm").addEventListener("submit", (e) => { e.preventDefault(); submitAuth(); });
+  $("forgot").onclick = forgotPassword;
+  $("pwEye").onclick = () => {
+    const on = $("pw").type === "password";
+    $("pw").type = on ? "text" : "password";
+    $("pwEye").textContent = on ? "숨기기" : "보기";
+  };
+  setAuthMode("login");
+
+  // 비밀번호 재설정 메일의 링크로 돌아온 경우: 새 비밀번호를 정하게 한다
+  sb.auth.onAuthStateChange(async (event) => {
+    if (event === "PASSWORD_RECOVERY") {
+      show("auth");
+      const np = prompt("새 비밀번호를 정해 주세요 (6자 이상)");
+      if (np && np.length >= 6) {
+        const { error } = await sb.auth.updateUser({ password: np });
+        if (error) setAuthMsg(error.message);
+        else { setAuthMsg("비밀번호를 바꿨어요. 이제 로그인돼요.", true); await enter().catch(() => {}); }
+      }
+    }
+  });
+
   const { data } = await sb.auth.getSession();
   if (!data.session) return show("auth");
   try { await enter(); } catch (e) { fail("비서를 불러오지 못했어요", e.message); }
