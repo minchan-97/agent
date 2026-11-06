@@ -31,6 +31,7 @@ from biseo import actions as act  # noqa: E402
 from biseo import brain, db, tick  # noqa: E402
 from biseo import tasks as tk  # noqa: E402
 from biseo import skills as sk  # noqa: E402
+from biseo import apps  # noqa: E402
 
 app = FastAPI(title="biseojin")
 
@@ -219,6 +220,88 @@ def task_step(task_id: int, authorization: str | None = Header(None)):
     if not res["task"]:
         raise HTTPException(404, "없는 과제")
     return res["task"]
+
+
+# ---------- 홈 화면 앱 ----------
+def _run(fn, *a):
+    """앱 항목 처리 공통: 잘못된 값은 400, 없는 항목은 404 로."""
+    try:
+        return fn(*a)
+    except LookupError as e:
+        raise HTTPException(404, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/home")
+def home(authorization: str | None = Header(None)):
+    return apps.today(_session(authorization))
+
+
+@app.get("/api/events")
+def events_list(start: str = "", end: str = "", authorization: str | None = Header(None)):
+    return {"items": _run(apps.list_events, _session(authorization), start or None, end or None)}
+
+
+@app.get("/api/events/{item_id}")
+def events_get(item_id: int, authorization: str | None = Header(None)):
+    return _run(apps.get_event, _session(authorization), item_id)
+
+
+@app.get("/api/reminders")
+def reminders_list(past: int = 0, authorization: str | None = Header(None)):
+    return {"items": apps.list_reminders(_session(authorization), include_past=bool(past))}
+
+
+@app.get("/api/notes")
+def notes_list(authorization: str | None = Header(None)):
+    return {"items": apps.list_memory(_session(authorization), "note")}
+
+
+@app.get("/api/drafts")
+def drafts_list(authorization: str | None = Header(None)):
+    return {"items": apps.list_memory(_session(authorization), "draft")}
+
+
+_CRUD = {
+    "events":    (apps.create_event, apps.update_event, apps.delete_event),
+    "reminders": (apps.create_reminder, apps.update_reminder, apps.delete_reminder),
+    "notes":     (apps.create_note, apps.update_memory, apps.delete_memory),
+    "drafts":    (None, apps.update_memory, apps.delete_memory),
+}
+
+
+@app.post("/api/{kind}/new")
+async def item_new(kind: str, request: Request, authorization: str | None = Header(None)):
+    if kind not in _CRUD or not _CRUD[kind][0]:
+        raise HTTPException(404, "없는 앱")
+    sb = _session(authorization)
+    return _run(_CRUD[kind][0], sb, await request.json())
+
+
+@app.post("/api/{kind}/{item_id}/update")
+async def item_update(kind: str, item_id: int, request: Request,
+                      authorization: str | None = Header(None)):
+    if kind not in _CRUD:
+        raise HTTPException(404, "없는 앱")
+    sb = _session(authorization)
+    return _run(_CRUD[kind][1], sb, item_id, await request.json())
+
+
+@app.post("/api/{kind}/{item_id}/delete")
+def item_delete(kind: str, item_id: int, authorization: str | None = Header(None)):
+    if kind not in _CRUD:
+        raise HTTPException(404, "없는 앱")
+    return _run(_CRUD[kind][2], _session(authorization), item_id)
+
+
+@app.post("/api/events/{item_id}/remind")
+async def event_remind(item_id: int, request: Request, authorization: str | None = Header(None)):
+    """일정에 '몇 분 전' 알림 붙이기."""
+    sb = _session(authorization)
+    body = await request.json()
+    ev = _run(apps.get_event, sb, item_id)
+    return _run(apps.add_event_reminder, sb, ev, int(body.get("minutes", 30)))
 
 
 # ---------- 기능 (사이드바) ----------
