@@ -297,7 +297,7 @@ const CACHE_TOUCH = [
   [/\/api\/(notes)\b/, ["notes"]],
   [/\/api\/(drafts)\b/, ["drafts"]],
   [/\/api\/(tasks)\b/, ["tasks", "home"]],
-  [/\/api\/(actions|skills)\b.*\/(approve|reject|undo|run|remove)/, ["actions", "tasks", "skills", "home", "events", "reminders", "notes", "drafts"]],
+  [/\/api\/(actions|skills)\b.*\/(approve|reject|undo|run|remove|pin|unpin)/, ["actions", "tasks", "skills", "home", "events", "reminders", "notes", "drafts"]],
   [/\/api\/(shortcuts|search)\b/, ["tasks", "home"]],
   [/\/api\/(chat)\b/, ["history", "actions", "tasks", "home", "events", "reminders", "notes", "drafts", "skills"]],
   [/\/api\/(name)\b/, ["home"]],
@@ -403,9 +403,10 @@ function paintHome(h) {
     b.onclick = () => runInChat(msg);
     quick.append(b);
   }
-  for (const pin of (h.pins || [])) {           // 비서가 홈에 올린 내 단축 버튼
+  for (const pin of (h.pins || [])) {           // 홈에 올린 기능·단축 버튼
     const b = el("button", "sc"); b.append(miniIcon(pin.icon || "bolt", pin.tint || "amber"), el("span", "", pin.label));
-    b.onclick = async () => { await post(`/api/shortcuts/${pin.id}/run`); await openApp("tasks"); };
+    const ep = pin.skill ? `/api/skills/${pin.id}/run` : `/api/shortcuts/${pin.id}/run`;
+    b.onclick = async () => { await post(ep, {}); await openApp("tasks"); };
     quick.append(b);
   }
   w.append(quick);
@@ -839,8 +840,12 @@ SCREENS.skills = {
       const d = el("div", "card");
       d.append(el("div", "t", c.name + (c.origin === "agent" ? " · 비서가 제안" : "")), el("div", "s", c.description),
                el("div", "s", `쓰는 도구: ${c.tool_labels.join(", ") || "없음"} · ${c.uses}번 씀`));
+      if (c.pinned) d.querySelector(".t").textContent += " · 홈에 있음";
       const row = el("div", "row"); const a = input("text", "", { placeholder: "무엇에 쓸지 (선택)" });
       row.append(a, button("실행", "small", async () => { await post(`/api/skills/${c.id}/run`, { text: a.value }); await openApp("tasks"); }),
+        button(c.pinned ? "홈에서 내리기" : "홈에 아이콘", "ghost small", async () => {
+          await post(`/api/skills/${c.id}/${c.pinned ? "unpin" : "pin"}`); await render();
+        }),
         button("지우기", "ghost small", async () => { if (confirm(`'${c.name}' 기능을 지울까요?`)) { await post(`/api/skills/${c.id}/remove`); await render(); } }));
       d.append(row); nodes.push(d);
     }
