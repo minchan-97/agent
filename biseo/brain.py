@@ -34,7 +34,8 @@ CONTRACT = """
   "reply": "사용자에게 할 말",
   "actions": [{"kind": "...", "args": {...}, "reason": "왜 하자고 하는지 한 줄"}],
   "user_facts": ["..."],
-  "task_answers": [{"task_id": 숫자, "answer": "..."}]
+  "task_answers": [{"task_id": 숫자, "answer": "..."}],
+  "suggest": [{"kind": "note|reminder|draft|event|start_task", "label": "버튼에 쓸 짧은 말", "args": {...}}]
 }
 
 actions 에 쓸 수 있는 kind 와 args
@@ -61,6 +62,10 @@ actions 에 쓸 수 있는 kind 와 args
 - 하자고 한 일이 "이미 끝났다"고 말하지 마. 실행할지는 시스템과 사용자가 정한다.
   "메모로 남겨 둘게요", "알림을 걸어 둘게요"처럼 말하면 충분하다.
 - 할 일이 없으면 actions 는 [].
+- suggest: 사용자가 "해 줘"라고 시키진 않았지만 도움이 될 만한 행동을, 실행하지 말고 '제안'으로 담아라.
+  예: 약속을 말하면 {"kind":"event","label":"일정에 추가","args":{...}}, 할 일을 말하면 {"kind":"note","label":"메모로 저장",...},
+  마감을 말하면 {"kind":"reminder","label":"알림 걸기",...}. 사용자는 버튼으로 수락한다. args 는 actions 와 같은 형식.
+  확실히 시킨 일은 actions 로, 시키지 않았지만 유용한 건 suggest 로. 둘은 겹치지 않게. 없으면 [].
 - 경기 일정·결과, 날씨, 가격, 뉴스, 개봉·출시일처럼 바뀌는 바깥 사실은 네 기억으로 답하지 마.
   search 를 요청하고, reply 에는 날짜·시간·상대·숫자를 쓰지 말고 "찾아볼게요" 정도만 써.
 - task_answers: 아래 [답을 기다리는 과제]의 질문에 사용자가 이번 말로 답했으면 그 답을 넣어. 아니면 [].
@@ -114,6 +119,7 @@ def _ask(messages: list) -> dict:
     out["actions"] = [a for a in out.get("actions") or [] if isinstance(a, dict)]
     out["user_facts"] = [f for f in out.get("user_facts") or [] if isinstance(f, str)]
     out["task_answers"] = [x for x in out.get("task_answers") or [] if isinstance(x, dict)]
+    out["suggest"] = [x for x in out.get("suggest") or [] if isinstance(x, dict) and x.get("kind")][:4]
     return out
 
 
@@ -214,4 +220,5 @@ def respond(sb, agent: dict, user_text: str) -> dict:
         "searched": searched, "forced_search": forced,
         "search_tries": len(trail)}}).execute()
 
-    return {"reply": reply, "actions": done, "answered_tasks": answered}
+    return {"reply": reply, "actions": done, "answered_tasks": answered,
+            "suggest": out.get("suggest", [])}
