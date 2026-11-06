@@ -14,6 +14,7 @@ from .norm import normalize
 from .privacy import mask
 
 SUGGEST_AT = 3
+PIN_AT = 5          # 단축 버튼이 이만큼 쓰이면 홈에 두자고 제안
 
 
 def note(sb, app: str, text: str):
@@ -31,6 +32,25 @@ def note(sb, app: str, text: str):
           .eq("id", rows[0]["id"]).execute()
     else:
         sb.table("usage_patterns").insert({"app": app, "norm_key": key, "sample": sample}).execute()
+
+
+def maybe_pin(sb) -> dict | None:
+    """자주 눌리는 단축 버튼을 홈에 고정하자고 제안한다."""
+    from . import actions as act
+    hot = sb.table("shortcuts").select("*").gte("uses", PIN_AT).eq("pinned", False) \
+            .order("uses", desc=True).limit(1).execute().data
+    if not hot:
+        return None
+    s0 = hot[0]
+    # 이미 이 버튼으로 홈 고정 제안이 떠 있으면 다시 안 함
+    open_props = sb.table("actions").select("args").eq("kind", "pin_shortcut") \
+                   .eq("status", "proposed").execute().data or []
+    if any((p.get("args") or {}).get("shortcut_id") == s0["id"] for p in open_props):
+        return None
+    return act.propose(sb, "pin_shortcut",
+                       {"shortcut_id": s0["id"], "label": s0["label"]},
+                       reason=f"'{s0['label']}' 버튼을 {s0['uses']}번 쓰셨어요. 홈 화면에 둘까요?",
+                       origin="self")
 
 
 def maybe_suggest(sb) -> dict | None:
