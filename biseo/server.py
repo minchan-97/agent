@@ -220,7 +220,7 @@ def suggest_accept(body: SuggestIn, authorization: str | None = Header(None)):
         goal = str(g.get("goal") or g.get("text") or g.get("title") or body.label or "").strip()
         if len(goal) < 2:
             raise HTTPException(400, "맡길 내용이 비어 있어요")
-        return _run(tk.create, sb, goal)
+        return _kick(sb, _run(tk.create, sb, goal))
     return act.propose(sb, body.kind, g, "채팅 제안 수락", origin="user")
 
 
@@ -260,6 +260,16 @@ def decide(action_id: int, verb: str, authorization: str | None = Header(None)):
 
 
 # ---------- 과제 ----------
+def _kick(sb, task):
+    """과제를 맡기면 다음 크론을 기다리지 않고 첫 걸음을 바로 돌린다 (시작은 즉시)."""
+    try:
+        from biseo import tick
+        tick.run_task_steps(sb, _agent(sb), task["id"], brain._ask, max_steps=1)
+        from biseo import tasks as _tk
+        return _tk.get(sb, task["id"]) or task
+    except Exception:
+        return task  # 첫 걸음이 실패해도 과제는 남고, 크론이 이어서 돌린다
+
 @app.get("/api/tasks")
 def list_tasks(authorization: str | None = Header(None)):
     sb = _session(authorization)
@@ -286,7 +296,7 @@ class GoalIn(BaseModel):
 @app.post("/api/tasks")
 def new_task(body: GoalIn, authorization: str | None = Header(None)):
     sb = _session(authorization)
-    return tk.create(sb, body.goal, icon=body.icon, tint=body.tint)
+    return _kick(sb, tk.create(sb, body.goal, icon=body.icon, tint=body.tint))
 
 
 class AnswerIn(BaseModel):
@@ -321,7 +331,7 @@ def search_run(body: SearchIn, authorization: str | None = Header(None)):
     sb = _session(authorization)
     from biseo import observe
     observe.note(sb, "search", body.query.strip())
-    return tk.create(sb, f"{body.query.strip()} — 최신 정보를 찾아 핵심만 정리", icon="search", tint="indigo")
+    return _kick(sb, tk.create(sb, f"{body.query.strip()} — 최신 정보를 찾아 핵심만 정리", icon="search", tint="indigo"))
 
 
 @app.get("/api/tasks/{task_id}")
@@ -521,7 +531,8 @@ def shortcuts_new(body: ShortcutIn, authorization: str | None = Header(None)):
 @app.post("/api/shortcuts/{sid}/run")
 def shortcuts_run(sid: int, authorization: str | None = Header(None)):
     sb = _session(authorization)
-    return _run(sc.run, sb, sid)
+    t = _run(sc.run, sb, sid)
+    return _kick(sb, t) if isinstance(t, dict) and t.get("id") else t
 
 
 @app.post("/api/shortcuts/{sid}/remove")
@@ -580,7 +591,7 @@ def run_skill(skill_id: int, body: RunIn, authorization: str | None = Header(Non
     if not s:
         raise HTTPException(404, "없는 기능이에요")
     goal = f"[{s['name']}] {body.text.strip()}" if body.text.strip() else f"[{s['name']}] 실행"
-    return tk.create(sb, goal, skill_id=skill_id)
+    return _kick(sb, tk.create(sb, goal, skill_id=skill_id))
 
 
 @app.post("/api/skills/{skill_id}/pin")
