@@ -280,6 +280,8 @@ class SearchIn(BaseModel):
 def search_run(body: SearchIn, authorization: str | None = Header(None)):
     """검색 앱의 '찾기' 버튼: 채팅 없이 바로 탐색 과제를 만든다."""
     sb = _session(authorization)
+    from biseo import observe
+    observe.note(sb, "search", body.query.strip())
     return tk.create(sb, f"{body.query.strip()} — 최신 정보를 찾아 핵심만 정리", icon="search", tint="indigo")
 
 
