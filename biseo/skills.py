@@ -13,14 +13,15 @@ skills.py — 비서가 할 줄 아는 일.
 """
 from .privacy import mask
 
-ALLOWED_TOOLS = ("search", "note", "reminder", "draft")
+ALLOWED_TOOLS = ("search", "note", "reminder", "draft", "event")
 
-TOOL_LABEL = {"search": "검색", "note": "메모", "reminder": "알림", "draft": "초안"}
+TOOL_LABEL = {"search": "검색", "note": "메모", "reminder": "알림", "draft": "초안", "event": "일정"}
 
 BUILTIN = [
     {"key": "search",   "name": "검색",      "description": "모르는 최신 정보를 찾아봐요"},
     {"key": "note",     "name": "메모",      "description": "기억해 둘 일을 적어 둬요"},
     {"key": "reminder", "name": "알림 예약", "description": "정한 시각에 폰으로 알려 줘요"},
+    {"key": "event",    "name": "일정",      "description": "일정을 넣고, 알림과 메모를 붙여요"},
     {"key": "draft",    "name": "글 초안",   "description": "메시지나 글을 대신 써 둬요"},
     {"key": "task",     "name": "과제 맡기", "description": "여러 걸음이 필요한 일을 틈틈이 진행해요"},
 ]
