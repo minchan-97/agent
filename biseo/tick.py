@@ -21,6 +21,7 @@ from datetime import datetime, timedelta, timezone
 from . import notify
 from . import push
 from . import observe
+from . import growth
 from . import tasks as tk
 from .db import Scoped
 
@@ -75,6 +76,25 @@ def _waiting_text(sb, count: int) -> str:
     detail = g.get("title") or g.get("name") or g.get("text") or g.get("goal") or ""
     head = f"{what} ‘{str(detail)[:24]}’" if detail else what
     return head + (f" 외 {count - 1}개가 확인을 기다려요." if count > 1 else "이(가) 확인을 기다려요.")
+
+
+def _grow_once(sb, agent: dict, ask_llm):
+    """하루 한 번만, 대화가 있었으면 바탕을 다듬는다."""
+    already = (sb.table("outbox").select("id").eq("rule", "grew")
+               .gte("created_at", _today_start()).limit(1).execute().data)
+    if already:
+        return
+    msgs = (sb.table("episodes").select("role,text").order("id", desc=True)
+            .limit(12).execute().data or [])[::-1]
+    if len(msgs) < 2:
+        return
+    try:
+        growth.grow(sb, [{"role": m["role"], "text": m["text"]} for m in msgs],
+                    ask_llm, deep=bool(agent.get("heir")))
+        # 하루 한 번 표시 (알림은 아님 → notified=False 로 기록만)
+        sb.table("outbox").insert({"rule": "grew", "body": "", "notified": False}).execute()
+    except Exception:
+        pass
 
 
 def _morning_brief(sb, agent: dict):
@@ -134,10 +154,14 @@ def step_user(sb, agent: dict, ask_llm, allow_task=True, only_due=False) -> dict
             if res.get("notify"):
                 _say(sb, agent, "task", res["notify"], f"{name} · 맡은 일", "/?open=tasks")
 
-    # 3. 아침 브리핑 — 하루 한 번, 아침에 먼저 말을 건다
+    # 3. 성장 — 하루 한 번, 최근 대화로 바탕을 조금 다듬는다 (heir 면 더 깊게)
+    if allow_task:
+        _grow_once(sb, agent, ask_llm)
+
+    # 4. 아침 브리핑 — 하루 한 번, 아침에 먼저 말을 건다
     _morning_brief(sb, agent)
 
-    # 4. 버튼·홈 제안 — 자주 쓰는 걸 하나 올린다 (확인함으로)
+    # 5. 버튼·홈 제안 — 자주 쓰는 걸 하나 올린다 (확인함으로)
     if allow_task:
         try:
             if not observe.maybe_suggest(sb):
@@ -145,7 +169,7 @@ def step_user(sb, agent: dict, ask_llm, allow_task=True, only_due=False) -> dict
         except Exception:
             pass
 
-    # 5. 오래 기다리는 확인 — 하루 한 번
+    # 6. 오래 기다리는 확인 — 하루 한 번
     cutoff = (now - timedelta(hours=WAIT_HOURS)).isoformat()
     waiting = (sb.table("actions").select("id", count="exact").eq("status", "proposed")
                .lte("created_at", cutoff).execute())
@@ -160,7 +184,7 @@ def step_user(sb, agent: dict, ask_llm, allow_task=True, only_due=False) -> dict
 
 def run(raw_sb, ask_llm, only_due=False) -> dict:
     started = time.monotonic()
-    agents = (raw_sb.table("agents").select("user_id,name,ntfy_topic")
+    agents = (raw_sb.table("agents").select("user_id,name,ntfy_topic,heir")
               .not_.is_("name", "null").execute().data) or []
     report = {}
     for a in agents:
