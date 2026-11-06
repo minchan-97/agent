@@ -22,6 +22,7 @@ from . import search
 from . import explore as ex
 from . import observe
 from . import growth
+from . import heir
 from . import tasks as tk
 from . import skills as sk
 from .absorb import absorb
@@ -150,7 +151,8 @@ def respond(sb, agent: dict, user_text: str) -> dict:
 
     extra += sk.for_prompt(sb)
     messages = [{"role": "system",
-                 "content": system_prompt(agent["name"], facts, notes, now) + growth.for_prompt(sb) + extra
+                 "content": system_prompt(agent["name"], facts, notes, now)
+                 + growth.for_prompt(sb) + heir.for_prompt(agent) + extra
                  + "\n\n" + CONTRACT}]
     for h in history:
         messages.append({"role": "user" if h["role"] == "user" else "assistant",
