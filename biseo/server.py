@@ -338,6 +338,9 @@ def home(authorization: str | None = Header(None)):
         for s0 in sc.list_for(sb, app_name):
             if s0.get("pinned"):
                 pins.append({"id": s0["id"], "label": s0["label"], "icon": s0.get("icon"), "tint": s0.get("tint")})
+    for sk0 in sk.list_pinned(sb):
+        pins.append({"id": sk0["id"], "label": sk0["name"], "icon": sk0.get("icon") or "bolt",
+                     "tint": sk0.get("tint") or "indigo", "skill": True})
     data["pins"] = pins
     return data
 
@@ -515,6 +518,18 @@ def run_skill(skill_id: int, body: RunIn, authorization: str | None = Header(Non
         raise HTTPException(404, "없는 기능이에요")
     goal = f"[{s['name']}] {body.text.strip()}" if body.text.strip() else f"[{s['name']}] 실행"
     return tk.create(sb, goal, skill_id=skill_id)
+
+
+@app.post("/api/skills/{skill_id}/pin")
+def skill_pin(skill_id: int, authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    return _run(sk.set_pinned, sb, skill_id, True)
+
+
+@app.post("/api/skills/{skill_id}/unpin")
+def skill_unpin(skill_id: int, authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    return _run(sk.set_pinned, sb, skill_id, False)
 
 
 @app.post("/api/skills/{skill_id}/remove")
