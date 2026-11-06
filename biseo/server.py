@@ -135,7 +135,12 @@ def config():
 def heir_get(authorization: str | None = Header(None)):
     sb = _session(authorization)
     a = _agent(sb)
-    return {"heir": bool(a.get("heir")), "persona": a.get("persona") or ""}
+    mine = bool(a.get("heir"))
+    # 자리가 이미 찼는지 (남이 heir 면 나는 영영 못 켠다)
+    taken = bool(db.for_cron().table("agents").select("user_id")
+                 .eq("heir", True).limit(1).execute().data)
+    return {"heir": mine, "persona": a.get("persona") or "",
+            "available": mine or not taken}
 
 
 class HeirIn(BaseModel):
@@ -144,10 +149,20 @@ class HeirIn(BaseModel):
 
 @app.post("/api/heir")
 def heir_set(body: HeirIn, authorization: str | None = Header(None)):
+    """켜기: 전체에서 아직 아무도 아닐 때만 선착순 1명. 끄기: 본인 것만 끈다."""
     sb = _session(authorization)
     _agent(sb)
-    sb.table("agents").update({"heir": bool(body.on)}).eq("user_id", sb.uid).execute()
-    return {"heir": bool(body.on)}
+    if not body.on:
+        sb.table("agents").update({"heir": False}).eq("user_id", sb.uid).execute()
+        return {"heir": False}
+    # DB 함수가 '아무도 아닐 때만' 올려 준다 (동시 요청도 유니크 인덱스가 1명만 통과)
+    try:
+        got = db.for_cron().rpc("claim_heir", {"uid": sb.uid}).execute().data
+    except Exception:
+        raise HTTPException(500, "heir 설정 함수가 없어요 (71_heir_unique.sql 실행 필요)")
+    if not got:
+        raise HTTPException(409, "이미 몰랑이의 자식이 정해졌어요. 한 명만 될 수 있어요.")
+    return {"heir": True}
 
 
 # ---------- 비서 ----------
