@@ -195,17 +195,53 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 let sb, agentName = "", current = null;
 
 /* ---------- 서버 ---------- */
-async function api(path, opts = {}) {
+let _token = null;
+async function token() {
+  if (_token && _token.exp > Date.now() / 1000 + 60) return _token.v;
   const { data } = await sb.auth.getSession();
+  const v = data.session?.access_token;
+  try { _token = { v, exp: JSON.parse(atob(v.split(".")[1])).exp }; } catch { _token = { v, exp: 0 }; }
+  return v;
+}
+async function api(path, opts = {}) {
   const res = await fetch(path, {
     ...opts,
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session?.access_token}`, ...(opts.headers || {}) },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${await token()}`, ...(opts.headers || {}) },
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.detail || `요청이 실패했어요 (${res.status})`);
   return body;
 }
-const post = (path, body) => api(path, { method: "POST", body: JSON.stringify(body || {}) });
+/* ---------- 화면 데이터 캐시: 먼저 보여 주고, 뒤에서 갱신 ---------- */
+const cache = {
+  store: new Map(),
+  paths: { home: "/api/home", events: "/api/events", reminders: "/api/reminders",
+           notes: "/api/notes", drafts: "/api/drafts", tasks: "/api/tasks",
+           actions: "/api/actions", skills: "/api/skills", history: "/api/history" },
+  has(k) { return this.store.has(k); },
+  peek(k) { return this.store.get(k); },
+  async get(k) { return this.store.has(k) ? this.store.get(k) : this.fresh(k); },
+  async fresh(k) { const v = await api(this.paths[k]); this.store.set(k, v); return v; },
+  drop(...ks) { for (const k of ks) this.store.delete(k); },
+  clear() { this.store.clear(); },
+  async warm() { await Promise.all(Object.keys(this.paths).map((k) => this.fresh(k).catch(() => {}))); },
+};
+
+const CACHE_TOUCH = [
+  [/\/api\/(events)\b/, ["events", "home", "reminders", "notes"]],   // 일정은 알림·메모와 얽힘
+  [/\/api\/(reminders)\b/, ["reminders", "home"]],
+  [/\/api\/(notes)\b/, ["notes"]],
+  [/\/api\/(drafts)\b/, ["drafts"]],
+  [/\/api\/(tasks)\b/, ["tasks", "home"]],
+  [/\/api\/(actions|skills)\b.*\/(approve|reject|undo|run|remove)/, ["actions", "tasks", "skills", "home", "events", "reminders", "notes", "drafts"]],
+  [/\/api\/(chat)\b/, ["history", "actions", "tasks", "home", "events", "reminders", "notes", "drafts", "skills"]],
+  [/\/api\/(name)\b/, ["home"]],
+];
+async function post(path, body) {
+  const r = await api(path, { method: "POST", body: JSON.stringify(body || {}) });
+  for (const [re, keys] of CACHE_TOUCH) if (re.test(path)) cache.drop(...keys);
+  return r;
+}
 
 /* ---------- 시각 ---------- */
 const pad = (n) => String(n).padStart(2, "0");
@@ -253,8 +289,15 @@ async function goHome() {
   show("home");
   $("today").textContent = new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "long" });
   $("agentName").textContent = agentName;
-  const h = await api("/api/home").catch(() => ({ events: [], pending: 0, asking: 0 }));
+  if (cache.has("home")) {                 // 바로 그리고
+    paintHome(cache.peek("home"));
+    cache.fresh("home").then((h) => { if (!current) paintHome(h); }).catch(() => {});
+  } else {
+    paintHome(await cache.get("home").catch(() => ({ events: [], pending: 0, asking: 0 })));
+  }
+}
 
+function paintHome(h) {
   const w = $("widget"); w.replaceChildren(el("h2", "", "오늘"));
   if (!h.events.length) w.append(el("div", "empty", "오늘 일정이 없어요."));
   for (const e of h.events) {
@@ -292,10 +335,22 @@ async function openApp(key, push = true) {
   if (push) history.pushState({ app: key }, "", "#" + key);
   await render();
 }
-async function render() {
+async function render(revalidate = true) {
   const body = $("screenBody");
-  try { await SCREENS[current].render(body); }
-  catch (e) { body.replaceChildren(el("div", "empty-state", e.message)); }
+  const key = SCREENS[current].cacheKey;
+  try {
+    if (key && cache.has(key)) {
+      // 지난번 받아 둔 값으로 즉시 그린다 (서버를 안 기다린다)
+      await SCREENS[current].render(body, cache.peek(key));
+      if (revalidate) {
+        cache.fresh(key).then((v) => {
+          if (current && SCREENS[current].cacheKey === key) SCREENS[current].render(body, v).catch(() => {});
+        }).catch(() => {});
+      }
+    } else {
+      await SCREENS[current].render(body, key ? await cache.get(key) : null);
+    }
+  } catch (e) { body.replaceChildren(el("div", "empty-state", e.message)); }
 }
 $("back").onclick = () => history.back();
 window.addEventListener("popstate", (e) => (e.state?.app ? openApp(e.state.app, false) : goHome()));
@@ -333,9 +388,9 @@ function button(label, kind, onClick) {
 
 /* ===================== 일정 ===================== */
 SCREENS.events = {
-  async render(body) {
-    const since = new Date(); since.setHours(0, 0, 0, 0);
-    const { items } = await api(`/api/events?start=${encodeURIComponent(since.toISOString())}`);
+  cacheKey: "events",
+  async render(body, data) {
+    const { items } = data || await cache.get("events");
     const nodes = []; let last = "";
     for (const e of items) {
       const day = md(e.starts_at);
@@ -399,8 +454,9 @@ async function editEvent(id) {
 
 /* ===================== 메모 ===================== */
 SCREENS.notes = {
-  async render(body) {
-    const { items } = await api("/api/notes");
+  cacheKey: "notes",
+  async render(body, data) {
+    const { items } = data || await cache.get("notes");
     listOrEmpty(body, items.map((n) => itemBtn(n.title || n.content.split("\n")[0].slice(0, 40),
       `${md(n.updated_at)}${n.event_id ? " · 일정에 붙음" : ""}\n${n.title ? n.content : n.content.split("\n").slice(1).join(" ")}`.trim(),
       () => editNote(n.id, n))), "메모가 없어요.");
@@ -427,8 +483,10 @@ async function editNote(id, n, backToEvent) {
 /* ===================== 알림 ===================== */
 let showPastReminders = false;
 SCREENS.reminders = {
-  async render(body) {
-    const { items } = await api(`/api/reminders?past=${showPastReminders ? 1 : 0}`);
+  cacheKey: "reminders",
+  async render(body, data) {
+    const { items } = showPastReminders ? await api("/api/reminders?past=1")
+                                        : (data || await cache.get("reminders"));
     const t = button(showPastReminders ? "다가올 알림 보기" : "지난 알림 보기", "ghost small toggle", async () => { showPastReminders = !showPastReminders; await render(); });
     const nodes = items.map((r) => itemBtn(r.text, `${when(r.due_at)}${r.event_id ? " · 일정에 붙음" : ""}${r.status === "sent" ? " · 보냄" : ""}`,
       () => (r.status === "scheduled" ? editReminder(r) : null)));
@@ -452,8 +510,9 @@ function editReminder(r) {
 
 /* ===================== 초안 ===================== */
 SCREENS.drafts = {
-  async render(body) {
-    const { items } = await api("/api/drafts");
+  cacheKey: "drafts",
+  async render(body, data) {
+    const { items } = data || await cache.get("drafts");
     listOrEmpty(body, items.map((d) => itemBtn(d.content.split("\n")[0].slice(0, 40), md(d.updated_at), () => editDraft(d))),
       "초안이 없어요.\n채팅에서 \u201c학부모님께 보낼 안내 문자 써 줘\u201d처럼 부탁해 보세요.");
   },
@@ -470,8 +529,9 @@ function editDraft(d) {
 /* ===================== 맡은 일 ===================== */
 const TASK_STATE = { open: "진행 중", waiting_user: "답을 기다려요", waiting_approval: "확인을 기다려요", done: "끝났어요", stopped: "멈췄어요" };
 SCREENS.tasks = {
-  async render(body) {
-    const { live, ended } = await api("/api/tasks");
+  cacheKey: "tasks",
+  async render(body, data) {
+    const { live, ended } = data || await cache.get("tasks");
     const nodes = [...live, ...ended].map((t) => {
       const ended = t.status === "done" || t.status === "stopped";
       const d = el("div", "card" + (t.status === "waiting_user" ? " ask" : "") + (ended ? " ended" : ""));
@@ -503,15 +563,21 @@ function describe(a) {
   return g.text || g.query || a.reason || "";
 }
 SCREENS.inbox = {
-  async render(body) {
-    const { pending, recent } = await api("/api/actions");
+  cacheKey: "actions",
+  async render(body, data) {
+    const { pending, recent } = data || await cache.get("actions");
     const nodes = [];
     if (pending.length) nodes.push(el("div", "group", "확인이 필요해요"));
     for (const a of pending) {
       const d = el("div", "card wait"); d.append(el("div", "t", a.label), el("div", "b", describe(a)));
       const row = el("div", "row");
-      row.append(button("하기", "small", async () => { await post(`/api/actions/${a.id}/approve`); await render(); }),
-                 button("하지 않기", "ghost small", async () => { await post(`/api/actions/${a.id}/reject`); await render(); }));
+      const decide = (verb) => async () => {
+        d.style.opacity = "0.4";                      // 먼저 흐리게 (즉시 반응)
+        try { await post(`/api/actions/${a.id}/${verb}`); d.remove(); if (!$("screenBody").querySelector(".card")) await render(false); }
+        catch (e) { d.style.opacity = "1"; alert(e.message); }
+      };
+      row.append(button("하기", "small", decide("approve")),
+                 button("하지 않기", "ghost small", decide("reject")));
       d.append(row); nodes.push(d);
     }
     if (recent.length) nodes.push(el("div", "group", "묻지 않고 해 둔 일"));
@@ -526,8 +592,9 @@ SCREENS.inbox = {
 
 /* ===================== 기능 ===================== */
 SCREENS.skills = {
-  async render(body) {
-    const { builtin, custom } = await api("/api/skills");
+  cacheKey: "skills",
+  async render(body, data) {
+    const { builtin, custom } = data || await cache.get("skills");
     const nodes = [el("div", "group", "기본 기능 · 지울 수 없어요")];
     for (const b of builtin) nodes.push(itemBtn(b.name, b.description, () => {}));
     nodes.push(el("div", "group", "추가된 기능"));
@@ -615,9 +682,10 @@ SCREENS.settings = {
 /* ===================== 채팅 ===================== */
 const OPEN_LINK = { event_id: ["events", "일정 보기"], reminder_id: ["reminders", "알림 보기"], memory_id: ["notes", "메모 보기"], task_id: ["tasks", "맡은 일 보기"], skill_id: ["skills", "기능 보기"] };
 SCREENS.chat = {
-  async render(body) {
+  cacheKey: "history",
+  async render(body, data) {
     const log = el("div", "log"); log.id = "log"; body.replaceChildren(log);
-    const { items } = await api("/api/history");
+    const { items } = data || await cache.get("history");
     if (!items.length) log.append(el("div", "empty-state", `${agentName}에게 부탁할 일을 적어 보세요.\n일정, 알림, 메모로 남길 일은 각 앱에 저장돼요.`));
     for (const m of items) bubble(m.role === "user" ? "user" : "agent", m.text);
   },
@@ -686,6 +754,7 @@ async function enter() {
   agentName = me.name; document.title = me.name;
   const target = new URLSearchParams(location.search).get("open");
   history.replaceState(null, "", location.pathname);
+  cache.warm();                            // 모든 앱 데이터를 한 번에 데운다 (기다리지 않는다)
   await goHome();
   if (target) { history.replaceState(null, "", location.pathname); await openTarget(target); }
   // 알림 서비스 워커가 있으면 연결해 두고, 알림을 누르면 화면을 바꾼다
