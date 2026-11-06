@@ -944,15 +944,20 @@ SCREENS.settings = {
       const h = el("div", "sub");
       h.append(el("h3", "", "몰랑이의 자식"));
       h.append(el("p", "muted", hs.heir
-        ? "이 계정의 비서는 지내며 자기 결(정체성)이 자라요."
-        : "켜면, 이 비서가 당신과 지내며 자기만의 결을 갖기 시작해요. (실험적)"));
+        ? "이 계정의 비서는 지내며 자기 결(정체성)이 자라요. 몰랑이의 자식은 당신 하나예요."
+        : hs.available
+          ? "켜면, 이 비서가 당신과 지내며 자기만의 결을 갖기 시작해요. 한 명만 될 수 있고, 먼저 켠 사람으로 고정돼요. (실험적)"
+          : "몰랑이의 자식은 이미 다른 계정으로 정해졌어요. 한 명만 될 수 있어요."));
       if (hs.heir && hs.persona) {
         const pv = el("div", "resulttext"); pv.style.fontSize = ".9rem"; pv.textContent = hs.persona;
         h.append(el("p", "muted", "지금까지 자란 모습:"), pv);
       }
-      h.append(button(hs.heir ? "끄기" : "켜기", "ghost small", async () => {
-        await post("/api/heir", { on: !hs.heir }); await render();
-      }));
+      if (hs.heir || hs.available) {
+        h.append(button(hs.heir ? "끄기" : "켜기", "ghost small", async () => {
+          try { await post("/api/heir", { on: !hs.heir }); } catch (e) { alert(e.message); }
+          await render();
+        }));
+      }
       box.append(h);
     } catch { /* 권한·네트워크 문제면 토글 숨김 */ }
 
