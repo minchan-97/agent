@@ -48,13 +48,16 @@ class _FixPath:
             orig = scope.get("path") or "/"
             q = parse_qsl((scope.get("query_string") or b"").decode(), keep_blank_values=True)
             rest = next((v for k, v in q if k == "__path"), None)
-            q = [(k, v) for k, v in q if k != "__path"]
-            if rest is not None:
+            q = [(k, v) for k, v in q if k not in ("__path", "path")]
+            p = orig
+            if rest is not None:                       # 예전 rewrite 방식이 남아 있을 때
                 p = "/api/" + rest.lstrip("/")
             else:
-                p = orig
-                if not p.startswith("/api/"):
-                    p = "/api" + (p if p.startswith("/") else "/" + p)
+                for pre in ("/api/index.py", "/api/index"):
+                    if p.startswith(pre + "/"):
+                        p = "/api/" + p[len(pre) + 1:]
+                        break
+            # 그 밖의 경로는 건드리지 않는다 (FastAPI 프로젝트 방식에서는 원래 경로가 그대로 온다)
             scope = {**scope, "path": p, "raw_path": p.encode(),
                      "query_string": urlencode(q).encode(), "_orig_path": orig}
         await self.inner(scope, receive, send)
@@ -79,6 +82,13 @@ def _agent(sb) -> dict:
     # 첫 접속: 이름 없는 비서를 만든다. 알림 주제는 길고 뜻 없게 (주제 = 비밀번호)
     topic = "bs-" + secrets.token_urlsafe(18)
     return sb.table("agents").insert({"ntfy_topic": topic}).execute().data[0]
+
+
+# ---------- 첫 화면 ----------
+@app.get("/", include_in_schema=False)
+def root():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse("/index.html")
 
 
 # ---------- 공개 ----------
