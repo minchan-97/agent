@@ -20,6 +20,7 @@ biseo/
   tasks.py          과제: 붙잡고 있다가 한 걸음씩 진행
   skills.py         기능: 기본 기능(잠김) + 추가 기능(지울 수 있음)
   apps.py           앱 항목(일정·알림·메모·초안) 만들기·고치기·지우기와 연동
+  shortcuts.py      내가 만드는 명령 버튼 (검색·과제 앱)
   tick.py           크론: 사람마다 알림 → 과제 한 걸음 → 확인 알림
   db.py             연결 + Scoped (모든 쿼리에 user_id 자동)
 public/index.html   스마트폰식 화면: 홈(오늘 위젯 + 앱 아이콘) → 각 앱
