@@ -87,3 +87,34 @@ def test_claim_due_only_once(monkeypatch):
     first = apps.claim_due(sb, now)
     second = apps.claim_due(sb, now)
     assert len(first) == 1 and second == []
+
+
+# ---------------- 체감 속도: 이어 달리기 ----------------
+def _always(ans):
+    return lambda msgs: dict(ans)
+
+
+def test_run_chains_steps_until_stop_point(monkeypatch):
+    """한 번 부르면 한 걸음이 아니라, 끝날 때까지(또는 한도까지) 이어 달린다."""
+    sb = _sb(monkeypatch)
+    t = tk.create(sb, "메모 세 개 남기기")
+    answers = iter([
+        {"thought": "1", "action": {"kind": "draft", "args": {"to": "나", "text": "a"}}, "status": "continue"},
+        {"thought": "2", "action": {"kind": "draft", "args": {"to": "나", "text": "b"}}, "status": "continue"},
+        {"thought": "3", "action": None, "status": "done", "result": "끝"},
+        {"verdict": "done", "quality": 4, "gap": "", "result": "끝"},     # 끝내기 전 자기 점검
+    ])
+    res = tick.run_task_steps(sb, AGENT, t["id"], lambda m: next(answers), max_steps=8, budget=30)
+    assert res["steps"] == 3 and tk.get(sb, t["id"])["status"] == "done"
+
+
+def test_cron_tick_moves_several_tasks(monkeypatch):
+    """한 과제가 멈출 지점에 닿으면, 같은 틱의 남은 시간으로 다음 과제도 진행한다."""
+    sb = _sb(monkeypatch)
+    a = tk.create(sb, "첫 번째 일")
+    b = tk.create(sb, "두 번째 일")
+    ask = _always({"thought": "필요한 정보", "action": None, "status": "ask_user",
+                   "question": "언제까지인가요?"})
+    tick.step_user(sb, {**AGENT, "user_id": "u"}, ask)
+    assert tk.get(sb, a["id"])["status"] == "waiting_user"
+    assert tk.get(sb, b["id"])["status"] == "waiting_user"
