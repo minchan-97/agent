@@ -189,11 +189,14 @@ create table if not exists tasks (
   icon          text,
   tint          text,
   last_step_at  timestamptz,
+  -- 지금 누가 이 과제를 진행 중인지 (크론·"지금 한 걸음"이 겹쳐도 한쪽만 진행)
+  lease_until   timestamptz not null default 'epoch',
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
   constraint steps_cap check (steps <= max_steps),
   constraint max_steps_range check (max_steps between 1 and 60)
 );
+alter table tasks add column if not exists lease_until timestamptz not null default 'epoch';
 create index if not exists tasks_open on tasks(user_id, status, last_step_at nulls first);
 
 -- ---------- 8. 행동 ----------
