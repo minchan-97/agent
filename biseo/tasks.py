@@ -209,6 +209,25 @@ def _messages(agent_name: str, t: dict, skill: dict | None = None) -> list:
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 
+EXTERNAL_MARK = "[외부 자료]"
+
+
+def saw_external(t: dict) -> bool:
+    """
+    이 과제가 지금까지 바깥 자료(검색 결과)를 본 적이 있나.
+    한 번 봤으면 그 뒤의 모든 판단은 그 자료의 영향을 받을 수 있으므로,
+    과제가 끝날 때까지 오염 표시가 이어진다 (끈적한 오염).
+    기록에서 계산하므로 예전에 만든 과제에도 그대로 적용된다.
+    """
+    for e in t.get("log") or []:
+        if e.get("by") == "user":
+            continue
+        if (e.get("action") or {}).get("kind") == "search" and \
+                str(e.get("outcome", "")).startswith(EXTERNAL_MARK):
+            return True
+    return False
+
+
 def _same_as_before(t: dict, action: dict) -> bool:
     key = json.dumps(action, ensure_ascii=False, sort_keys=True)
     for e in t.get("log") or []:
@@ -280,7 +299,7 @@ def step(sb, agent: dict, task_id: int, ask_llm) -> dict:
                 try:
                     pack = ex.explore(q, today_only, ask_llm, max_tries=4)
                     if pack["results"]:
-                        entry["outcome"] = "[외부 자료] " + " | ".join(
+                        entry["outcome"] = EXTERNAL_MARK + " " + " | ".join(
                             f"({r.get('published') or '작성 시각 모름'}) {r['title']}: {r['snippet']} ({r['url']})"
                             for r in pack["results"])[:SNIPPET]
                     else:
@@ -292,11 +311,17 @@ def step(sb, agent: dict, task_id: int, ask_llm) -> dict:
             else:
                 entry["outcome"] = "검색을 쓸 수 없음 (BRAVE_API_KEY 없음)"
         else:
-            row = act.propose(sb, kind, args, thought, origin="self", task_id=task_id)
+            # 앞선 걸음에서 검색 자료를 봤으면, 이 행동은 그 자료의 영향을 받았을 수 있다
+            tainted = saw_external(t)
+            row = act.propose(sb, kind, args, thought, origin="self", task_id=task_id,
+                              tainted=tainted)
             entry["outcome"] = f"{act.KINDS[kind]['label']}: {row.get('status')}"
+            if tainted:
+                entry["tainted"] = True
             if row.get("status") == "proposed":
                 status = "waiting_approval"
-                notify = f"'{t['goal'][:30]}' 진행 중에 확인할 일이 생겼어요."
+                notify = (f"'{t['goal'][:30]}' 진행 중에 확인할 일이 생겼어요."
+                          + (" (검색 자료를 보고 나온 일)" if tainted else ""))
 
     if status == "ask_user":
         q = str(out.get("question") or "어떻게 할지 알려 주세요.")[:300]
