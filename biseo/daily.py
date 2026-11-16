@@ -86,17 +86,17 @@ def gather(sb) -> dict:
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     from . import apps
     evs = apps.events_between(sb, start.isoformat(), (start + timedelta(days=4)).isoformat(), limit=12)
-    rems = sb.table("reminders").select("text,due_at").eq("status", "scheduled") \
+    rems = sb.table("reminders").select("id,text,due_at").eq("status", "scheduled") \
              .lt("due_at", (start + timedelta(days=2)).isoformat()) \
              .order("due_at", desc=False).limit(8).execute().data or []
     # 과제는 목표·상태만 (결과·기록에는 검색으로 가져온 바깥 글이 있을 수 있다)
-    tasks = sb.table("tasks").select("goal,status,question") \
+    tasks = sb.table("tasks").select("id,goal,status,question") \
               .in_("status", ["open", "waiting_user", "waiting_approval", "stopped"]) \
               .limit(8).execute().data or []
-    notes = sb.table("task_memory").select("title,content").eq("kind", "note") \
+    notes = sb.table("task_memory").select("id,title,content").eq("kind", "note") \
               .order("updated_at", desc=True).limit(5).execute().data or []
-    facts = sb.table("facts_active").select("text").order("strength", desc=True).limit(12).execute().data or []
-    talk = (sb.table("episodes").select("role,text").order("id", desc=True).limit(10).execute().data or [])[::-1]
+    facts = sb.table("facts_active").select("id,text").order("strength", desc=True).limit(12).execute().data or []
+    talk = (sb.table("episodes").select("id,role,text").order("id", desc=True).limit(10).execute().data or [])[::-1]
     pending = sb.table("actions").select("id", count="exact").eq("status", "proposed").execute().count or 0
     return {"events": evs, "reminders": rems, "tasks": tasks, "notes": notes,
             "facts": facts, "talk": talk, "pending": pending}
@@ -130,10 +130,12 @@ PROMPT = """
   "items": [
     {"title": "제안 한 줄 (무엇을 할지, 짧게)",
      "why": "왜 오늘인지 한 문장 (재료의 어떤 일정·과제·말에서 나왔는지)",
+     "evidence": ["E1", "C3"],
      "kind": "task | note | reminder | event | none",
      "args": {}}
   ]
 }
+evidence: 이 제안이 나온 재료 줄의 번호(대괄호 안의 E·R·T·N·F·C 번호)를 1~3개. 번호를 댈 수 없는 제안은 만들지 마라.
 kind 와 args
   task      {"goal": "비서가 맡아서 할 일 한 문장"}       조사·정리·초안처럼 비서가 해 줄 수 있는 일
   reminder  {"text": "알릴 말", "due_at": "2026-11-17T15:00:00+09:00"}   오늘 이후 시각만
@@ -150,19 +152,32 @@ kind 와 args
 """
 
 
-def _material_text(g: dict, now: datetime) -> str:
-    def lines(rows, f):
-        return "\n".join("- " + f(r) for r in rows) or "- (없음)"
-    return (
-        f"지금: {now.strftime('%Y-%m-%d (%a) %H:%M')} (한국)\n\n"
-        f"[가까운 일정]\n{lines(g['events'], lambda e: f'{_hm(e['starts_at'])} {e['title']}' + (f' @{e['place']}' if e.get('place') else ''))}\n\n"
-        f"[걸어 둔 알림]\n{lines(g['reminders'], lambda r: f'{_hm(r['due_at'])} {r['text']}')}\n\n"
-        f"[맡은 일]\n{lines(g['tasks'], lambda t: f'{t['goal']} ({t['status']})' + (f' 질문: {t['question']}' if t.get('question') else ''))}\n\n"
-        f"[최근 메모]\n{lines(g['notes'], lambda n: (n.get('title') or '') + ' ' + str(n['content'])[:120])}\n\n"
-        f"[이 사람에 대해 아는 것]\n{lines(g['facts'], lambda f: f['text'])}\n\n"
-        f"[최근 대화]\n{lines(g['talk'], lambda m: ('사용자' if m['role'] == 'user' else '나') + ': ' + str(m['text'])[:160])}\n\n"
-        f"확인함에 기다리는 일: {g['pending']}건"
-    )
+def _material(g: dict, now: datetime) -> tuple:
+    """판단 재료를 번호 붙은 줄로. 돌려주는 값: (글, {번호: 근거}) — 제안이 어느 줄에서 나왔는지 인용하게 한다."""
+    index, out = {}, [f"지금: {now.strftime('%Y-%m-%d (%a) %H:%M')} (한국)"]
+
+    def section(title, prefix, rows, fmt, kind):
+        out.append(f"\n[{title}]")
+        if not rows:
+            out.append("- (없음)")
+        for i, r in enumerate(rows, 1):
+            tag = f"{prefix}{i}"
+            text = fmt(r)
+            index[tag] = {"tag": tag, "kind": kind, "id": r.get("id"), "text": text[:160]}
+            out.append(f"[{tag}] {text}")
+
+    section("가까운 일정", "E", g["events"],
+            lambda e: f"{_hm(e['starts_at'])} {e['title']}" + (f" @{e['place']}" if e.get("place") else "")
+            + (" (반복)" if e.get("repeat") else ""), "event")
+    section("걸어 둔 알림", "R", g["reminders"], lambda r: f"{_hm(r['due_at'])} {r['text']}", "reminder")
+    section("맡은 일", "T", g["tasks"],
+            lambda t: f"{t['goal']} ({t['status']})" + (f" 질문: {t['question']}" if t.get("question") else ""), "task")
+    section("최근 메모", "N", g["notes"], lambda n: ((n.get("title") or "") + " " + str(n["content"])[:120]).strip(), "note")
+    section("이 사람에 대해 아는 것", "F", g["facts"], lambda f: f["text"], "fact")
+    section("최근 대화", "C", g["talk"],
+            lambda m: ("사용자" if m["role"] == "user" else "나") + ": " + str(m["text"])[:160], "talk")
+    out.append(f"\n확인함에 기다리는 일: {g['pending']}건")
+    return "\n".join(out), index
 
 
 def _clean_items(raw) -> list:
@@ -177,23 +192,40 @@ def _clean_items(raw) -> list:
         args = it.get("args") if isinstance(it.get("args"), dict) else {}
         if kind == "task" and not str(args.get("goal", "")).strip():
             args = {"goal": title}
+        ev = [str(x).strip().strip("[]") for x in (it.get("evidence") or []) if isinstance(x, (str, int))][:3]
         out.append({"id": secrets.token_hex(3), "title": title,
                     "why": str(it.get("why", "")).strip()[:160],
-                    "kind": kind, "args": args, "state": "new"})
+                    "evidence": ev, "kind": kind, "args": args, "state": "new"})
     return out
 
 
 def make(sb, agent: dict, ask_llm, now=None) -> dict:
     """오늘의 제안을 만든다. 실패하면 예외를 그대로 올린다 (부르는 쪽이 횟수를 센다)."""
+    from . import judge
     from .privacy import mask
     now = now or _now()
     g = gather(sb)
-    out = ask_llm([{"role": "system", "content": PROMPT},
-                   {"role": "user", "content": mask(_material_text(g, now))}])
+    material, index = _material(g, now)
+    # 몰랑이 판단 노드: 추천 트리를 걷고, 비슷했던 지난 추천을 회상해서 함께 넣는다
+    w = judge.walk(sb, "recommendation")
+    brief_ctx = " ".join(v["text"] for v in list(index.values())[:20])
+    recalled = judge.recall(sb, "recommendation", brief_ctx)
+    system = PROMPT + "\n\n" + judge.directive_text(w) + ("\n\n" + judge.recall_text(recalled) if recalled else "")
+    out = ask_llm([{"role": "system", "content": system},
+                   {"role": "user", "content": mask(material)}])
+    items = _clean_items(out.get("items"))
     plan = {"date": now.date().isoformat(), "at": now.isoformat(), "done": True,
             "greeting": str(out.get("greeting", "")).strip()[:160] or "좋은 아침이에요.",
-            "brief": brief_line(g), "items": _clean_items(out.get("items"))}
+            "brief": brief_line(g), "items": items}
     _save(sb, plan)
+    # 제안마다 판단 하나: 어느 길로, 어느 재료 줄을 근거로, 어떤 지난 판단을 떠올렸는지
+    for it in items:
+        try:
+            judge.record(sb, w, summary=f"{it['title']} — {it['why']}".strip(" —"),
+                         context=brief_ctx, evidence=[index[t] for t in it.get("evidence", []) if t in index],
+                         recalled=recalled, ref_kind="daily", ref_id=it["id"])
+        except Exception as e:      # 판단 기록이 실패해도 제안은 나간다
+            print("JUDGE_RECORD_SKIP", type(e).__name__, str(e)[:120])
     return plan
 
 
@@ -263,4 +295,6 @@ def decide(sb, item_id: str, accept: bool) -> dict:
     else:
         item["state"] = "dismissed"
     _save(sb, plan)
+    from . import judge
+    judge.safe_feedback(sb, "daily", item_id, 1.0 if accept else -1.0)    # 판단 노드가 배운다
     return {"item": item, **result}
