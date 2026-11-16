@@ -13,7 +13,12 @@ db.py — Supabase 연결.
   그래서 몰랑이처럼 주의가 아니라 구조로 막는다. 코어 모듈은 Scoped 만 받는다.
 """
 import os
-from supabase import create_client
+
+
+def create_client(url, key):
+    # supabase 패키지는 실제로 연결할 때만 불러온다 (시험에서는 가짜 DB 를 쓴다)
+    from supabase import create_client as _create
+    return _create(url, key)
 
 
 def _url() -> str:
