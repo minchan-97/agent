@@ -35,7 +35,7 @@ CONTRACT = """
 반드시 JSON 객체 하나로만 답해. 다른 글자는 쓰지 마.
 {
   "reply": "사용자에게 할 말",
-  "actions": [{"kind": "...", "args": {...}, "reason": "왜 하자고 하는지 한 줄"}],
+  "actions": [{"kind": "...", "args": {...}, "reason": "왜 하자고 하는지 한 줄", "because": ["U", "F1"]}],
   "user_facts": ["..."],
   "task_answers": [{"task_id": 숫자, "answer": "..."}],
   "suggest": [{"kind": "note|reminder|draft|event|start_task", "label": "버튼에 쓸 짧은 말", "args": {...}}]
@@ -66,6 +66,8 @@ actions 에 쓸 수 있는 kind 와 args
   send_message  아직 못 하는 일. 보내 달라고 하면 draft 로 대신 만들고 그렇다고 말해.
 
 규칙
+- because: 그 행동의 근거가 된 줄의 번호. U = 사용자의 이번 말, F번호 = 아는 사실, N번호 = 업무 기록.
+  근거가 사용자의 이번 말뿐이면 ["U"]. 근거를 댈 수 없는 행동은 하지 마.
 - 하자고 한 일이 "이미 끝났다"고 말하지 마. 실행할지는 시스템과 사용자가 정한다.
   "메모로 남겨 둘게요", "알림을 걸어 둘게요"처럼 말하면 충분하다.
 - 할 일이 없으면 actions 는 [].
@@ -158,10 +160,19 @@ def respond(sb, agent: dict, user_text: str) -> dict:
     text = mask(user_text.strip())[:4000]
     now = datetime.now(KST).strftime("%Y-%m-%d (%a) %H:%M")
 
-    facts = (sb.table("facts_active").select("text,trust")
+    facts = (sb.table("facts_active").select("id,text,trust")
              .order("strength", desc=True).limit(30).execute().data) or []
-    notes = [r["content"] for r in (sb.table("task_memory").select("content")
-             .eq("kind", "note").order("id", desc=True).limit(10).execute().data or [])]
+    note_rows = (sb.table("task_memory").select("id,content")
+                 .eq("kind", "note").order("id", desc=True).limit(10).execute().data or [])
+    # 판단 근거 번호: 행동마다 어느 줄을 근거로 했는지 인용하게 한다 ('왜?' 화면이 그 줄로 데려간다)
+    evidence_index = {"U": {"tag": "U", "kind": "talk", "id": None, "text": text[:160]}}
+    for i, f in enumerate(facts, 1):
+        evidence_index[f"F{i}"] = {"tag": f"F{i}", "kind": "fact", "id": f.get("id"), "text": f["text"][:160]}
+        f["text"] = f"[F{i}] {f['text']}"
+    notes = []
+    for i, n in enumerate(note_rows, 1):
+        evidence_index[f"N{i}"] = {"tag": f"N{i}", "kind": "note", "id": n.get("id"), "text": str(n["content"])[:160]}
+        notes.append(f"[N{i}] {n['content']}")
     history = (sb.table("episodes").select("role,text")
                .order("id", desc=True).limit(8).execute().data or [])[::-1]
 
@@ -178,6 +189,15 @@ def respond(sb, agent: dict, user_text: str) -> dict:
             f"#{o['id']} {o['goal']} ({o['status']})" for o in open_tasks)
 
     extra += sk.for_prompt(sb)
+    # 몰랑이 판단 노드: 대화 판단 트리를 걷고, 비슷했던 지난 판단을 회상한다
+    from . import judge
+    try:
+        jw = judge.walk(sb, "response")
+        recalled = judge.recall(sb, "response", text)
+        extra += "\n\n" + judge.directive_text(jw) + ("\n\n" + judge.recall_text(recalled) if recalled else "")
+    except Exception as e:          # 판단 기록 표가 아직 없어도 대화는 된다
+        print("JUDGE_WALK_SKIP", type(e).__name__, str(e)[:120])
+        jw, recalled = None, []
     messages = [{"role": "system",
                  "content": system_prompt(agent["name"], facts, notes, now)
                  + growth.for_prompt(sb) + heir.for_prompt(agent) + extra
@@ -235,9 +255,22 @@ def respond(sb, agent: dict, user_text: str) -> dict:
     # 그래서 오염 표시를 붙여, 승격돼 있어도 반드시 묻게 한다.
     done = []
     for a in out["actions"][:3]:
-        done.append(act.propose(sb, str(a.get("kind", "")), a.get("args") or {},
-                                str(a.get("reason", "")), origin="user",
-                                tainted=saw_external))
+        row = act.propose(sb, str(a.get("kind", "")), a.get("args") or {},
+                          str(a.get("reason", "")), origin="user", tainted=saw_external)
+        done.append(row)
+        # 행동마다 판단 하나: 이 행동이 어느 근거(이번 말·사실·기록)에서 나왔는지
+        if jw and row.get("id"):
+            tags = [str(t).strip("[] ") for t in (a.get("because") or ["U"]) if isinstance(t, (str, int))][:4] or ["U"]
+            ev = [evidence_index[t] for t in tags if t in evidence_index] or [evidence_index["U"]]
+            if saw_external:
+                ev.append({"tag": "W", "kind": "web", "id": None, "text": "이번 답에 쓴 검색 자료"})
+            try:
+                judge.record(sb, jw, summary=f"{act.KINDS.get(row['kind'], {}).get('label', row['kind'])}: "
+                                             f"{a.get('reason') or ''}".strip(": "),
+                             context=text, evidence=ev, recalled=recalled,
+                             ref_kind="action", ref_id=row["id"], tainted=saw_external)
+            except Exception as e:
+                print("JUDGE_RECORD_SKIP", type(e).__name__, str(e)[:120])
 
     answered = []
     waiting_ids = {w["id"] for w in waiting}
