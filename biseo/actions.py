@@ -173,6 +173,8 @@ def approve(sb, action_id: int) -> dict:
         clean = t.get("clean", 0) + 1
         _save_trust(sb, row["kind"], clean, promoted=clean >= PROMOTE_AT)
     _resume_task(sb, row, "승인됨 → " + done["status"])
+    from . import judge
+    judge.safe_feedback(sb, "action", action_id, 1.0)          # 판단 노드가 배운다
     return done
 
 
@@ -188,6 +190,8 @@ def reject(sb, action_id: int) -> dict:
         if pid:
             sb.table("usage_patterns").update({"dismissed": True}).eq("id", pid).execute()
     _resume_task(sb, row, "사용자가 하지 않기로 함")
+    from . import judge
+    judge.safe_feedback(sb, "action", action_id, -1.0)
     return sb.table("actions").update({"status": "rejected", "decided_at": _now()}
                                       ).eq("id", action_id).execute().data[0]
 
@@ -215,6 +219,8 @@ def undo(sb, action_id: int) -> dict:
         sb.table("events").delete().eq("id", res["event_id"]).execute()
     if row.get("auto_executed") and row["tier"] == 3:
         _save_trust(sb, row["kind"], 0, promoted=False)
+    from . import judge
+    judge.safe_feedback(sb, "action", action_id, -1.0)          # 되돌린 건 틀린 판단
     return sb.table("actions").update({"status": "undone", "decided_at": _now()}
                                       ).eq("id", action_id).execute().data[0]
 
