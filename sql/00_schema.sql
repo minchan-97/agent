@@ -15,6 +15,7 @@
 --      - 남에게 닿는 행동(tier 4)은 사람 승인 없이 완료될 수 없다
 --      - 외부에서 들어온 내용이 계기인 행동은 최소 tier 4
 --      - 추가 기능은 기본 도구 밖의 도구를 쓸 수 없다
+--      - 검색 결과를 보고 나온 행동(tainted)은 승격돼 있어도 사람에게 묻는다
 --      - 과제는 걸음 한도를 넘을 수 없다
 --      - 몰랑이의 자식(heir)은 전체에서 한 명뿐이다
 -- ============================================================
@@ -204,6 +205,8 @@ create table if not exists actions (
   approved_by_human boolean not null default false,
   result            jsonb,
   task_id           bigint references tasks(id) on delete set null,
+  -- 검색 결과(바깥 글)를 본 뒤에 나온 행동. tier 3 이상이면 자동 실행할 수 없다.
+  tainted           boolean not null default false,
   due_at            timestamptz,
   created_at        timestamptz not null default now(),
   decided_at        timestamptz,
@@ -216,6 +219,14 @@ create table if not exists actions (
   constraint t4_needs_human check (not (tier = 4 and status in ('done','scheduled') and not approved_by_human))
 );
 alter table actions add column if not exists task_id bigint references tasks(id) on delete set null;
+alter table actions add column if not exists tainted boolean not null default false;
+-- 오염된 행동은 승격돼 있어도 묻는다 (보기·초안인 tier 1·2 는 일어나는 일이 없으므로 예외)
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'tainted_never_auto') then
+    alter table actions add constraint tainted_never_auto
+      check (not (tainted and auto_executed and tier >= 3));
+  end if;
+end $$;
 create index if not exists actions_open on actions(user_id, status);
 create index if not exists actions_due on actions(status, due_at) where status = 'scheduled';
 
