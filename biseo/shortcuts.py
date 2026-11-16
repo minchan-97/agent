@@ -52,6 +52,7 @@ def run(sb, sid: int):
         raise ValueError("없는 버튼이에요")
     sb.table("shortcuts").update({"uses": (s.get("uses") or 0) + 1}).eq("id", sid).execute()
     if s["kind"] == "task":
-        return tk.create(sb, s["text"])
+        return tk.create(sb, s["text"], shortcut_id=s["id"])
     # 검색 버튼: "~ 찾아서 정리" 과제로 만들어, 자율 탐색 + 정리까지 가게 한다
-    return tk.create(sb, f"{s['text']} — 최신 정보를 찾아 핵심만 정리", icon="search", tint="indigo")
+    return tk.create(sb, f"{s['text']} — 최신 정보를 찾아 핵심만 정리", icon="search", tint="indigo",
+                     shortcut_id=s["id"])
