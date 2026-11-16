@@ -13,6 +13,18 @@ actions.py — 비서가 바깥에 대해 하는 일과, 어디까지 스스로 
 이건 DB 제약(external_is_strict)이 한 번 더 강제한다.
 
 강등: 자동 실행한 것을 사용자가 되돌리면 그 종류는 다시 묻는 단계로 내려간다.
+
+검색 오염 (tainted)
+  검색 결과(바깥 웹페이지)를 본 뒤에 나온 행동은 '오염됨'으로 표시한다.
+  웹페이지 안의 글이 LLM 을 움직여 행동을 만들었을 수 있기 때문이다.
+  오염된 행동은 tier 3 이상이면 승격돼 있어도 자동 실행하지 않고 반드시 묻는다.
+  (tier 1·2 는 보기·초안이라 일어나는 일이 없으므로 그대로 둔다.)
+  사람이 승인하면 그 승인은 승격 횟수에 넣지 않는다: 오염된 맥락의 승인으로
+  다음의 깨끗한 행동까지 자동 실행되게 만들지 않기 위해서다.
+  DB 제약(tainted_never_auto)이 한 번 더 강제한다.
+
+  origin='external'(메일·문자처럼 사용자에게 '들어온' 것)과는 다르다.
+  external 은 무조건 4등급이고, 오염은 '묻는 것'만 강제한다.
 """
 from datetime import datetime, timezone
 
@@ -51,28 +63,38 @@ def _save_trust(sb, kind: str, clean: int, promoted: bool):
 
 
 def propose(sb, kind: str, args: dict, reason: str = "", origin: str = "user",
-            task_id: int | None = None) -> dict:
-    """LLM 이 하자고 한 일을 등급에 따라 실행하거나 확인함에 넣는다."""
+            task_id: int | None = None, tainted: bool = False) -> dict:
+    """
+    LLM 이 하자고 한 일을 등급에 따라 실행하거나 확인함에 넣는다.
+    tainted=True: 검색 결과를 본 뒤에 나온 행동. tier 3 이상이면 무조건 묻는다.
+    """
     if kind in FORBIDDEN or kind not in KINDS:
         return {"kind": kind, "status": "blocked", "why": "하지 않는 일"}
     spec = KINDS[kind]
     tier = 4 if origin == "external" else spec["tier"]
 
+    tainted = bool(tainted)
+
     if tier == 4 and not spec.get("enabled", True):
-        row = _insert(sb, kind, tier, origin, args, reason, "blocked", task_id=task_id)
+        row = _insert(sb, kind, tier, origin, args, reason, "blocked", task_id=task_id,
+                      tainted=tainted)
         return {**row, "why": "아직 이 비서가 할 수 없는 일"}
 
-    auto = tier in (1, 2) or (tier == 3 and _trust(sb, kind).get("promoted"))
+    auto = tier in (1, 2) or (tier == 3 and not tainted and _trust(sb, kind).get("promoted"))
     if not auto:
-        return _insert(sb, kind, tier, origin, args, reason, "proposed", task_id=task_id)
+        return _insert(sb, kind, tier, origin, args, reason, "proposed", task_id=task_id,
+                       tainted=tainted)
 
-    row = _insert(sb, kind, tier, origin, args, reason, "proposed", auto=True, task_id=task_id)
+    row = _insert(sb, kind, tier, origin, args, reason, "proposed", auto=True, task_id=task_id,
+                  tainted=tainted)
     return execute(sb, row)
 
 
-def _insert(sb, kind, tier, origin, args, reason, status, auto=False, task_id=None) -> dict:
+def _insert(sb, kind, tier, origin, args, reason, status, auto=False, task_id=None,
+            tainted=False) -> dict:
     data = {"kind": kind, "tier": tier, "origin": origin, "args": args or {},
-            "reason": (reason or "")[:300], "status": status, "auto_executed": auto}
+            "reason": (reason or "")[:300], "status": status, "auto_executed": auto,
+            "tainted": bool(tainted)}
     if task_id:
         data["task_id"] = task_id
     return sb.table("actions").insert(data).execute().data[0]
@@ -142,7 +164,8 @@ def approve(sb, action_id: int) -> dict:
     row = sb.table("actions").update({"approved_by_human": True, "decided_at": _now()}
                                      ).eq("id", action_id).execute().data[0]
     done = execute(sb, row)
-    if row["tier"] == 3 and done["status"] in ("done", "scheduled"):
+    # 오염된 행동의 승인은 승격 횟수에 넣지 않는다
+    if row["tier"] == 3 and not row.get("tainted") and done["status"] in ("done", "scheduled"):
         t = _trust(sb, row["kind"])
         clean = t.get("clean", 0) + 1
         _save_trust(sb, row["kind"], clean, promoted=clean >= PROMOTE_AT)
@@ -154,7 +177,8 @@ def reject(sb, action_id: int) -> dict:
     row = _get(sb, action_id)
     if not row or row["status"] != "proposed":
         return {"error": "거절할 수 있는 상태가 아님"}
-    if row["tier"] == 3:
+    # 오염된 행동을 거절한 건 그 종류를 못 믿어서가 아니라 바깥 글을 걸러낸 것이므로 강등하지 않는다
+    if row["tier"] == 3 and not row.get("tainted"):
         _save_trust(sb, row["kind"], 0, promoted=False)
     if row["kind"] == "suggest_shortcut":
         pid = (row.get("args") or {}).get("pattern_id")
