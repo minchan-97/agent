@@ -45,6 +45,10 @@ drop function if exists claim_heir(uuid);
 create function claim_heir(uid uuid) returns uuid
 language plpgsql security definer set search_path = public as $$
 begin
+  -- 이미 내가 heir 면 그대로 성공 (다시 켜도 거절되지 않게)
+  if exists (select 1 from agents where heir and user_id = uid) then
+    return uid;
+  end if;
   if exists (select 1 from agents where heir) then
     return null;
   end if;
