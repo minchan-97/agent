@@ -166,6 +166,7 @@ def respond(sb, agent: dict, user_text: str) -> dict:
     own_work = any(a.get("kind") in ("note", "reminder", "draft", "event") for a in out["actions"])
     forced = not wanted and not own_work and needs_live_facts(text)
     searched = False
+    saw_external = False      # 두 번째 답이 검색 결과(바깥 글)를 보고 나왔는가
     trail = []
     if wanted or forced:
         q = str((wanted[0].get("args") or {}).get("query", "")) if wanted else text
@@ -181,6 +182,7 @@ def respond(sb, agent: dict, user_text: str) -> dict:
                 trail = found_pack["trail"]
                 searched = found_pack["found"]
                 if found:
+                    saw_external = True
                     ctx = search.to_context(found, found_pack["today_only"]) + "\n\n" + GROUNDED
                     note = ex.trail_text(trail)
                     if note:
@@ -201,10 +203,13 @@ def respond(sb, agent: dict, user_text: str) -> dict:
 
     reply = out["reply"].strip() or "잠깐 생각이 엉켰어요. 한 번만 다시 말해 줄래요?"
 
+    # 검색 결과를 본 뒤의 행동은 사용자가 시킨 것과 웹페이지 글이 시킨 것을 구분할 수 없다.
+    # 그래서 오염 표시를 붙여, 승격돼 있어도 반드시 묻게 한다.
     done = []
     for a in out["actions"][:3]:
         done.append(act.propose(sb, str(a.get("kind", "")), a.get("args") or {},
-                                str(a.get("reason", "")), origin="user"))
+                                str(a.get("reason", "")), origin="user",
+                                tainted=saw_external))
 
     answered = []
     waiting_ids = {w["id"] for w in waiting}
@@ -222,7 +227,7 @@ def respond(sb, agent: dict, user_text: str) -> dict:
     absorbed = absorb(sb, out["user_facts"], text, reply, agent["name"])
     sb.table("audit").insert({"kind": "turn", "detail": {
         "actions": [d.get("kind") for d in done], "absorbed": absorbed,
-        "searched": searched, "forced_search": forced,
+        "searched": searched, "forced_search": forced, "tainted": saw_external,
         "search_tries": len(trail)}}).execute()
 
     return {"reply": reply, "actions": done, "answered_tasks": answered,
