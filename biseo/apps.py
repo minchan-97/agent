@@ -175,16 +175,26 @@ def delete_reminder(sb, reminder_id) -> dict:
     return {"deleted": r["id"]}
 
 
+STUCK_MIN = 10
+
+
 def claim_due(sb, now_iso: str) -> list:
     """
     보낼 차례인 알림을 '가져간다'. scheduled → sending 으로 바꾸는 데 성공한 것만 돌려준다.
     1분 틱과 10분 틱이 겹쳐도, 한 알림은 한쪽만 가져가므로 두 번 가지 않는다.
     """
+    # 가져간 뒤 함수가 죽어 'sending' 에 갇힌 알림은 STUCK_MIN 분 뒤 다시 보낼 차례로 돌린다.
+    # (한 번도 안 가는 것보다 드물게 두 번 가는 쪽이 낫다)
+    stuck_before = (datetime.fromisoformat(now_iso.replace("Z", "+00:00"))
+                    - timedelta(minutes=STUCK_MIN)).isoformat()
+    sb.table("reminders").update({"status": "scheduled"}) \
+      .eq("status", "sending").lt("updated_at", stuck_before).execute()
+
     due = sb.table("reminders").select("id").eq("status", "scheduled") \
             .lte("due_at", now_iso).limit(10).execute().data or []
     got = []
     for d in due:
-        rows = sb.table("reminders").update({"status": "sending"}) \
+        rows = sb.table("reminders").update({"status": "sending", "updated_at": now_iso}) \
                  .eq("id", d["id"]).eq("status", "scheduled").execute().data
         if rows:
             got.append(rows[0])
