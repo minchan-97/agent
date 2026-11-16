@@ -275,6 +275,126 @@ dialog.ask .row{justify-content:flex-end}
 .body .sub{border-top:1px solid var(--line);margin-top:18px;padding-top:14px}
 .body .sub h3{font-size:.9rem;margin:0 0 8px;color:var(--muted)}
 details.adv summary{cursor:pointer;color:var(--muted);font-size:.9rem;margin:6px 0}
+
+/* ===================== C · 위젯 벤토 테마 =====================
+   테두리 대신 여백과 옅은 그림자, 진한 색은 '지금 가장 중요한 것' 하나에만. */
+:root{ --bg:#ECF0F5; --surface:#FFFFFF; --ink:#0E1A2B; --muted:#56616F; --line:#E3E8EE;
+  --accent:#0B4F8A; --accent-ink:#FFFFFF; --hero:#0B4F8A; --hero-ink:#FFFFFF; --hero-sub:#CFE0F2;
+  --amber-bg:#FFF1DE; --amber-ink:#5A3300; --soft:#F1F4F8; --live:#1F9D6A;
+  --shadow:0 1px 2px rgb(14 26 43 / .05), 0 6px 18px rgb(14 26 43 / .06); }
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0B121B; --surface:#141E2A; --ink:#E6EDF5; --muted:#97A6B8; --line:#223143;
+    --accent:#7AB0E0; --accent-ink:#0B121B; --hero:#1D578F; --hero-ink:#FFFFFF; --hero-sub:#C9DDF1;
+    --amber-bg:#3A2A12; --amber-ink:#F6DDB2; --soft:#1B2735; --live:#3DDC97;
+    --shadow:0 1px 2px rgb(0 0 0 / .3), 0 8px 22px rgb(0 0 0 / .25); }
+}
+body{background:var(--bg)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* 공통 부품: 테두리 없는 카드, 알약 버튼 */
+.card,.item,.widget{border:0!important;border-radius:20px;background:var(--surface);box-shadow:var(--shadow)}
+.card{padding:14px 16px}
+.card.ask,.card.wait,.item.wait{background:var(--amber-bg);box-shadow:none;border-left:0!important}
+.card.ended{opacity:.7;box-shadow:none}
+.btn{border-radius:999px;font-weight:600}
+.btn.ghost{background:var(--soft);border:0;color:var(--ink)}
+.btn.danger{background:transparent;border:0;color:var(--danger)}
+.btn.small{padding:8px 14px;min-height:36px}
+.screen header{border-bottom:0;padding:16px 0 8px}
+.screen header h1{font-size:1.05rem}
+.field input,.field textarea,.field select,.actionbar input,.card .row input{border:0;background:var(--surface);box-shadow:inset 0 0 0 1px var(--line);border-radius:12px}
+.sc{border:0;background:var(--surface);box-shadow:var(--shadow)}
+.bubble.agent{border:0;box-shadow:var(--shadow)}
+.progress{background:var(--soft)}
+dialog.sheet{background:var(--bg);border-radius:26px 26px 0 0}
+
+/* 홈 */
+.home{padding:22px 0 0;display:flex;flex-direction:column;height:100%;overflow-y:auto}
+.hhead{display:flex;justify-content:space-between;align-items:center;padding:0 4px 14px}
+.hhead .date{font-size:.82rem;font-weight:500;color:var(--muted)}
+.hhead h1{font-size:1.65rem;font-weight:800;letter-spacing:-.03em;margin:0;color:var(--ink)}
+.avatar{width:44px;height:44px;border-radius:22px;border:0;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:1rem;cursor:pointer}
+.bento{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding-bottom:16px}
+.bento .w2{grid-column:span 2}
+.bt{border:0;text-align:left;font:inherit;color:var(--ink);border-radius:26px;padding:16px 18px;cursor:pointer;display:flex}
+.bt.card-w{background:var(--surface);box-shadow:var(--shadow)}
+/* 큰 남색 카드: 지금 가장 중요한 한 가지 */
+.bt.hero{background:var(--hero);color:var(--hero-ink);justify-content:space-between;align-items:flex-end;min-height:128px;gap:12px}
+.hero .hl{display:flex;flex-direction:column;gap:3px;min-width:0}
+.hero .k{font-size:.75rem;font-weight:600;letter-spacing:.04em;color:var(--hero-sub)}
+.hero .t{font-size:1.2rem;font-weight:700;letter-spacing:-.01em;line-height:1.3}
+.hero .m{font-size:.82rem;color:var(--hero-sub)}
+.hero .hr{display:flex;flex-direction:column;align-items:flex-end;flex:none}
+.hero .n{font-size:2.9rem;font-weight:800;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums}
+.hero .n.sm{font-size:2rem}
+.hero .u{font-size:.8rem;font-weight:600;color:var(--hero-sub)}
+/* 오늘 하면 좋을 것 */
+.bt.plan{flex-direction:column;cursor:default;padding:16px 18px 8px}
+.plan .ph{display:flex;align-items:center;gap:8px;padding-bottom:6px}
+.plan .pi{width:22px;height:22px;border-radius:7px;background:var(--soft);color:var(--accent);display:grid;place-items:center}
+.plan .pi svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linejoin:round}
+.plan .pt{font-size:.9rem;font-weight:700}
+.plan .pc{margin-left:auto;font-size:.75rem;color:var(--muted)}
+.plan .pe{color:var(--muted);font-size:.88rem;margin:2px 0 12px}
+.plan .pr{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+.plan .pr.done{opacity:.55}
+.plan .px{flex:1;min-width:0;display:flex;flex-direction:column}
+.plan .pxt{font-size:.94rem;font-weight:600}
+.plan .pxw{font-size:.76rem;color:var(--muted)}
+.pill{height:36px;min-width:44px;padding:0 14px;border-radius:18px;border:0;font:inherit;font-size:.82rem;font-weight:600;cursor:pointer;margin-bottom:8px;align-self:flex-start}
+.pill.dark{background:var(--ink);color:var(--surface)}
+.plan .pr .pill{margin:0}
+.iconbtn{width:36px;height:36px;border-radius:18px;border:0;background:var(--soft);color:var(--muted);display:grid;place-items:center;cursor:pointer;flex:none}
+.iconbtn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+/* 작은 카드 */
+.bt.small{flex-direction:column;justify-content:space-between;min-height:112px}
+.bt.small.amber{background:var(--amber-bg);color:var(--amber-ink)}
+.small .sk{font-size:.82rem;font-weight:600;display:flex;align-items:center;gap:6px}
+.small .sv{display:flex;align-items:baseline;gap:6px}
+.small .sv.col{flex-direction:column;align-items:stretch;gap:6px}
+.small .n{font-size:2.2rem;font-weight:800;letter-spacing:-.03em;line-height:1}
+.small .u{font-size:.75rem;font-weight:600}
+.small .tt{font-size:.82rem;font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.small .bar{display:block;height:5px;border-radius:3px;background:var(--soft);overflow:hidden}
+.small .bar i{display:block;height:5px;background:var(--live);border-radius:3px}
+.dot{width:7px;height:7px;border-radius:4px;display:inline-block}
+.dot.live{background:var(--live)}
+.dot.wait{background:#B25E00}
+@media (prefers-reduced-motion: no-preference){ .dot.live{animation:blink 1.4s infinite} }
+.ainote{border:0;background:none;font:inherit;font-size:.84rem;color:var(--muted);display:flex;gap:6px;cursor:pointer;padding:0 6px;text-align:left}
+.ainote b{color:var(--accent)}
+/* 홈 입력줄 결과 카드 */
+.bt.result{flex-direction:column;cursor:default;position:relative}
+.result .you{color:var(--muted);font-size:.84rem;margin:0 36px 6px 0}
+.result .reply{white-space:pre-wrap}
+.result .x{position:absolute;top:10px;right:10px}
+.result .bubble.thinking{box-shadow:none;padding:4px 0;background:none}
+/* 아래: 입력줄 + 독 */
+.homefoot{position:sticky;bottom:0;margin-top:auto;padding:10px 0 calc(14px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:10px;background:linear-gradient(rgb(236 240 245 / 0),var(--bg) 26%)}
+@media (prefers-color-scheme: dark){ .homefoot{background:linear-gradient(rgb(11 18 27 / 0),var(--bg) 26%)} }
+form.homebar{position:static;display:flex;align-items:center;gap:8px;min-height:52px;padding:4px 4px 4px 18px;border-radius:26px;background:var(--surface);box-shadow:0 1px 2px rgb(14 26 43 / .05),0 8px 22px rgb(14 26 43 / .10);margin:0}
+form.homebar textarea{flex:1;border:0;box-shadow:none;background:transparent;padding:10px 0;resize:none;outline:none;max-height:110px}
+form.homebar .send{width:44px;height:44px;border-radius:22px;border:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;cursor:pointer;flex:none}
+form.homebar .send svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.dock{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));padding:6px;border-radius:28px;background:rgb(255 255 255 / .72);box-shadow:inset 0 0 0 1px rgb(14 26 43 / .06);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+@media (prefers-color-scheme: dark){ .dock{background:rgb(20 30 42 / .8);box-shadow:inset 0 0 0 1px rgb(255 255 255 / .06)} }
+.dock button{height:52px;border:0;background:none;cursor:pointer;display:grid;place-items:center;color:var(--ink);position:relative;border-radius:22px}
+.dock button:active{background:var(--soft)}
+.dock svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.dock .badge{top:6px;right:calc(50% - 22px)}
+/* 모든 앱 시트 */
+.sheet .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px 8px;padding:6px 0 10px}
+.sheet .app-icon .tile{background:var(--surface);color:var(--accent);box-shadow:var(--shadow)}
+.sheet .app-icon .tile.accent{background:var(--accent);color:var(--accent-ink)}
+.sheet .app-icon span{color:var(--ink)}
+/* 채팅 입력줄도 홈과 같은 알약 모양 */
+form.compose{border-top:0;align-items:center;gap:6px;margin:6px 0 calc(12px + env(safe-area-inset-bottom,0px));padding:4px 4px 4px 6px;border-radius:26px;background:var(--surface);box-shadow:0 1px 2px rgb(14 26 43 / .05),0 8px 22px rgb(14 26 43 / .10)}
+form.compose textarea{border:0;box-shadow:none;background:transparent;outline:none;padding:10px 4px}
+form.compose .mic{width:44px;height:44px;border:0;border-radius:22px;background:transparent;color:var(--muted);display:grid;place-items:center}
+form.compose .mic.on{background:var(--accent);color:var(--accent-ink)}
+form.compose .mic svg,form.compose .send svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+form.compose .send{width:44px;height:44px;border-radius:22px;border:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;cursor:pointer;flex:none}
+form.compose .send:disabled{opacity:.5}
 </style>
 </head>
 <body>
@@ -331,17 +451,27 @@ details.adv summary{cursor:pointer;color:var(--muted);font-size:.9rem;margin:6px
     <div class="msg" id="nameMsg"></div>
   </section>
 
-  <!-- 홈 화면 -->
+  <!-- 홈 화면 (벤토) -->
   <section class="home" id="home" hidden>
-    <div class="date" id="today"></div>
-    <h1 id="agentName"></h1>
-    <div id="cards"></div>
-    <div class="widget" id="widget"></div>
-    <div class="grid" id="grid"></div>
-    <form class="homebar" id="homebar">
-      <textarea id="homeText" rows="1" placeholder="무엇이든 맡겨 주세요" aria-label="비서에게 맡기기"></textarea>
-      <button class="btn" id="homeSend" aria-label="보내기">맡기기</button>
-    </form>
+    <div class="hhead">
+      <div><div class="date" id="today"></div><h1 id="agentName"></h1></div>
+      <button class="avatar" id="avatar" aria-label="설정"></button>
+    </div>
+    <div class="bento" id="bento"></div>
+    <div class="homefoot">
+      <form class="homebar" id="homebar">
+        <label for="homeText" class="sr">비서에게 맡기기</label>
+        <textarea id="homeText" rows="1" placeholder="무엇이든 맡겨 주세요"></textarea>
+        <button class="send" id="homeSend" aria-label="보내기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+      </form>
+      <nav class="dock" aria-label="앱">
+        <button id="dockChat" aria-label="채팅"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg></button>
+        <button id="dockEvents" aria-label="일정"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></button>
+        <button id="dockTasks" aria-label="맡은 일"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10M10 12h10M10 18h10"/><path d="M3.5 6l1.3 1.3L7.5 4.6M3.5 12l1.3 1.3 2.7-2.7M3.5 18l1.3 1.3 2.7-2.7"/></svg></button>
+        <button id="dockNotes" aria-label="메모"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/></svg></button>
+        <button id="dockAll" aria-label="모든 앱"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.8"/><rect x="13" y="4" width="7" height="7" rx="1.8"/><rect x="4" y="13" width="7" height="7" rx="1.8"/><rect x="13" y="13" width="7" height="7" rx="1.8"/></svg></button>
+      </nav>
+    </div>
   </section>
 
   <!-- 앱 화면 (하나를 돌려 쓴다) -->
@@ -353,9 +483,10 @@ details.adv summary{cursor:pointer;color:var(--muted);font-size:.9rem;margin:6px
     </header>
     <div class="body" id="screenBody"></div>
     <form class="compose" id="compose" hidden>
-      <button type="button" class="mic" id="mic" aria-label="음성으로 말하기" hidden>🎤</button>
+      <button type="button" class="mic" id="mic" aria-label="음성으로 말하기" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+      <label for="text" class="sr">비서에게 말하기</label>
       <textarea id="text" rows="1" placeholder="부탁할 일을 적어 주세요"></textarea>
-      <button class="btn" id="send">보내기</button>
+      <button class="send" id="send" aria-label="보내기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
     </form>
   </section>
 </div>
@@ -512,8 +643,7 @@ const SYS_APPS = new Set(["skills", "inbox", "settings"]);   // 관리용: 밝�
 async function goHome() {
   current = null;
   show("home");
-  $("today").textContent = new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "long" });
-  $("agentName").textContent = agentName;
+  paintHeader();
   if (cache.has("home")) {                 // 바로 그리고
     paintHome(cache.peek("home"));
     cache.fresh("home").then((h) => { if (!current) paintHome(h); }).catch(() => {});
@@ -522,8 +652,19 @@ async function goHome() {
   }
 }
 
-/* ---------- 홈 상황 카드: 지금 이 순간에 맞는 것만 위에 ---------- */
+/* ---------- 홈 (벤토): 비서가 지금 상황에 맞게 짜 주는 화면 ---------- */
 let homeResult = null;          // 홈 입력줄로 방금 맡긴 것의 결과 카드
+let lastHome = null;
+function greeting() {
+  const hr = new Date().getHours();
+  return hr < 5 ? "늦은 밤이에요" : hr < 11 ? "좋은 아침이에요" : hr < 17 ? "좋은 오후예요" : hr < 22 ? "좋은 저녁이에요" : "늦은 밤이에요";
+}
+function paintHeader() {
+  const d = new Date();
+  $("today").textContent = `${d.toLocaleDateString("ko-KR", { weekday: "long" })} · ${d.toLocaleDateString("ko-KR", { month: "long", day: "numeric" })} · ${agentName}`;
+  $("agentName").textContent = greeting();
+  $("avatar").textContent = (agentName || "비").slice(0, 1);
+}
 function soonEvent(h) {
   const now = Date.now();
   return (h.events || []).find((e) => {
@@ -531,75 +672,187 @@ function soonEvent(h) {
     return t > now - 5 * 60e3 && t - now <= 60 * 60e3;          // 시작 60분 전 ~ 시작 5분 후
   });
 }
-function paintCards(h) {
-  const cards = [];
-  if (homeResult) cards.push(homeResult);
-  // 1. 곧 시작하는 일정
-  const soon = soonEvent(h);
-  if (soon) {
-    const mins = Math.round((new Date(soon.starts_at).getTime() - Date.now()) / 60e3);
-    const c = el("div", "ctx soon");
-    c.append(el("h2", "", mins > 0 ? `${mins}분 뒤 시작` : "지금 시작"),
-             el("div", "big", soon.title), el("div", "muted", hm(soon.starts_at) + (soon.place ? ` · ${soon.place}` : "")));
-    c.onclick = () => openApp("events").then(() => editEvent(soon.id));
-    cards.push(c);
+function nextEvent(h) {
+  const now = Date.now() - 5 * 60e3;
+  return (h.events || []).find((e) => new Date(e.starts_at).getTime() >= now);
+}
+const span2 = (n) => { n.classList.add("w2"); return n; };
+
+// 1. 큰 남색 카드: 지금 가장 중요한 한 가지 (곧 시작 > 다음 일정 > 다음 알림 > 빈 날)
+function heroCard(h) {
+  const b = span2(el("button", "bt hero"));
+  const left = el("span", "hl"), right = el("span", "hr");
+  const soon = soonEvent(h), next = nextEvent(h);
+  if (soon || next) {
+    const e = soon || next;
+    const mins = Math.max(0, Math.round((new Date(e.starts_at).getTime() - Date.now()) / 60e3));
+    left.append(el("span", "k", soon ? (mins ? "곧 시작" : "지금 시작") : "다음 일정"),
+                el("span", "t", e.title), el("span", "m", hm(e.starts_at) + (e.place ? ` · ${e.place}` : "")));
+    if (soon) right.append(el("span", "n", String(mins)), el("span", "u", "분 뒤"));
+    else right.append(el("span", "n sm", hm(e.starts_at).replace(/^(오전|오후)\s*/, "")),
+                      el("span", "u", hm(e.starts_at).startsWith("오후") ? "오후" : "오전"));
+    b.onclick = () => openApp("events").then(() => editEvent(e.id));
+  } else if (h.next_reminder) {
+    left.append(el("span", "k", "다음 알림"), el("span", "t", h.next_reminder.text), el("span", "m", when(h.next_reminder.due_at)));
+    b.onclick = () => openApp("reminders");
+  } else {
+    left.append(el("span", "k", "오늘"), el("span", "t", "남은 일정이 없어요"), el("span", "m", "아래에 맡길 일을 적어 보세요"));
+    b.onclick = () => openApp("events");
   }
-  // 2. 오늘의 제안 (비서가 먼저 생각한 것)
+  b.append(left, right);
+  return b;
+}
+
+// 2. 오늘 하면 좋을 것 (비서가 먼저 생각한 제안)
+function planCard(h) {
+  const c = span2(el("div", "bt card-w plan"));
+  const head = el("div", "ph");
+  const ic = el("span", "pi"); ic.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON.bolt}</svg>`;
+  head.append(ic, el("span", "pt", "오늘 하면 좋을 것"));
   const plan = h.daily;
-  if (plan && (plan.items || []).length) {
-    const c = el("div", "ctx plan");
-    const head = el("h2"); head.append(miniIcon("bolt", "blue"), "오늘의 제안"); c.append(head);
-    if (plan.greeting) c.append(el("p", "greet", plan.greeting));
-    for (const it of plan.items) {
-      if (it.state === "dismissed") continue;
-      const row = el("div", "sug" + (it.state !== "new" ? " done" : ""));
-      row.append(el("div", "t", (it.state === "accepted" ? "✓ " : it.state === "dismissed" ? "– " : "") + it.title));
-      if (it.why) row.append(el("div", "w", it.why));
-      const r = el("div", "row");
-      const yes = it.kind === "none" ? "할게요" : it.kind === "task" ? "맡기기" : "그렇게 하기";
-      r.append(button(yes, "small", async () => {
+  const items = (plan?.items || []).filter((i) => i.state !== "dismissed");
+  if (!plan) {
+    const get = el("button", "pill dark", "✦ 지금 생각해 보기");
+    get.onclick = async () => {
+      get.disabled = true; get.textContent = "생각하는 중…";
+      try { await post("/api/daily/now"); cache.drop("home"); await goHome(); }
+      catch (e) { toast(e.message, "err"); get.disabled = false; get.textContent = "✦ 지금 생각해 보기"; }
+    };
+    c.append(head, el("p", "pe", "매일 정한 시각에 비서가 오늘 할 만한 일을 먼저 골라 드려요."), get);
+    return c;
+  }
+  const done = items.filter((i) => i.state === "accepted").length;
+  if (items.length) head.append(el("span", "pc", `${items.length}개 중 ${done}개 정함`));
+  c.append(head);
+  if (!items.length) c.append(el("p", "pe", plan.greeting || "오늘은 따로 챙길 게 없어요."));
+  for (const it of items) {
+    const row = el("div", "pr" + (it.state === "accepted" ? " done" : ""));
+    const txt = el("span", "px");
+    txt.append(el("span", "pxt", (it.state === "accepted" ? "✓ " : "") + it.title));
+    if (it.why) txt.append(el("span", "pxw", it.why));
+    row.append(txt);
+    if (it.state === "new") {
+      const yes = it.kind === "none" ? "할게요" : "맡기기";
+      row.append(button(yes, "pill dark", async () => {
         const res = await post(`/api/daily/${it.id}/accept`);
-        if (res.task) { driveTask(res.task.id); toast("맡았어요. 진행 상황은 '맡은 일'에서 볼 수 있어요."); }
+        if (res.task) { driveTask(res.task.id); toast("맡았어요. 진행은 '맡은 일'에서 볼 수 있어요."); }
         else if (res.action?.status === "proposed") toast("확인함에 올려 뒀어요.");
         else if (res.action) toast("해 뒀어요.");
         cache.drop("home"); await goHome();
-      }), button("넘기기", "ghost small", async () => { await post(`/api/daily/${it.id}/dismiss`); cache.drop("home"); await goHome(); }));
-      row.append(r); c.append(row);
+      }));
+      const no = el("button", "iconbtn"); no.setAttribute("aria-label", `'${it.title}' 넘기기`);
+      no.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+      no.onclick = async () => { no.disabled = true; try { await post(`/api/daily/${it.id}/dismiss`); cache.drop("home"); await goHome(); } catch (e) { toast(e.message, "err"); no.disabled = false; } };
+      row.append(no);
     }
-    cards.push(c);
+    c.append(row);
   }
-  // 3. 비서가 스스로 만든 것 알림 (사흘 동안)
+  return c;
+}
+
+// 3. 작은 카드 둘: 확인함 · 진행 중인 일
+function inboxCard(h) {
+  const b = el("button", "bt small" + (h.pending ? " amber" : " card-w"));
+  b.append(el("span", "sk", "확인함"));
+  const v = el("span", "sv");
+  v.append(el("span", "n", String(h.pending || 0)), el("span", "u", h.pending ? "건 기다려요" : "비어 있어요"));
+  b.append(v); b.onclick = () => openApp("inbox");
+  return b;
+}
+function taskCard(h) {
+  const t = h.task;
+  const b = el("button", "bt small card-w");
+  if (t) {
+    const k = el("span", "sk"); k.append(el("span", t.status === "waiting_user" ? "dot wait" : "dot live"),
+      t.status === "waiting_user" ? "답을 기다려요" : "진행 중");
+    const bar = el("span", "bar"); const f = el("i");
+    f.style.width = Math.min(100, Math.round((t.steps / Math.max(1, t.max_steps)) * 100)) + "%"; bar.append(f);
+    const v = el("span", "sv col"); v.append(el("span", "tt", t.goal), bar);
+    b.append(k, v);
+  } else {
+    b.append(el("span", "sk", "맡은 일"));
+    const v = el("span", "sv"); v.append(el("span", "n", "0"), el("span", "u", "개 진행 중")); b.append(v);
+  }
+  b.onclick = () => openApp("tasks");
+  return b;
+}
+
+function paintHome(h) {
+  lastHome = h;
+  paintHeader();
+  const cells = [];
+  if (homeResult) cells.push(homeResult);
+  cells.push(heroCard(h), planCard(h), inboxCard(h), taskCard(h));
+  // 비서가 스스로 만든 버튼 알림 (사흘 동안)
   const fresh = (h.pins || []).find((p) => p.origin === "agent" && p.created_at &&
     Date.now() - new Date(p.created_at).getTime() < 3 * 864e5);
   if (fresh) {
-    const n = el("div", "ainote");
-    n.append(el("b", "", "✦"), el("span", "", `자주 쓰셔서 '${fresh.label}' 버튼을 홈에 만들어 뒀어요.`));
-    cards.push(n);
+    const n = span2(el("button", "ainote"));
+    n.append(el("b", "", "✦"), el("span", "", `자주 쓰셔서 '${fresh.label}' 버튼을 만들어 뒀어요`));
+    n.onclick = () => runPin(fresh);
+    cells.push(n);
   }
-  $("cards").replaceChildren(...cards);
+  $("bento").replaceChildren(...cells);
+  // 독 배지
+  const tb = $("dockTasks").querySelector(".badge"); if (tb) tb.remove();
+  if (h.asking) $("dockTasks").append(el("span", "badge", String(h.asking)));
+  const ab = $("dockAll").querySelector(".badge"); if (ab) ab.remove();
+  if (h.pending) $("dockAll").append(el("span", "badge", String(h.pending)));
 }
 
-// 홈에 있는 동안 1분마다 '곧 시작' 카드의 남은 시간을 다시 그린다 (서버는 안 부른다)
-setInterval(() => { if (!current && !$("home").hidden && cache.has("home")) paintCards(cache.peek("home")); }, 60e3);
+/* ---------- 모든 앱: 독의 마지막 칸 ---------- */
+function openAllApps() {
+  const h = lastHome || {};
+  openSheet("모든 앱", (s) => {
+    const grid = el("div", "grid");
+    for (const [key, label] of APPS) {
+      const b = el("button", "app-icon");
+      b.innerHTML = `<div class="tile"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[key] || ICON.dot}</svg></div>`;
+      b.append(el("span", "", label));
+      if (key === "inbox" && h.pending) b.append(el("div", "badge", String(h.pending)));
+      if (key === "tasks" && h.asking) b.append(el("div", "badge", String(h.asking)));
+      b.onclick = () => { closeSheet(); openApp(key); };
+      grid.append(b);
+    }
+    for (const pin of (h.pins || [])) {           // 홈에 올린 기능·버튼 (비서가 만든 건 ✦)
+      const b = el("button", "app-icon" + (pin.origin === "agent" ? " ai" : ""));
+      b.innerHTML = `<div class="tile accent"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[pin.icon] || ICON.bolt}</svg></div>`;
+      b.append(el("span", "", pin.label));
+      b.onclick = () => { closeSheet(); runPin(pin); };
+      grid.append(b);
+    }
+    s.append(grid);
+  });
+}
+$("dockChat").onclick = () => openApp("chat");
+$("dockEvents").onclick = () => openApp("events");
+$("dockTasks").onclick = () => openApp("tasks");
+$("dockNotes").onclick = () => openApp("notes");
+$("dockAll").onclick = openAllApps;
+$("avatar").onclick = () => openApp("settings");
+
+// 홈에 있는 동안 1분마다 다시 그린다 ('40분 뒤' 숫자·인사말이 흐르도록. 서버는 안 부른다)
+setInterval(() => { if (!current && !$("home").hidden && lastHome) paintHome(lastHome); }, 60e3);
 
 /* ---------- 홈 입력줄: 대화방에 들어가지 않고 바로 맡긴다 (결과는 카드로) ---------- */
 $("homebar").addEventListener("submit", async (e) => {
   e.preventDefault();
   const text = $("homeText").value.trim(); if (!text) return;
   $("homeText").value = ""; $("homeSend").disabled = true;
-  const c = el("div", "ctx result");
-  const x = el("button", "x", "×"); x.setAttribute("aria-label", "닫기");
+  const c = span2(el("div", "bt card-w result"));
+  const x = el("button", "iconbtn x"); x.setAttribute("aria-label", "닫기");
+  x.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   x.onclick = () => { homeResult = null; c.remove(); };
   const wait = el("div", "bubble thinking"); wait.append(el("i"), el("i"), el("i"));
   c.append(x, el("p", "you", text), wait);
-  homeResult = c; $("cards").prepend(c); $("home").scrollTop = 0;
+  homeResult = c; $("bento").prepend(c); $("home").scrollTop = 0;
   try {
     const res = await post("/api/chat", { text });
     for (const a of res.actions || []) if (a.result?.task_id) driveTask(a.result.task_id);
     wait.replaceWith(el("div", "reply", res.reply));
     linkChips(res.actions || [], c);
     suggestChips(res.suggest || [], c);
-    cache.fresh("home").then((h) => { if (!current) { paintHome(h); } }).catch(() => {});
+    cache.fresh("home").then((h) => { if (!current) paintHome(h); }).catch(() => {});
   } catch (err) {
     wait.replaceWith(el("div", "reply", err.message));
     $("homeText").value = text;
@@ -608,57 +861,6 @@ $("homebar").addEventListener("submit", async (e) => {
 $("homeText").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("homebar").requestSubmit(); }
 });
-
-function paintHome(h) {
-  paintCards(h);
-  const w = $("widget"); w.replaceChildren(el("h2", "", "오늘"));
-  if (!h.events.length) w.append(el("div", "empty", "오늘 일정이 없어요."));
-  for (const e of h.events) {
-    const b = el("button", "ev");
-    b.append(el("b", "", hm(e.starts_at)), el("span", "", e.title + (e.place ? ` · ${e.place}` : "")));
-    b.onclick = () => openApp("events").then(() => editEvent(e.id));
-    w.append(b);
-  }
-  if (h.next_reminder) w.append(el("div", "next", `다음 알림 · ${when(h.next_reminder.due_at)} — ${h.next_reminder.text}`));
-  const chips = el("div", "chips");
-  if (h.pending) { const c = el("button", "chip", `확인할 일 ${h.pending}`); c.onclick = () => openApp("inbox"); chips.append(c); }
-  if (h.asking) { const c = el("button", "chip", `답을 기다리는 질문 ${h.asking}`); c.onclick = () => openApp("tasks"); chips.append(c); }
-  if (!h.daily) {
-    const get = el("button", "chip"); get.style.background = "var(--mine)"; get.style.color = "var(--accent)";
-    get.textContent = "✦ 오늘의 제안 받기";
-    get.onclick = async () => {
-      get.disabled = true; get.textContent = "생각하는 중…";
-      try { await post("/api/daily/now"); cache.drop("home"); await goHome(); }
-      catch (e) { toast(e.message, "err"); get.disabled = false; get.textContent = "✦ 오늘의 제안 받기"; }
-    };
-    chips.append(get);
-  }
-  if (chips.children.length) w.append(chips);
-
-  // (예전 '오늘 브리핑·이번 주 정리' 고정 칩은 뺐다 → 비서가 먼저 건네는 '오늘의 제안'이 그 자리를 맡는다)
-
-  const tiles = APPS.map(([key, label]) => {
-    const b = el("button", "app-icon" + (SYS_APPS.has(key) ? " sys" : ""));
-    b.innerHTML = `<div class="tile"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[key] || ICON.dot}</svg></div>`;
-    b.append(el("span", "", label));
-    if (key === "inbox" && h.pending) b.append(el("div", "badge", String(h.pending)));
-    if (key === "tasks" && h.asking) b.append(el("div", "badge", String(h.asking)));
-    b.onclick = () => openApp(key);
-    return b;
-  });
-  // 홈에 올린 기능·단축 버튼도 같은 격자에 타일로 (색 있는 아이콘)
-  for (const pin of (h.pins || [])) {
-    const b = el("button", "app-icon" + (pin.origin === "agent" ? " ai" : ""));
-    if (pin.origin === "agent") b.title = "비서가 만든 버튼";
-    const tile = el("div", "tile pin-tile");
-    tile.style.background = TINT[pin.tint] || TINT.indigo;
-    tile.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[pin.icon] || ICON.bolt}</svg>`;
-    b.append(tile, el("span", "", pin.label));
-    b.onclick = () => runPin(pin);
-    tiles.push(b);
-  }
-  $("grid").replaceChildren(...tiles);
-}
 
 // 홈 타일을 누르면: 무엇에 쓸지 적는 작은 창. 비우고 실행하면 그냥 실행.
 function runPin(pin) {
