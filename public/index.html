@@ -200,6 +200,38 @@ code.topic{display:block;background:var(--surface);border:1px solid var(--line);
 .app-icon.sys .tile{background:var(--surface);color:var(--accent);border:1px solid var(--line);box-shadow:none}
 @media (prefers-color-scheme: dark){ .app-icon .tile{background:linear-gradient(160deg,#2A64A0 0%,var(--tile) 70%)} }
 
+/* 홈: 상황 카드 */
+.home{display:flex;flex-direction:column}
+.home .grid{margin-bottom:12px}
+.ctx{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px 16px;margin-bottom:12px}
+.ctx h2{font-size:.82rem;font-weight:700;margin:0 0 6px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.ctx.soon{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.ctx.soon .big{font-size:1.05rem;font-weight:700}
+.ctx.plan h2{color:var(--accent)}
+.ctx h2 .mini{width:16px;height:16px;display:inline-grid;place-items:center}
+.ctx h2 .mini svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ctx .greet{margin:0 0 8px}
+.sug{border-top:1px solid var(--line);padding:10px 0 2px}
+.sug .t{font-weight:600}
+.sug .w{color:var(--muted);font-size:.86rem;margin:2px 0 8px}
+.sug.done{opacity:.55}
+.sug.done .row{display:none}
+.ctx.result .you{color:var(--muted);font-size:.88rem;margin:0 0 6px}
+.ctx.result .reply{white-space:pre-wrap}
+.ctx.result .bubble.thinking{border:0;padding:6px 0;background:none}
+.ctx .x{float:right;background:none;border:0;color:var(--muted);cursor:pointer;font-size:1.1rem;line-height:1;padding:0 2px}
+.ainote{font-size:.86rem;color:var(--muted);margin:-4px 0 14px;display:flex;gap:6px}
+.ainote b{color:var(--accent)}
+/* 비서가 만든 타일: 반짝 표시 */
+.app-icon.ai .tile{position:relative}
+.app-icon.ai .tile::after{content:"✦";position:absolute;top:-6px;left:-6px;width:20px;height:20px;border-radius:50%;
+  background:var(--surface);color:var(--accent);font-size:11px;display:grid;place-items:center;border:1px solid var(--line)}
+/* 홈 아래 입력줄 */
+form.homebar{position:sticky;bottom:0;margin-top:auto;display:flex;gap:8px;padding:10px 0 calc(12px + env(safe-area-inset-bottom,0px));
+  background:linear-gradient(transparent,var(--bg) 22%)}
+form.homebar textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:14px;padding:11px 14px;background:var(--surface);max-height:120px;box-shadow:0 2px 10px rgb(0 0 0 / .06)}
+form.homebar .btn{border-radius:14px}
+
 /* 지금 진행 중인 과제 */
 .live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:6px;vertical-align:1px}
 @media (prefers-reduced-motion: no-preference){ .live-dot{animation:blink 1.2s infinite} .card.running .progress i{background-image:linear-gradient(90deg,var(--accent),#3D8BD0,var(--accent));background-size:200% 100%;animation:flow 1.4s linear infinite} @keyframes flow{to{background-position:-200% 0}} }
@@ -303,8 +335,13 @@ details.adv summary{cursor:pointer;color:var(--muted);font-size:.9rem;margin:6px
   <section class="home" id="home" hidden>
     <div class="date" id="today"></div>
     <h1 id="agentName"></h1>
+    <div id="cards"></div>
     <div class="widget" id="widget"></div>
     <div class="grid" id="grid"></div>
+    <form class="homebar" id="homebar">
+      <textarea id="homeText" rows="1" placeholder="무엇이든 맡겨 주세요" aria-label="비서에게 맡기기"></textarea>
+      <button class="btn" id="homeSend" aria-label="보내기">맡기기</button>
+    </form>
   </section>
 
   <!-- 앱 화면 (하나를 돌려 쓴다) -->
@@ -406,6 +443,7 @@ const CACHE_TOUCH = [
   [/\/api\/(shortcuts|search|apps\/[a-z]+\/skills)\b/, ["tasks", "home"]],
   [/\/api\/(chat)\b/, ["history", "actions", "tasks", "home", "events", "reminders", "notes", "drafts", "skills"]],
   [/\/api\/(name)\b/, ["home"]],
+  [/\/api\/(daily)\b/, ["home", "tasks", "actions", "reminders", "events", "notes"]],
 ];
 async function post(path, body) {
   const r = await api(path, { method: "POST", body: JSON.stringify(body || {}) });
@@ -484,7 +522,95 @@ async function goHome() {
   }
 }
 
+/* ---------- 홈 상황 카드: 지금 이 순간에 맞는 것만 위에 ---------- */
+let homeResult = null;          // 홈 입력줄로 방금 맡긴 것의 결과 카드
+function soonEvent(h) {
+  const now = Date.now();
+  return (h.events || []).find((e) => {
+    const t = new Date(e.starts_at).getTime();
+    return t > now - 5 * 60e3 && t - now <= 60 * 60e3;          // 시작 60분 전 ~ 시작 5분 후
+  });
+}
+function paintCards(h) {
+  const cards = [];
+  if (homeResult) cards.push(homeResult);
+  // 1. 곧 시작하는 일정
+  const soon = soonEvent(h);
+  if (soon) {
+    const mins = Math.round((new Date(soon.starts_at).getTime() - Date.now()) / 60e3);
+    const c = el("div", "ctx soon");
+    c.append(el("h2", "", mins > 0 ? `${mins}분 뒤 시작` : "지금 시작"),
+             el("div", "big", soon.title), el("div", "muted", hm(soon.starts_at) + (soon.place ? ` · ${soon.place}` : "")));
+    c.onclick = () => openApp("events").then(() => editEvent(soon.id));
+    cards.push(c);
+  }
+  // 2. 오늘의 제안 (비서가 먼저 생각한 것)
+  const plan = h.daily;
+  if (plan && (plan.items || []).length) {
+    const c = el("div", "ctx plan");
+    const head = el("h2"); head.append(miniIcon("bolt", "blue"), "오늘의 제안"); c.append(head);
+    if (plan.greeting) c.append(el("p", "greet", plan.greeting));
+    for (const it of plan.items) {
+      if (it.state === "dismissed") continue;
+      const row = el("div", "sug" + (it.state !== "new" ? " done" : ""));
+      row.append(el("div", "t", (it.state === "accepted" ? "✓ " : it.state === "dismissed" ? "– " : "") + it.title));
+      if (it.why) row.append(el("div", "w", it.why));
+      const r = el("div", "row");
+      const yes = it.kind === "none" ? "할게요" : it.kind === "task" ? "맡기기" : "그렇게 하기";
+      r.append(button(yes, "small", async () => {
+        const res = await post(`/api/daily/${it.id}/accept`);
+        if (res.task) { driveTask(res.task.id); toast("맡았어요. 진행 상황은 '맡은 일'에서 볼 수 있어요."); }
+        else if (res.action?.status === "proposed") toast("확인함에 올려 뒀어요.");
+        else if (res.action) toast("해 뒀어요.");
+        cache.drop("home"); await goHome();
+      }), button("넘기기", "ghost small", async () => { await post(`/api/daily/${it.id}/dismiss`); cache.drop("home"); await goHome(); }));
+      row.append(r); c.append(row);
+    }
+    cards.push(c);
+  }
+  // 3. 비서가 스스로 만든 것 알림 (사흘 동안)
+  const fresh = (h.pins || []).find((p) => p.origin === "agent" && p.created_at &&
+    Date.now() - new Date(p.created_at).getTime() < 3 * 864e5);
+  if (fresh) {
+    const n = el("div", "ainote");
+    n.append(el("b", "", "✦"), el("span", "", `자주 쓰셔서 '${fresh.label}' 버튼을 홈에 만들어 뒀어요.`));
+    cards.push(n);
+  }
+  $("cards").replaceChildren(...cards);
+}
+
+// 홈에 있는 동안 1분마다 '곧 시작' 카드의 남은 시간을 다시 그린다 (서버는 안 부른다)
+setInterval(() => { if (!current && !$("home").hidden && cache.has("home")) paintCards(cache.peek("home")); }, 60e3);
+
+/* ---------- 홈 입력줄: 대화방에 들어가지 않고 바로 맡긴다 (결과는 카드로) ---------- */
+$("homebar").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = $("homeText").value.trim(); if (!text) return;
+  $("homeText").value = ""; $("homeSend").disabled = true;
+  const c = el("div", "ctx result");
+  const x = el("button", "x", "×"); x.setAttribute("aria-label", "닫기");
+  x.onclick = () => { homeResult = null; c.remove(); };
+  const wait = el("div", "bubble thinking"); wait.append(el("i"), el("i"), el("i"));
+  c.append(x, el("p", "you", text), wait);
+  homeResult = c; $("cards").prepend(c); $("home").scrollTop = 0;
+  try {
+    const res = await post("/api/chat", { text });
+    for (const a of res.actions || []) if (a.result?.task_id) driveTask(a.result.task_id);
+    wait.replaceWith(el("div", "reply", res.reply));
+    linkChips(res.actions || [], c);
+    suggestChips(res.suggest || [], c);
+    cache.fresh("home").then((h) => { if (!current) { paintHome(h); } }).catch(() => {});
+  } catch (err) {
+    wait.replaceWith(el("div", "reply", err.message));
+    $("homeText").value = text;
+  } finally { $("homeSend").disabled = false; }
+});
+$("homeText").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("homebar").requestSubmit(); }
+});
+
 function paintHome(h) {
+  paintCards(h);
   const w = $("widget"); w.replaceChildren(el("h2", "", "오늘"));
   if (!h.events.length) w.append(el("div", "empty", "오늘 일정이 없어요."));
   for (const e of h.events) {
@@ -497,21 +623,19 @@ function paintHome(h) {
   const chips = el("div", "chips");
   if (h.pending) { const c = el("button", "chip", `확인할 일 ${h.pending}`); c.onclick = () => openApp("inbox"); chips.append(c); }
   if (h.asking) { const c = el("button", "chip", `답을 기다리는 질문 ${h.asking}`); c.onclick = () => openApp("tasks"); chips.append(c); }
+  if (!h.daily) {
+    const get = el("button", "chip"); get.style.background = "var(--mine)"; get.style.color = "var(--accent)";
+    get.textContent = "✦ 오늘의 제안 받기";
+    get.onclick = async () => {
+      get.disabled = true; get.textContent = "생각하는 중…";
+      try { await post("/api/daily/now"); cache.drop("home"); await goHome(); }
+      catch (e) { toast(e.message, "err"); get.disabled = false; get.textContent = "✦ 오늘의 제안 받기"; }
+    };
+    chips.append(get);
+  }
   if (chips.children.length) w.append(chips);
 
-  // 빠른 실행: 자주 하는 지시를 버튼 한 번으로. 채팅 앱을 열고 그 말을 바로 보낸다.
-  const quick = el("div", "shortcuts"); quick.style.margin = "4px 0 20px";
-  const QUICK = [
-    ["오늘 브리핑", "오늘 일정과 할 일을 짧게 브리핑해줘"],
-    ["이번 주 정리", "이번 주 해야 할 일을 정리해줘"],
-    ["안 끝난 일", "아직 안 끝난 과제와 확인할 일을 알려줘"],
-  ];
-  for (const [label, msg] of QUICK) {
-    const b = el("button", "sc"); b.append(miniIcon("bolt", "blue"), el("span", "", label));
-    b.onclick = () => runInChat(msg);
-    quick.append(b);
-  }
-  w.append(quick);
+  // (예전 '오늘 브리핑·이번 주 정리' 고정 칩은 뺐다 → 비서가 먼저 건네는 '오늘의 제안'이 그 자리를 맡는다)
 
   const tiles = APPS.map(([key, label]) => {
     const b = el("button", "app-icon" + (SYS_APPS.has(key) ? " sys" : ""));
@@ -524,7 +648,8 @@ function paintHome(h) {
   });
   // 홈에 올린 기능·단축 버튼도 같은 격자에 타일로 (색 있는 아이콘)
   for (const pin of (h.pins || [])) {
-    const b = el("button", "app-icon");
+    const b = el("button", "app-icon" + (pin.origin === "agent" ? " ai" : ""));
+    if (pin.origin === "agent") b.title = "비서가 만든 버튼";
     const tile = el("div", "tile pin-tile");
     tile.style.background = TINT[pin.tint] || TINT.indigo;
     tile.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[pin.icon] || ICON.bolt}</svg>`;
@@ -1141,6 +1266,26 @@ SCREENS.settings = {
     const box = el("div");
     box.append(field("비서 이름", name), button("이름 바꾸기", "ghost small", async () => { const r = await post("/api/name", { name: name.value.trim() }); agentName = r.name; toast("바꿨어요."); }));
 
+    // 오늘의 생각: 매일 비서가 먼저 생각하는 시각
+    const th = el("div", "sub");
+    th.append(el("h3", "", "오늘의 생각"),
+      el("p", "muted", "매일 이 시각에 비서가 오늘 일정·맡은 일·최근 이야기를 보고 '오늘 하면 좋을 것'을 먼저 건네요. 알림으로 오고 홈에도 떠요."));
+    const on = me.think_at != null;
+    const tIn = input("time", me.think_at || "07:30", { step: 300 });
+    tIn.disabled = !on;
+    const thRow = el("div", "row");
+    const tog = el("label", "consent"); const cb = el("input"); cb.type = "checkbox"; cb.checked = on;
+    cb.onchange = () => { tIn.disabled = !cb.checked; };
+    tog.append(cb, el("span", "", "매일 먼저 생각하기"));
+    thRow.append(tIn, button("저장", "small", async () => {
+      const v = cb.checked ? (tIn.value || "07:30").slice(0, 5) : null;
+      await post("/api/daily/settings", { think_at: v });
+      toast(v ? `매일 ${v}에 생각할게요.` : "매일 생각하기를 껐어요.");
+    }));
+    tIn.style.cssText = "padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)";
+    th.append(tog, thRow);
+    box.append(th);
+
     // 앱 알림
     const p = el("div", "sub"); p.style.marginTop = "22px";
     p.append(el("h3", "", "알림"));
@@ -1257,7 +1402,7 @@ function bubble(role, text, extra = "") {
   const b = el("div", `bubble ${role} new ${extra}`, text); log.append(b);
   $("screenBody").scrollTop = $("screenBody").scrollHeight; return b;
 }
-function suggestChips(suggest) {
+function suggestChips(suggest, target = null) {
   if (!suggest || !suggest.length) return;
   const wrap = el("div", "links");
   for (const sg of suggest) {
@@ -1276,9 +1421,10 @@ function suggestChips(suggest) {
     };
     wrap.append(c);
   }
+  if (target) { target.append(wrap); return; }
   $("log").append(wrap); $("screenBody").scrollTop = $("screenBody").scrollHeight;
 }
-function linkChips(actions) {
+function linkChips(actions, target = null) {
   const wrap = el("div", "links");
   for (const a of actions) {
     if (a.status === "proposed") { const c = el("button", "", "확인함에서 결정하기"); c.onclick = () => openApp("inbox"); wrap.append(c); continue; }
@@ -1291,7 +1437,9 @@ function linkChips(actions) {
       }
     }
   }
-  if (wrap.children.length) { $("log").append(wrap); $("screenBody").scrollTop = $("screenBody").scrollHeight; }
+  if (!wrap.children.length) return;
+  if (target) { target.append(wrap); return; }
+  $("log").append(wrap); $("screenBody").scrollTop = $("screenBody").scrollHeight;
 }
 $("compose").addEventListener("submit", async (e) => {
   e.preventDefault();
