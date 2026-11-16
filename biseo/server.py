@@ -48,6 +48,7 @@ try:
     from biseo import daily  # noqa: E402
     from biseo import layout as home_layout  # noqa: E402
     from biseo import memory as mem  # noqa: E402
+    from biseo import judge  # noqa: E402
 except Exception:  # noqa: BLE001
     _lines = traceback.format_exc().strip().splitlines()
     _BOOT_ERROR = {"detail": "서버 본체를 불러오지 못했어요",
@@ -527,6 +528,15 @@ def home(authorization: str | None = Header(None)):
                              "summary": first[:80], "steps": t.get("steps"), "max_steps": t.get("max_steps")}
     data["pin_runs"] = runs
     return data
+
+
+# ---------- 왜? (판단 회상) ----------
+@app.get("/api/why/{kind}/{ref_id}")
+def why(kind: str, ref_id: str, authorization: str | None = Header(None)):
+    if kind not in ("daily", "action", "task"):
+        raise HTTPException(404, "없는 종류")
+    sb = _session(authorization)
+    return _run(judge.explain, sb, kind, ref_id)
 
 
 # ---------- 비서가 나에 대해 아는 것 (투명한 기억) ----------
