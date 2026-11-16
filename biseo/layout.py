@@ -12,7 +12,7 @@ import re
 KEY = "home.layout"
 MAX_PAGES = 5
 MAX_PER_PAGE = 8
-APPS = ("chat", "search", "events", "notes", "reminders", "tasks", "drafts", "skills", "inbox", "settings")
+APPS = ("chat", "search", "events", "notes", "reminders", "tasks", "drafts", "skills", "inbox", "memory", "settings")
 
 # 종류 → 가능한 크기 (첫 번째가 기본)
 TYPES = {
