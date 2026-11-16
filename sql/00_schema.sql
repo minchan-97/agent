@@ -134,6 +134,13 @@ create table if not exists events (
   updated_at  timestamptz not null default now(),
   constraint ends_after_start check (ends_at is null or ends_at >= starts_at)
 );
+alter table events add column if not exists repeat text;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'events_repeat_ok') then
+    alter table events add constraint events_repeat_ok
+      check (repeat is null or repeat in ('daily','weekdays','weekly','monthly'));
+  end if;
+end $$;
 create index if not exists events_when on events(user_id, starts_at);
 
 -- ---------- 5. 업무 기억 (정체성과 분리) ----------
@@ -205,6 +212,7 @@ create table if not exists tasks (
   constraint max_steps_range check (max_steps between 1 and 60)
 );
 alter table tasks add column if not exists lease_until timestamptz not null default 'epoch';
+alter table tasks add column if not exists shortcut_id bigint;      -- 버튼(단축)으로 시작한 과제 → 홈 위젯이 '최근 결과'를 보여 준다
 create index if not exists tasks_open on tasks(user_id, status, last_step_at nulls first);
 
 -- ---------- 8. 행동 ----------
@@ -276,6 +284,15 @@ create table if not exists reminders (
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
+-- 반복 알림: 보내면 '보냄'으로 끝나지 않고 다음 회차로 다시 걸린다. repeat_anchor 는 첫 회차(매월 31일 같은 날을 기억)
+alter table reminders add column if not exists repeat text;
+alter table reminders add column if not exists repeat_anchor timestamptz;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'reminders_repeat_ok') then
+    alter table reminders add constraint reminders_repeat_ok
+      check (repeat is null or repeat in ('daily','weekdays','weekly','monthly'));
+  end if;
+end $$;
 create index if not exists reminders_due on reminders(status, due_at) where status = 'scheduled';
 create index if not exists reminders_event on reminders(event_id);
 
