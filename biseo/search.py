@@ -13,6 +13,7 @@ facts 에는 절대 들어가지 않는다 (DB 제약 only_user_absorbs 가 한 
 """
 import os
 import re
+import time
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -58,15 +59,31 @@ def _published(r: dict):
         return None
 
 
+RATE_RETRIES = 2          # Brave 가 "너무 빠르다"(429)고 하면 이만큼 기다렸다 다시
+RATE_WAIT_MAX = 3.0       # 초. 한 번 기다리는 최대 시간 (함수 시간 한도를 넘기지 않게)
+
+
+def _wait_for(r, attempt: int) -> float:
+    """429 응답에서 얼마나 기다릴지. Retry-After 가 있으면 따르고, 없으면 1초·2초."""
+    try:
+        return min(RATE_WAIT_MAX, max(0.2, float(r.headers.get('Retry-After', ''))))
+    except (TypeError, ValueError):
+        return min(RATE_WAIT_MAX, 1.0 * (attempt + 1))
+
+
 def brave(query: str, count: int = 5, freshness: str | None = None) -> list:
     params = {'q': query, 'count': count, 'country': 'KR', 'search_lang': 'ko'}
     if freshness:
         params['freshness'] = freshness          # pd = 최근 하루
-    r = requests.get(
-        BRAVE_ENDPOINT,
-        headers={'Accept': 'application/json',
-                 'X-Subscription-Token': os.environ['BRAVE_API_KEY']},
-        params=params, timeout=10)
+    for attempt in range(RATE_RETRIES + 1):
+        r = requests.get(
+            BRAVE_ENDPOINT,
+            headers={'Accept': 'application/json',
+                     'X-Subscription-Token': os.environ['BRAVE_API_KEY']},
+            params=params, timeout=10)
+        if r.status_code != 429 or attempt == RATE_RETRIES:
+            break
+        time.sleep(_wait_for(r, attempt))     # 요금제의 초당 요청 한도에 걸림 → 잠깐 쉬고 다시
     r.raise_for_status()
     out = []
     for x in r.json().get('web', {}).get('results', []):
