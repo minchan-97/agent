@@ -169,6 +169,22 @@ def config():
 
 
 # ---------- 몰랑이의 자식 (heir) 토글 — 본인만 ----------
+def _heir_allowed(uid: str) -> bool:
+    """
+    외부 공개 뒤에는 아무나 선착순으로 heir 를 가져가면 안 된다.
+    HEIR_OWNER_EMAIL 에 적힌 계정만 켤 수 있다. 비어 있으면 아무도 새로 켤 수 없다
+    (이미 heir 인 계정은 그대로 유지·끄기 가능).
+    """
+    owner = os.environ.get("HEIR_OWNER_EMAIL", "").strip().lower()
+    if not owner:
+        return False
+    try:
+        u = db.for_cron().auth.admin.get_user_by_id(uid).user
+        return bool(u and (u.email or "").lower() == owner)
+    except Exception:
+        return False
+
+
 @app.get("/api/heir")
 def heir_get(authorization: str | None = Header(None)):
     sb = _session(authorization)
@@ -177,8 +193,13 @@ def heir_get(authorization: str | None = Header(None)):
     # 자리가 이미 찼는지 (남이 heir 면 나는 영영 못 켠다)
     taken = bool(db.for_cron().table("agents").select("user_id")
                  .eq("heir", True).limit(1).execute().data)
-    return {"heir": mine, "persona": a.get("persona") or "",
-            "available": mine or not taken}
+    return {"heir": mine, "persona": a.get("persona") or "" if mine else "",
+            "available": mine or (not taken and _heir_allowed(sb.uid))}
+
+
+def a_is_heir(sb) -> bool:
+    rows = sb.table("agents").select("heir").limit(1).execute().data
+    return bool(rows and rows[0].get("heir"))
 
 
 class HeirIn(BaseModel):
@@ -193,6 +214,8 @@ def heir_set(body: HeirIn, authorization: str | None = Header(None)):
     if not body.on:
         sb.table("agents").update({"heir": False}).eq("user_id", sb.uid).execute()
         return {"heir": False}
+    if not a_is_heir(sb) and not _heir_allowed(sb.uid):
+        raise HTTPException(403, "이 계정에서는 켤 수 없어요.")
     # DB 함수가 '아무도 아닐 때만' 올려 준다 (동시 요청도 유니크 인덱스가 1명만 통과)
     try:
         got = db.for_cron().rpc("claim_heir", {"uid": sb.uid}).execute().data
@@ -201,6 +224,27 @@ def heir_set(body: HeirIn, authorization: str | None = Header(None)):
     if not got:
         raise HTTPException(409, "이미 몰랑이의 자식이 정해졌어요. 한 명만 될 수 있어요.")
     return {"heir": True}
+
+
+# ---------- 계정 삭제 ----------
+@app.post("/api/account/delete")
+def account_delete(authorization: str | None = Header(None)):
+    """
+    본인 계정을 지운다. auth.users 행을 지우면 모든 표가 on delete cascade 로 함께 지워진다.
+    (개인정보보호법의 파기·앱스토어의 '앱 안에서 계정 삭제' 요건)
+    """
+    sb = _session(authorization)
+    uid = sb.uid
+    svc = db.for_cron()
+    try:
+        svc.table("push_subscriptions").delete().eq("user_id", uid).execute()
+        svc.auth.admin.delete_user(uid)
+    except Exception as e:
+        print("ACCOUNT_DELETE_ERROR", uid[:8], type(e).__name__, str(e)[:200])
+        raise HTTPException(500, "계정을 지우지 못했어요. 잠시 뒤 다시 해 주세요.")
+    _TOKENS.clear()
+    print("ACCOUNT_DELETED", uid[:8])
+    return {"deleted": True}
 
 
 # ---------- 비서 ----------
