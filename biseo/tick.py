@@ -31,7 +31,7 @@ MAX_PER_DAY = 6
 BRIEF_HOUR = 7          # 아침 브리핑을 보낼 시각 (이 시각 이후 첫 틱)
 WAIT_HOURS = 3
 TIME_BUDGET = 45      # 초. Vercel 함수 시간 안에 끝나도록
-MAX_STEPS_PER_TICK = 4   # 한 번 깨울 때 한 과제를 최대 몇 걸음까지 (간단한 일은 한 번에 끝)
+MAX_STEPS_PER_TICK = 8   # 한 번 깨울 때 한 과제를 최대 몇 걸음까지 (멈출 지점이 나오면 그 전에 끝)
 STEP_SOFT_BUDGET = 35    # 초. 이 안에서만 연속으로 걸음을 묶는다
 
 
@@ -180,14 +180,21 @@ def step_user(sb, agent: dict, ask_llm, allow_task=True, only_due=False) -> dict
     if only_due:          # 1분 틱: 알림만 보고 끝 (LLM 안 부름)
         return out
 
-    # 2. 과제 진행 — 한 번 깨울 때 여러 걸음 (멈출 지점이 나오면 거기서 끝)
+    # 2. 과제 진행 — 한 과제가 멈출 지점(묻기·확인·완료)에 닿으면, 남은 시간으로 다음 과제도
     if allow_task:
-        tid = tk.pick_next(sb)
-        if tid:
-            res = run_task_steps(sb, agent, tid, ask_llm)
-            out["task"] = res
+        started = time.monotonic()
+        seen, ran = set(), []
+        while time.monotonic() - started < STEP_SOFT_BUDGET:
+            tid = tk.pick_next(sb)
+            if not tid or tid in seen:
+                break
+            seen.add(tid)
+            left = STEP_SOFT_BUDGET - (time.monotonic() - started)
+            res = run_task_steps(sb, agent, tid, ask_llm, budget=left)
+            ran.append(res)
             if res.get("notify"):
                 _say(sb, agent, "task", res["notify"], f"{name} · 맡은 일", "/?open=tasks")
+        out["task"] = ran or None
 
     # 3. 성장 — 하루 한 번, 최근 대화로 바탕을 조금 다듬는다 (heir 면 더 깊게)
     if allow_task:
