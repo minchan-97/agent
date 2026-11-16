@@ -118,13 +118,14 @@ def keys(service_sb) -> dict:
 
 
 # ---------------- 발송 ----------------
-def send_one(sub: dict, payload: dict, vapid: dict) -> int:
+def send_one(sub: dict, payload: dict, vapid: dict) -> tuple:
+    """돌려주는 값: (상태 코드, 실패 이유). 애플은 실패 이유를 본문에 짧게 준다 (예: BadJwtToken)."""
     body = encrypt(json.dumps(payload, ensure_ascii=False).encode(), sub["p256dh"], sub["auth"])
     r = requests.post(sub["endpoint"], data=body, timeout=10, headers={
         "Authorization": vapid_header(sub["endpoint"], vapid),
         "Content-Encoding": "aes128gcm", "Content-Type": "application/octet-stream",
         "TTL": str(TTL), "Urgency": "high"})
-    return r.status_code
+    return r.status_code, ("" if r.status_code < 300 else (r.text or "")[:120])
 
 
 def send(service_sb, user_id: str, title: str, body: str, url: str = "/") -> dict:
@@ -137,14 +138,18 @@ def send(service_sb, user_id: str, title: str, body: str, url: str = "/") -> dic
         return {"sent": 0, "devices": 0}
     vapid = keys(service_sb)
     payload = {"title": title[:80], "body": body[:240], "url": url}
-    sent = 0
+    sent, failures = 0, []
     for s in subs:
         try:
-            code = send_one(s, payload, vapid)
-        except Exception:
-            code = 0
+            code, why = send_one(s, payload, vapid)
+        except Exception as e:
+            code, why = 0, type(e).__name__
         if code in (200, 201, 202):
             sent += 1
-        elif code in (404, 410):                    # 앱을 지웠거나 알림을 끈 기기
+            continue
+        host = urlparse(s["endpoint"]).netloc
+        failures.append({"device": s.get("device") or "기기", "host": host, "code": code, "why": why})
+        print("PUSH_FAIL", host, code, why)
+        if code in (404, 410):                      # 앱을 지웠거나 알림을 끈 기기
             service_sb.table("push_subscriptions").delete().eq("id", s["id"]).execute()
-    return {"sent": sent, "devices": len(subs)}
+    return {"sent": sent, "devices": len(subs), "failures": failures}
