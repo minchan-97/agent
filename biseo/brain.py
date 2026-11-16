@@ -102,18 +102,42 @@ def needs_live_facts(text: str) -> bool:
     return bool(_LIVE_FACT.search(text)) and not _PERSONAL.search(text)
 
 
+class LLMUnavailable(Exception):
+    """LLM 이 지금 답할 수 없음 (시간 초과, 요청 한도, 연결 실패, 서버 오류).
+    화면에는 '잠시 뒤 다시'로 보여 주고, 과제는 다음 틱에 다시 시도한다."""
+
+
+LLM_TIMEOUT = float(os.environ.get("LLM_TIMEOUT", "25"))   # 초. Vercel 함수 시간 안에 끝나도록
+LLM_RETRIES = 2                                            # 일시 오류는 SDK 가 지수 대기로 재시도
+
+_client_cache = {}
+
+
 def _client():
-    from openai import OpenAI
-    return OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+    # 함수가 따뜻할 때(warm) 연결을 다시 쓰도록 한 번 만든 클라이언트를 재사용한다
+    if "c" not in _client_cache:
+        from openai import OpenAI
+        _client_cache["c"] = OpenAI(api_key=os.environ["OPENAI_API_KEY"],
+                                    timeout=LLM_TIMEOUT, max_retries=LLM_RETRIES)
+    return _client_cache["c"]
 
 
 def _ask(messages: list) -> dict:
-    res = _client().chat.completions.create(
-        model=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
-        messages=messages,
-        response_format={"type": "json_object"},
-        temperature=0.6,
-    )
+    try:
+        import openai
+        transient = (openai.APITimeoutError, openai.APIConnectionError,
+                     openai.RateLimitError, openai.InternalServerError)
+    except Exception:          # SDK 가 없거나 버전이 달라도 아래에서 일반 오류로 처리
+        transient = ()
+    try:
+        res = _client().chat.completions.create(
+            model=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.6,
+        )
+    except transient as e:
+        raise LLMUnavailable(type(e).__name__) from e
     try:
         out = json.loads(res.choices[0].message.content or "{}")
     except json.JSONDecodeError:
