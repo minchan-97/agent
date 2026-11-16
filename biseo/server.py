@@ -82,25 +82,63 @@ class _FixPath:
 
 
 # ---------- 예상 못 한 오류도 이유를 돌려준다 ----------
+# 개발 중에만 켠다: 오류 응답에 종류·위치·내용을 그대로 담는다.
+# 꺼져 있으면 사용자에게는 짧은 안내와 오류 번호만 가고, 자세한 건 Vercel Logs 에만 남는다.
+DEBUG = os.environ.get("DEBUG_ERRORS") == "1"
+
+
+def _error_id() -> str:
+    return secrets.token_hex(3)
+
+
 @app.exception_handler(Exception)
 async def _any_error(request: Request, exc: Exception):
-    """화면에 '요청에 실패했어요 (500)'만 뜨지 않게, 오류 종류와 위치를 짧게 돌려준다.
-    자세한 전체 기록은 Vercel Logs 에 남긴다."""
+    eid = _error_id()
     tb = traceback.extract_tb(exc.__traceback__)
     mine = [f for f in tb if "/biseo/" in f.filename]
     where = f"{mine[-1].filename.split('/biseo/')[-1]}:{mine[-1].lineno}" if mine else ""
-    msg = str(exc).replace("\n", " ")[:200]
-    print("ERROR", request.url.path, "".join(traceback.format_exception(exc)))
-    return JSONResponse(status_code=500, content={
-        "detail": f"서버 오류 ({type(exc).__name__}{' · ' + where if where else ''}): {msg}"})
+    print("ERROR", eid, request.method, request.url.path, "".join(traceback.format_exception(exc)))
+    content = {"detail": "잠깐 문제가 생겼어요. 잠시 뒤 다시 해 주세요.", "error_id": eid}
+    if DEBUG:
+        content["debug"] = f"{type(exc).__name__}{' · ' + where if where else ''}: " \
+                           f"{str(exc).replace(chr(10), ' ')[:200]}"
+    return JSONResponse(status_code=500, content=content)
+
+
+if not _BOOT_ERROR:
+    @app.exception_handler(brain.LLMUnavailable)
+    async def _llm_down(request: Request, exc: Exception):
+        print("LLM_UNAVAILABLE", request.url.path, str(exc))
+        return JSONResponse(status_code=503, headers={"Retry-After": "20"}, content={
+            "detail": "지금 생각하는 쪽(AI)이 바빠요. 20초쯤 뒤에 다시 말해 주세요.",
+            "retry_after": 20})
 
 
 # ---------- 인증 ----------
+_TOKENS: dict = {}          # 토큰 → (uid, 확인한 시각). 함수가 따뜻한 동안만 산다
+TOKEN_TTL = 60              # 초. 이 안에서는 Supabase Auth 에 다시 묻지 않는다
+
+
+def _uid_cached(token: str):
+    """요청마다 Auth 서버에 왕복하지 않게, 확인된 토큰을 잠깐 기억한다.
+    (RLS 는 여전히 매 쿼리에서 토큰을 검사하므로, 만료 토큰으로 남의 행을 볼 수는 없다)"""
+    import time as _t
+    hit = _TOKENS.get(token)
+    if hit and _t.monotonic() - hit[1] < TOKEN_TTL:
+        return hit[0]
+    uid = db.user_id_from_token(token)
+    if uid:
+        if len(_TOKENS) > 500:
+            _TOKENS.clear()
+        _TOKENS[token] = (uid, _t.monotonic())
+    return uid
+
+
 def _session(authorization: str | None):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "로그인이 필요해요")
     token = authorization.split(" ", 1)[1]
-    uid = db.user_id_from_token(token)
+    uid = _uid_cached(token)
     if not uid:
         raise HTTPException(401, "로그인이 만료됐어요")
     # 사용자 토큰(RLS) + Scoped(user_id 자동) 이중으로 막는다
@@ -200,7 +238,24 @@ def chat(body: ChatIn, authorization: str | None = Header(None)):
     a = _agent(sb)
     if not a.get("name"):
         raise HTTPException(409, "먼저 비서 이름을 정해 주세요")
+    _rate_limit(sb)
     return brain.respond(sb, a, body.text)
+
+
+CHAT_PER_MIN = int(os.environ.get("CHAT_PER_MIN", "10"))
+CHAT_PER_DAY = int(os.environ.get("CHAT_PER_DAY", "300"))
+
+
+def _rate_limit(sb):
+    """비용 폭주 방지. 서버리스는 메모리가 인스턴스마다 따로라 DB(대화 기록)로 센다."""
+    now = datetime.now(timezone.utc)
+    def count(since):
+        return (sb.table("episodes").select("id", count="exact").eq("role", "user")
+                .gte("created_at", since.isoformat()).execute().count or 0)
+    if count(now - timedelta(minutes=1)) >= CHAT_PER_MIN:
+        raise HTTPException(429, "말이 너무 빨라요. 1분쯤 뒤에 다시 해 주세요.")
+    if count(now - timedelta(days=1)) >= CHAT_PER_DAY:
+        raise HTTPException(429, "오늘 대화 한도에 닿았어요. 내일 다시 이야기해요.")
 
 
 class SuggestIn(BaseModel):
@@ -356,9 +411,14 @@ def task_resume(task_id: int, authorization: str | None = Header(None)):
 def task_step(task_id: int, authorization: str | None = Header(None)):
     """크론을 기다리지 않고 지금 한 걸음. 등급 규칙은 똑같이 적용된다."""
     sb = _session(authorization)
-    res = tk.step(sb, _agent(sb), task_id, brain._ask)
-    if not res["task"]:
+    if not tk.get(sb, task_id):
         raise HTTPException(404, "없는 과제")
+    if not tk.lease(sb, task_id):
+        raise HTTPException(409, "지금 이 과제를 진행하는 중이에요. 잠시 뒤 다시 확인해 주세요.")
+    try:
+        res = tk.step(sb, _agent(sb), task_id, brain._ask)
+    finally:
+        tk.release(sb, task_id)
     return res["task"]
 
 
@@ -625,15 +685,42 @@ def cron_tick(only: str = "", authorization: str | None = Header(None)):
     return {"ok": True, "report": tick.run(db.for_cron(), brain._ask, only_due=(only == "due"))}
 
 
-# ---------- 진단 ----------
+# ---------- 상태 확인 ----------
+REQUIRED_ENV = ("SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY",
+                "OPENAI_API_KEY", "CRON_SECRET")
+
+
+@app.get("/api/health")
+def health():
+    """
+    배포가 살아 있는지 확인용 (모니터링 서비스가 1~5분마다 부르면 된다).
+    값은 절대 돌려주지 않고, 있는지·연결되는지만 알려 준다.
+    """
+    import time as _t
+    missing = [k for k in REQUIRED_ENV if not os.environ.get(k)]
+    db_ok, db_ms = False, None
+    if "SUPABASE_URL" not in missing and "SUPABASE_SERVICE_ROLE_KEY" not in missing:
+        t0 = _t.monotonic()
+        try:
+            db.for_cron().table("agents").select("user_id").limit(1).execute()
+            db_ok = True
+        except Exception as e:
+            print("HEALTH_DB_ERROR", type(e).__name__, str(e)[:200])
+        db_ms = round((_t.monotonic() - t0) * 1000)
+    ok = db_ok and not missing
+    body = {"ok": ok, "db": db_ok, "db_ms": db_ms, "missing_env": missing,
+            "search": bool(os.environ.get("BRAVE_API_KEY"))}
+    return JSONResponse(status_code=200 if ok else 503, content=body)
+
+
+# ---------- 없는 길 ----------
 @app.api_route("/api/{rest:path}", methods=["GET", "POST"])
 def not_found(rest: str, request: Request):
-    """맞는 길이 없을 때, 함수가 실제로 받은 경로를 보여 준다 (원인 찾기용)."""
-    hints = {k: v for k, v in request.headers.items()
-             if any(w in k for w in ("path", "url", "uri", "matched")) and "auth" not in k}
-    return JSONResponse(status_code=404, content={
-        "detail": "Not Found", "path_seen": request.scope.get("path"),
-        "original_path": request.scope.get("_orig_path"), "headers": hints})
+    content = {"detail": "없는 주소예요."}
+    if DEBUG:      # 배포 경로 문제를 찾을 때만: 함수가 실제로 받은 경로를 보여 준다
+        content.update(path_seen=request.scope.get("path"),
+                       original_path=request.scope.get("_orig_path"))
+    return JSONResponse(status_code=404, content=content)
 
 
 # app 은 FastAPI 그대로 두고, 경로 보정은 미들웨어로 끼운다.
@@ -649,7 +736,9 @@ class _BootGuard:
     async def __call__(self, scope, receive, send):
         if _BOOT_ERROR and scope.get("type") == "http":
             import json
-            body = json.dumps(_BOOT_ERROR, ensure_ascii=False).encode()
+            print("BOOT_ERROR", _BOOT_ERROR)
+            shown = _BOOT_ERROR if DEBUG else {"detail": "서버를 준비하지 못했어요. 잠시 뒤 다시 해 주세요."}
+            body = json.dumps(shown, ensure_ascii=False).encode()
             await send({"type": "http.response.start", "status": 500,
                         "headers": [(b"content-type", b"application/json; charset=utf-8")]})
             await send({"type": "http.response.body", "body": body})
