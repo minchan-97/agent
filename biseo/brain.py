@@ -44,10 +44,14 @@ CONTRACT = """
 actions 에 쓸 수 있는 kind 와 args
   search        {"query": "검색어"}          모르는 최신 정보가 필요할 때만
   note          {"text": "남길 내용"}        사용자가 기록해 달라고 할 때
-  reminder      {"text": "알릴 말", "due_at": "2026-11-03T15:00:00+09:00"}
+  reminder      {"text": "알릴 말", "due_at": "2026-11-03T15:00:00+09:00", "repeat": 선택}
+                repeat: "daily"(매일) | "weekdays"(평일) | "weekly"(매주) | "monthly"(매월).
+                "매주 화요일", "매일 아침"처럼 반복을 말했을 때만 넣고, due_at 은 첫 회차 시각으로.
   draft         {"to": "받는 사람", "text": "초안"}   글을 대신 써 달라고 할 때
   event         {"title": "일정 이름", "starts_at": "2026-11-05T15:00:00+09:00",
-                 "ends_at": 선택, "place": 선택, "remind_before_min": 선택(숫자), "note": 선택}
+                 "ends_at": 선택, "place": 선택, "remind_before_min": 선택(숫자), "note": 선택,
+                 "repeat": 선택(daily|weekdays|weekly|monthly)}
+                "매주 화요일 협의회"처럼 반복하는 일정이면 repeat 를 넣고 starts_at 은 다가올 첫 회차로.
                 사용자의 약속·회의·행사 같은 일정. "~분 전에 알려 줘"가 붙으면
                 reminder 를 따로 만들지 말고 remind_before_min 에 넣어 (일정과 연결된다).
   start_task    {"goal": "과제 목표 한 문장", "skill_id": 숫자 또는 null}
