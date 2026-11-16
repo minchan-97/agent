@@ -13,7 +13,7 @@ from .privacy import mask
 APPS = ("search", "tasks")
 
 
-def create(sb, app: str, label: str, text: str) -> dict:
+def create(sb, app: str, label: str, text: str, origin: str = "user") -> dict:
     if app not in APPS:
         raise ValueError("검색 또는 맡은 일 앱에만 버튼을 만들 수 있어요")
     label = mask(str(label or "")).strip()[:20]
@@ -23,7 +23,8 @@ def create(sb, app: str, label: str, text: str) -> dict:
     kind = "search" if app == "search" else "task"
     icon = "search" if kind == "search" else "bolt"
     return sb.table("shortcuts").insert({
-        "app": app, "label": label, "kind": kind, "text": text, "icon": icon}).execute().data[0]
+        "app": app, "label": label, "kind": kind, "text": text, "icon": icon,
+        "origin": "agent" if origin == "agent" else "user"}).execute().data[0]
 
 
 def list_for(sb, app: str) -> list:
