@@ -118,7 +118,8 @@ def execute(sb, row: dict) -> dict:
         elif kind == "reminder":
             from . import apps
             r = apps.create_reminder(sb, {"text": args.get("text") or "알림",
-                                          "due_at": args.get("due_at")},
+                                          "due_at": args.get("due_at"),
+                                          "repeat": args.get("repeat")},
                                      by="agent" if row.get("origin") == "self" else "user")
             patch = {"status": "done", "done_at": _now(), "due_at": r["due_at"],
                      "result": {"reminder_id": r["id"]}}
