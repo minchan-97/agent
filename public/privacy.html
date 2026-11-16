@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>개인정보처리방침</title>
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<style>
+:root{--bg:#F3F6FA;--surface:#fff;--ink:#13263A;--muted:#5A6B7D;--line:#D4DDE7;--accent:#004880;color-scheme:light}
+@media (prefers-color-scheme: dark){:root{--bg:#0C1520;--surface:#14202D;--ink:#E3EBF3;--muted:#93A4B6;--line:#253445;--accent:#7AB0E0;color-scheme:dark}}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.7 "Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo",sans-serif}
+main{max-width:720px;margin:0 auto;padding:28px 20px 60px}
+h1{font-size:1.5rem;color:var(--accent);margin:0 0 4px}
+h2{font-size:1.05rem;margin:28px 0 8px}
+p,li{color:var(--ink)} .muted{color:var(--muted);font-size:.9rem}
+table{width:100%;border-collapse:collapse;font-size:.9rem;margin:8px 0;background:var(--surface)}
+th,td{border:1px solid var(--line);padding:8px;text-align:left;vertical-align:top}
+th{background:var(--bg)}
+.ph{background:#FFF3CD;color:#7a5200;padding:0 4px;border-radius:4px}
+@media (prefers-color-scheme: dark){.ph{background:#3a2e10;color:#f5d38a}}
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+<main>
+<h1>개인정보처리방침</h1>
+<p class="muted">시행일: <span class="ph">[2026년 ○월 ○일]</span></p>
+
+<p><span class="ph">[운영자 이름]</span>(이하 "운영자")는 개인 비서 서비스(이하 "서비스")를 운영하면서
+「개인정보 보호법」에 따라 이용자의 개인정보를 보호하고, 관련 문의를 신속하게 처리하기 위해 다음과 같이 개인정보처리방침을 둡니다.</p>
+
+<h2>1. 처리하는 개인정보 항목</h2>
+<table>
+<tr><th>구분</th><th>항목</th></tr>
+<tr><td>회원가입·로그인</td><td>이메일 주소, 비밀번호(암호화되어 저장되며 운영자도 원문을 볼 수 없음)</td></tr>
+<tr><td>서비스 이용 중 이용자가 입력한 정보</td><td>비서와의 대화 내용, 일정·알림·메모·초안, 맡긴 일(과제)과 그 진행 기록, 비서 이름, 이용자가 밝힌 자신에 대한 사실</td></tr>
+<tr><td>알림</td><td>알림을 켠 기기의 푸시 구독 정보(기기 종류: 아이폰·안드로이드·컴퓨터)</td></tr>
+<tr><td>자동 생성 정보</td><td>서비스 이용 기록(행동 승인·거절 기록, 접속 일시), 오류 기록</td></tr>
+</table>
+<p class="muted">대화 중 주민등록번호·휴대전화번호·카드번호·계좌번호처럼 보이는 숫자는 저장하거나 AI로 보내기 전에 자동으로 가려집니다(형식이 다르면 못 가릴 수 있습니다).
+그래도 민감한 개인정보(건강, 신념, 다른 사람의 개인정보 등)는 가급적 입력하지 마세요.</p>
+
+<h2>2. 처리 목적</h2>
+<ul>
+<li>회원 식별과 로그인</li>
+<li>비서 기능 제공: 대화 응답, 일정·알림·메모 관리, 과제 진행, 알림 발송</li>
+<li>이용자에게 맞춘 응답(말투·선호 반영)</li>
+<li>서비스 안정성 확보: 오류 확인, 부정 이용 방지, 이용량 제한</li>
+</ul>
+
+<h2>3. 보유 및 이용 기간</h2>
+<p>회원 탈퇴(설정 → 계정 삭제) 시 모든 개인정보를 <b>지체 없이 파기</b>합니다.
+다만 관계 법령에서 보존을 요구하는 경우에는 그 기간 동안 보관합니다. 오류 기록(서버 로그)은 호스팅 업체의 보관 정책에 따라
+최대 <span class="ph">[○일]</span> 뒤 자동 삭제됩니다.</p>
+
+<h2>4. 처리 위탁 및 국외 이전</h2>
+<p>운영자는 서비스 제공을 위해 아래 업체에 개인정보 처리를 맡기며, 일부는 국외에서 처리됩니다.
+이용자는 회원가입 시 이에 동의하며, 동의하지 않으면 서비스를 이용할 수 없습니다(이 서비스의 핵심 기능이 아래 업체 없이는 동작하지 않기 때문입니다).</p>
+<table>
+<tr><th>받는 자</th><th>국가</th><th>이전 항목</th><th>목적</th><th>보유 기간</th></tr>
+<tr><td>Supabase Inc.</td><td><span class="ph">[프로젝트 지역, 예: 대한민국(서울) / 미국]</span></td><td>1항의 모든 항목</td><td>데이터베이스·로그인</td><td>회원 탈퇴 시까지</td></tr>
+<tr><td>OpenAI, L.L.C.</td><td>미국</td><td>대화 내용, 과제 내용, 비서가 참고하는 메모·사실</td><td>AI 응답 생성</td><td>OpenAI API 정책에 따름(<span class="ph">[예: 최대 30일 보관 후 삭제, 학습에 사용하지 않음 — 계약 확인 후 기재]</span>)</td></tr>
+<tr><td>Vercel Inc.</td><td>미국</td><td>요청 처리 중 지나가는 모든 항목, 오류 기록</td><td>서버 운영</td><td>처리 즉시 / 로그는 Vercel 정책에 따름</td></tr>
+<tr><td>Brave Software, Inc.</td><td>미국</td><td>검색어(대화에서 뽑아낸 것)</td><td>최신 정보 검색</td><td>Brave 정책에 따름</td></tr>
+</table>
+<p class="muted">이전 시기와 방법: 서비스 이용 시마다 암호화된 네트워크(HTTPS)로 전송합니다.</p>
+
+<h2>5. 개인정보의 파기</h2>
+<p>보유 기간이 끝나거나 목적이 달성되면 지체 없이 파기합니다. 전자 파일은 복구할 수 없는 방법으로 삭제합니다.
+앱에서 개별 일정·메모·알림을 지우면 그 항목은 바로 삭제됩니다.</p>
+
+<h2>6. 이용자의 권리</h2>
+<p>이용자는 언제든지 자신의 개인정보를 열람·정정·삭제하거나 처리 정지를 요구할 수 있습니다.
+대부분은 앱 안에서 직접 할 수 있고(각 앱에서 수정·삭제, 설정에서 계정 삭제), 그 밖의 요청은 아래 연락처로 해 주시면 지체 없이 처리합니다.</p>
+
+<h2>7. 안전성 확보 조치</h2>
+<ul>
+<li>모든 데이터는 계정별로 분리되어, 데이터베이스 행 단위 보안(RLS)으로 본인만 접근할 수 있습니다.</li>
+<li>비밀번호는 암호화되어 저장되며, 모든 통신은 HTTPS로 암호화됩니다.</li>
+<li>남에게 전송되거나 되돌릴 수 없는 행동은 이용자의 승인 없이 실행되지 않도록 데이터베이스 제약으로 막혀 있습니다.</li>
+<li>잠금 화면에 보이는 알림에는 민감해 보이는 내용을 싣지 않습니다.</li>
+</ul>
+
+<h2>8. 만 14세 미만 아동</h2>
+<p>서비스는 만 14세 이상만 가입할 수 있으며, 만 14세 미만 아동의 개인정보를 알면서 수집하지 않습니다.</p>
+
+<h2>9. 자동 수집 장치</h2>
+<p>로그인 상태 유지를 위해 브라우저 저장소(localStorage)를 사용합니다. 광고·추적용 쿠키는 쓰지 않습니다.</p>
+
+<h2>10. 개인정보 보호책임자</h2>
+<p>성명: <span class="ph">[이름]</span><br>연락처: <span class="ph">[이메일]</span></p>
+<p class="muted">개인정보 침해 신고·상담: 개인정보침해신고센터(privacy.kisa.or.kr, 국번없이 118),
+개인정보분쟁조정위원회(www.kopico.go.kr, 1833-6972)</p>
+
+<h2>11. 방침의 변경</h2>
+<p>이 방침을 바꿀 때는 시행 7일 전부터 서비스 안에서 알립니다. 이용자에게 불리한 변경은 30일 전에 알립니다.</p>
+
+<p class="muted" style="margin-top:36px"><a href="/">← 비서로 돌아가기</a></p>
+</main>
+</body>
+</html>
