@@ -200,6 +200,10 @@ code.topic{display:block;background:var(--surface);border:1px solid var(--line);
 .app-icon.sys .tile{background:var(--surface);color:var(--accent);border:1px solid var(--line);box-shadow:none}
 @media (prefers-color-scheme: dark){ .app-icon .tile{background:linear-gradient(160deg,#2A64A0 0%,var(--tile) 70%)} }
 
+/* 지금 진행 중인 과제 */
+.live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:6px;vertical-align:1px}
+@media (prefers-reduced-motion: no-preference){ .live-dot{animation:blink 1.2s infinite} .card.running .progress i{background-image:linear-gradient(90deg,var(--accent),#3D8BD0,var(--accent));background-size:200% 100%;animation:flow 1.4s linear infinite} @keyframes flow{to{background-position:-200% 0}} }
+
 /* 과제 진행 막대 */
 .progress{height:4px;border-radius:99px;background:var(--line);overflow:hidden;margin:6px 0 2px}
 .progress i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width .3s ease}
@@ -540,7 +544,7 @@ function runPin(pin) {
     s.append(el("p", "muted", "적은 내용으로 과제를 시작해요. 비워 두면 기본 동작으로 실행돼요."));
     const foot = el("div", "actions");
     foot.append(el("span"), button("실행", "", async () => {
-      await post(ep, { text: inp.value.trim() });
+      const t = await post(ep, { text: inp.value.trim() }); driveTask(t?.id);
       closeSheet(); await openApp("tasks");
     }));
     s.append(foot);
@@ -776,6 +780,49 @@ function editDraft(d) {
   });
 }
 
+/* ===================== 과제 엔진: 화면에서 바로 달리고, 저절로 갱신 ===================== */
+// 크론(2분)을 기다리지 않는다. 과제가 생기거나 화면에 열린 과제가 보이면 곧바로 진행을 요청하고,
+// 서버는 묻기·확인·완료·시간 한도까지 이어 달린다. 화면은 몇 초마다 새 상태를 받아 온다.
+const driving = new Set();
+const lastDrive = new Map();        // 과제 → 마지막으로 달리기를 끝낸 시각
+let taskPoll = null;
+const POLL_MS = 3500;
+const AUTO_COOLDOWN_MS = 20000;     // 화면이 저절로 다시 달리게 할 때의 최소 간격 (오류가 나도 서버를 두드리지 않게)
+
+function driveTask(id, auto = false) {
+  if (!id || driving.has(id)) return;
+  if (auto && Date.now() - (lastDrive.get(id) || 0) < AUTO_COOLDOWN_MS) return;
+  driving.add(id);
+  refreshTasksSoon(150);
+  api(`/api/tasks/${id}/run`, { method: "POST", body: "{}" })
+    .then((t) => announceTask(t))
+    .catch((e) => { if (!/이미 진행/.test(e.message)) toast(e.message, "err"); })
+    .finally(() => { driving.delete(id); lastDrive.set(id, Date.now()); cache.drop("tasks", "home", "actions"); refreshTasksSoon(0); });
+}
+function announceTask(t) {
+  if (!t || !t.status || t.status === "open") return;
+  const g = `'${(t.goal || "").slice(0, 18)}${(t.goal || "").length > 18 ? "…" : ""}'`;
+  const msg = { done: `${g} 끝났어요.`, waiting_user: `${g} 진행 중에 물어볼 게 생겼어요.`,
+                waiting_approval: `${g} 진행 중에 확인할 일이 생겼어요.`, stopped: `${g} 잠시 멈췄어요.` }[t.status];
+  if (msg) toast(msg);
+}
+function typingInScreen() {
+  const a = document.activeElement;
+  return a && $("screenBody").contains(a) && (a.tagName === "INPUT" || a.tagName === "TEXTAREA");
+}
+function refreshTasksSoon(delay = POLL_MS) {
+  clearTimeout(taskPoll);
+  taskPoll = setTimeout(async () => {
+    if (current !== "tasks" || document.hidden) return;
+    if (typingInScreen()) return refreshTasksSoon();      // 답을 적는 중이면 화면을 갈아엎지 않는다
+    try {
+      const v = await cache.fresh("tasks");
+      if (current === "tasks" && !typingInScreen()) await SCREENS.tasks.render($("screenBody"), v);
+    } catch { /* 다음 차례에 다시 */ }
+  }, delay);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden && current === "tasks") refreshTasksSoon(0); });
+
 /* ===================== 맡은 일 ===================== */
 const TASK_STATE = { open: "진행 중", waiting_user: "답을 기다려요", waiting_approval: "확인을 기다려요", done: "끝났어요", stopped: "멈췄어요" };
 SCREENS.tasks = {
@@ -783,14 +830,20 @@ SCREENS.tasks = {
   async render(body, data) {
     const { live, ended } = data || await cache.get("tasks");
     const head = el("div");
-    head.append(await actionBar("tasks", "맡길 일을 적어 주세요", async (v) => { await post("/api/tasks", { goal: v }); await render(); }));
+    head.append(await actionBar("tasks", "맡길 일을 적어 주세요", async (v) => {
+      const t = await post("/api/tasks", { goal: v }); driveTask(t?.id); await render(false);
+    }));
     head.append(await shortcutBar("tasks"));
     const nodes = [...live, ...ended].map((t) => {
       const ended = t.status === "done" || t.status === "stopped";
-      const d = el("div", "card" + (t.status === "waiting_user" ? " ask" : "") + (ended ? " ended" : ""));
+      const running = t.status === "open" && (t.running || driving.has(t.id));
+      const d = el("div", "card" + (t.status === "waiting_user" ? " ask" : "") + (ended ? " ended" : "") + (running ? " running" : ""));
       const lead = el("div", "lead");
       lead.append(miniIcon(t.icon || "dot", t.tint || "blue"), el("div", "t", t.goal));
-      d.append(lead, el("div", "s", `${TASK_STATE[t.status] || t.status} · ${t.steps}/${t.max_steps}단계`));
+      const st = el("div", "s");
+      if (running) st.append(el("span", "live-dot"));
+      st.append(`${running ? "지금 진행하는 중" : (TASK_STATE[t.status] || t.status)} · ${t.steps}/${t.max_steps}단계`);
+      d.append(lead, st);
       if (!ended) {
         const bar = el("div", "progress"); const fill = el("i");
         fill.style.width = Math.min(100, Math.round((t.steps / Math.max(1, t.max_steps)) * 100)) + "%";
@@ -806,13 +859,17 @@ SCREENS.tasks = {
         const a = input("text", "", { placeholder: "답을 적어 주세요" }); row.append(a,
           button("답하기", "small", async () => { await post(`/api/tasks/${t.id}/answer`, { text: a.value }); await render(); }));
       }
-      if (t.status === "open") row.append(button("바로 진행", "small", async () => { await post(`/api/tasks/${t.id}/step`); await render(); }));
-      if (t.status === "stopped") row.append(button("이어서 하기", "small", async () => { await post(`/api/tasks/${t.id}/resume`); await post(`/api/tasks/${t.id}/step`); await render(); }));
+      if (t.status === "stopped") row.append(button("이어서 하기", "small", async () => {
+        await post(`/api/tasks/${t.id}/resume`); driveTask(t.id); await render(false);
+      }));
       if (!ended) row.append(button("그만두기", "ghost small", async () => { await post(`/api/tasks/${t.id}/cancel`); await render(); }));
       if (row.children.length) d.append(row);
       return d;
     });
     body.replaceChildren(head, ...(nodes.length ? nodes : [el("div", "empty-state", "맡은 일이 없어요.\n위에 적어서 바로 맡기거나, 자주 쓰는 일은 버튼으로 저장해 두세요.")]));
+    // 화면에 열린 과제가 보이면, 누가 돌리고 있지 않은 것은 바로 달리게 한다 (버튼 없이)
+    for (const t of live) if (t.status === "open" && !t.running) driveTask(t.id, true);
+    if (live.some((t) => t.status === "open") || driving.size) refreshTasksSoon();
   },
 };
 
@@ -866,7 +923,7 @@ SCREENS.search = {
   async render(body) {                     // 검색은 늘 새로 — 캐시 없음
     const head = el("div");
     head.append(await actionBar("search", "무엇을 찾아볼까요?", async (v) => {
-      const t = await post("/api/search/run", { query: v });
+      const t = await post("/api/search/run", { query: v }); driveTask(t?.id);
       await openApp("tasks"); if (t?.id) {}
     }, "찾기"));
     head.append(await shortcutBar("search"));
@@ -895,7 +952,7 @@ async function shortcutBar(app) {
   for (const s of items) {
     const b = el("button", "sc");
     b.append(miniIcon(s.icon || "bolt", s.tint || "blue"), el("span", "", s.label));
-    b.onclick = async () => { await post(`/api/shortcuts/${s.id}/run`); await openApp("tasks"); };
+    b.onclick = async () => { const t = await post(`/api/shortcuts/${s.id}/run`); driveTask(t?.id); await openApp("tasks"); };
     const x = el("span", "x", "×");
     x.onclick = async (e) => { e.stopPropagation(); if (await askConfirm(`'${s.label}' 버튼을 지울까요?`)) { await post(`/api/shortcuts/${s.id}/remove`); await render(); } };
     b.append(x);
@@ -934,7 +991,7 @@ function runAppSkill(s) {
     sheet.append(field("요청 내용", inp));
     const foot = el("div", "actions");
     foot.append(el("span"), button("실행", "", async () => {
-      await post(`/api/skills/${s.id}/run`, { text: inp.value.trim() });
+      const t = await post(`/api/skills/${s.id}/run`, { text: inp.value.trim() }); driveTask(t?.id);
       closeSheet(); await openApp("tasks");
     }));
     sheet.append(foot);
@@ -1002,7 +1059,7 @@ SCREENS.inbox = {
       const row = el("div", "row");
       const decide = (verb) => async () => {
         d.style.opacity = "0.4";                      // 먼저 흐리게 (즉시 반응)
-        try { await post(`/api/actions/${a.id}/${verb}`); d.remove(); if (!$("screenBody").querySelector(".card")) await render(false); }
+        try { await post(`/api/actions/${a.id}/${verb}`); if (a.task_id) driveTask(a.task_id); d.remove(); if (!$("screenBody").querySelector(".card")) await render(false); }
         catch (e) { d.style.opacity = "1"; toast(e.message, "err"); }
       };
       row.append(button("하기", "small", decide("approve")),
@@ -1034,7 +1091,7 @@ SCREENS.skills = {
                el("div", "s", `쓰는 도구: ${c.tool_labels.join(", ") || "없음"} · ${c.uses}번 씀`));
       if (c.pinned) d.querySelector(".t").textContent += " · 홈에 있음";
       const row = el("div", "row"); const a = input("text", "", { placeholder: "무엇에 쓸지 (선택)" });
-      row.append(a, button("실행", "small", async () => { await post(`/api/skills/${c.id}/run`, { text: a.value }); await openApp("tasks"); }),
+      row.append(a, button("실행", "small", async () => { const t = await post(`/api/skills/${c.id}/run`, { text: a.value }); driveTask(t?.id); await openApp("tasks"); }),
         button(c.pinned ? "홈에서 내리기" : "홈에 아이콘", "ghost small", async () => {
           await post(`/api/skills/${c.id}/${c.pinned ? "unpin" : "pin"}`); await render();
         }),
@@ -1197,6 +1254,7 @@ function suggestChips(suggest) {
       c.disabled = true;
       try {
         const r = await post("/api/suggest/accept", { kind: sg.kind, label: sg.label || "", args: sg.args || {} });
+        if (r?.goal !== undefined && r?.id) driveTask(r.id);        // 제안이 과제로 맡겨졌으면 바로 시작
         c.textContent = "✓ " + (sg.label || "완료");
         c.classList.add("done");
         if (r?.status === "proposed") { c.textContent = "확인함에서 결정하기"; c.onclick = () => openApp("inbox"); c.disabled = false; c.classList.remove("done"); }
@@ -1230,6 +1288,8 @@ $("compose").addEventListener("submit", async (e) => {
   wait.setAttribute("aria-label", "생각하는 중"); wait.append(el("i"), el("i"), el("i"));
   try {
     const res = await post("/api/chat", { text });
+    // 대화에서 과제를 맡았으면 크론을 기다리지 않고 바로 시작
+    for (const a of res.actions || []) if (a.result?.task_id) driveTask(a.result.task_id);
     wait.classList.remove("thinking"); wait.removeAttribute("aria-label"); wait.textContent = res.reply;
     linkChips(res.actions || []);
     suggestChips(res.suggest || []);
