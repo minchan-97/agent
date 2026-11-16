@@ -370,8 +370,51 @@ def _reflect(agent, t, out, ask_llm) -> dict:
     return rf
 
 
+# ---------- 겹침 방지·오류 기록 ----------
+LEASE_SECONDS = 90      # 한 번 잡으면 이만큼 다른 쪽이 못 건드린다 (함수가 죽어도 풀린다)
+EPOCH = "1970-01-01T00:00:00+00:00"
+ERROR_MARK = "일시적 오류"
+MAX_ERRORS = 3          # 연속으로 이만큼 실패하면 과제를 멈추고 알린다
+
+
+def lease(sb, task_id: int, seconds: int = LEASE_SECONDS) -> bool:
+    """
+    과제를 잠깐 잡는다. 성공하면 True.
+    조건부 UPDATE 한 번이라 DB 안에서 원자적이다: 크론 틱 두 개, 또는 크론과
+    '지금 한 걸음'이 동시에 와도 한쪽만 성공한다.
+    """
+    now = datetime.now(timezone.utc)
+    rows = (sb.table("tasks")
+            .update({"lease_until": (now + timedelta(seconds=seconds)).isoformat()})
+            .eq("id", task_id).lt("lease_until", now.isoformat()).execute().data)
+    return bool(rows)
+
+
+def release(sb, task_id: int):
+    sb.table("tasks").update({"lease_until": EPOCH}).eq("id", task_id).execute()
+
+
+def record_error(sb, task_id: int, err: Exception) -> str | None:
+    """
+    걸음이 예외로 끝났을 때 기록한다. 과제는 그대로 열어 두고 다음 틱에 다시 시도한다.
+    연속 MAX_ERRORS 번이면 멈추고, 사용자에게 알릴 말을 돌려준다.
+    """
+    t = get(sb, task_id)
+    if not t or t["status"] != "open":
+        return None
+    kind = type(err).__name__
+    log = _append(t, {"by": "agent", "outcome": f"{ERROR_MARK} ({kind})"})
+    tail = [e for e in log if e.get("by") != "user"][-MAX_ERRORS:]
+    if len(tail) == MAX_ERRORS and all(str(e.get("outcome", "")).startswith(ERROR_MARK) for e in tail):
+        _save(sb, task_id, {"status": "stopped", "next_step": None, "log": log})
+        return f"'{t['goal'][:30]}' 과제를 진행하다 오류가 반복돼서 멈췄어요. 잠시 뒤 '이어서 하기'를 눌러 주세요."
+    _save(sb, task_id, {"log": log})
+    return None
+
+
 def pick_next(sb):
     """가장 오래 손대지 않은 열린 과제 하나."""
     rows = (sb.table("tasks").select("id").eq("status", "open")
+            .lt("lease_until", datetime.now(timezone.utc).isoformat())
             .order("last_step_at", desc=False, nullsfirst=True).limit(1).execute().data)
     return rows[0]["id"] if rows else None
