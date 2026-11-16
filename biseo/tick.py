@@ -21,6 +21,7 @@ from datetime import datetime, timedelta, timezone
 from . import notify
 from . import push
 from . import observe
+from . import daily
 from . import growth
 from . import heir
 from . import tasks as tk
@@ -28,7 +29,6 @@ from .db import Scoped
 
 KST = timezone(timedelta(hours=9))
 MAX_PER_DAY = 6
-BRIEF_HOUR = 7          # 아침 브리핑을 보낼 시각 (이 시각 이후 첫 틱)
 WAIT_HOURS = 3
 TIME_BUDGET = 45      # 초. Vercel 함수 시간 안에 끝나도록
 MAX_STEPS_PER_TICK = 8   # 한 번 깨울 때 한 과제를 최대 몇 걸음까지 (멈출 지점이 나오면 그 전에 끝)
@@ -103,38 +103,6 @@ def _grow_once(sb, agent: dict, ask_llm):
         pass
 
 
-def _morning_brief(sb, agent: dict):
-    """아침에 오늘 일정·확인할 일을 한 줄로 먼저 건넨다. 규칙이 정한다 (LLM 없음)."""
-    now = datetime.now(KST)
-    if now.hour < BRIEF_HOUR:
-        return
-    already = (sb.table("outbox").select("id").eq("rule", "brief")
-               .gte("created_at", _today_start()).limit(1).execute().data)
-    if already:
-        return
-    from . import apps
-    h = apps.today(sb)
-    evs = h.get("events") or []
-    bits = []
-    if evs:
-        first = evs[0]
-        when_s = first["starts_at"]
-        try:
-            hm = datetime.fromisoformat(str(when_s).replace("Z", "+00:00")).astimezone(KST).strftime("%H:%M")
-        except ValueError:
-            hm = ""
-        more = f" 외 {len(evs) - 1}건" if len(evs) > 1 else ""
-        bits.append(f"오늘 일정 {len(evs)}건 (첫 일정 {hm} {first['title']}{more})")
-    else:
-        bits.append("오늘 등록된 일정은 없어요")
-    if h.get("pending"):
-        bits.append(f"확인할 일 {h['pending']}건")
-    if h.get("asking"):
-        bits.append(f"답을 기다리는 질문 {h['asking']}건")
-    name = agent.get("name") or "비서"
-    _say(sb, agent, "brief", "좋은 아침이에요. " + ", ".join(bits) + ".", f"{name} · 아침 브리핑", "/")
-
-
 def run_task_steps(sb, agent, tid, ask_llm, max_steps=MAX_STEPS_PER_TICK, budget=STEP_SOFT_BUDGET):
     """한 과제를 연속으로 여러 걸음. 'open'이 아니게 되면(묻기·확인·완료·멈춤) 즉시 중단."""
     started = time.monotonic()
@@ -200,8 +168,11 @@ def step_user(sb, agent: dict, ask_llm, allow_task=True, only_due=False) -> dict
     if allow_task:
         _grow_once(sb, agent, ask_llm)
 
-    # 4. 아침 브리핑 — 하루 한 번, 아침에 먼저 말을 건다
-    _morning_brief(sb, agent)
+    # 4. 오늘의 생각 — 사용자가 정한 시각에 하루 한 번, 비서가 먼저 오늘 할 만한 일을 건넨다
+    #    (브리핑도 여기에 합쳐졌다. 생각 시간을 끄면 아침 알림도 없다)
+    if allow_task:
+        daily.maybe_run(sb, agent, ask_llm,
+                        say=lambda rule, body, title, url: _say(sb, agent, rule, body, title, url))
 
     # 5. 버튼·홈 제안 — 자주 쓰는 걸 하나 올린다 (확인함으로)
     if allow_task:
@@ -226,7 +197,7 @@ def step_user(sb, agent: dict, ask_llm, allow_task=True, only_due=False) -> dict
 
 def run(raw_sb, ask_llm, only_due=False) -> dict:
     started = time.monotonic()
-    agents = (raw_sb.table("agents").select("user_id,name,ntfy_topic,heir")
+    agents = (raw_sb.table("agents").select("user_id,name,ntfy_topic,heir,think_at")
               .not_.is_("name", "null").execute().data) or []
     report = {}
     for a in agents:
