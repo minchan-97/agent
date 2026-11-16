@@ -183,6 +183,7 @@ code.topic{display:block;background:var(--surface);border:1px solid var(--line);
   .skel::after{animation:shimmer 1.3s infinite}
   @keyframes shimmer{to{transform:translateX(100%)}}
 }
+.card .taint { font-size: 12px; color: #b45309; margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -893,6 +894,8 @@ SCREENS.inbox = {
     if (pending.length) nodes.push(el("div", "group", "확인이 필요해요"));
     for (const a of pending) {
       const d = el("div", "card wait"); d.append(actionLead(a), el("div", "b", describe(a)));
+      // 검색 결과를 보고 나온 일: 웹페이지 글이 시킨 것일 수 있으니 내용을 한 번 더 보게 한다
+      if (a.tainted) d.append(el("div", "taint", "검색 자료를 보고 나온 일이에요. 내용이 맞는지 확인해 주세요."));
       const row = el("div", "row");
       const decide = (verb) => async () => {
         d.style.opacity = "0.4";                      // 먼저 흐리게 (즉시 반응)
