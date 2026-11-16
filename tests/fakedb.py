@@ -30,7 +30,7 @@ DEFAULTS = {
     "actions": {"approved_by_human": False, "auto_executed": False, "tainted": False,
                 "status": "proposed", "origin": "user", "result": None, "task_id": None},
     "tasks": {"status": "open", "steps": 0, "max_steps": 12, "log": [], "skill_id": None,
-              "last_step_at": None},
+              "last_step_at": None, "lease_until": "1970-01-01T00:00:00+00:00"},
     "action_trust": {"clean": 0, "promoted": False},
 }
 PKEYS = {"action_trust": ("kind",), "agent_state": ("key",)}
@@ -50,6 +50,7 @@ class _Query:
     def neq(self, k, v):  self.filters.append(lambda r: r.get(k) != v); return self
     def in_(self, k, vs): self.filters.append(lambda r: r.get(k) in vs); return self
     def gte(self, k, v):  self.filters.append(lambda r: r.get(k) is not None and str(r.get(k)) >= str(v)); return self
+    def lt(self, k, v):   self.filters.append(lambda r: r.get(k) is not None and str(r.get(k)) < str(v)); return self
     def lte(self, k, v):  self.filters.append(lambda r: r.get(k) is not None and str(r.get(k)) <= str(v)); return self
 
     def order(self, k, desc=False, nullsfirst=False):
