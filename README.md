@@ -1,3 +1,4 @@
+[README.md](https://github.com/user-attachments/files/34898952/README.md)
 # 비서진 (v0)
 
 몰랑이를 모체로 한 개인·가족 비서. 이름은 사용자가 짓는다.
