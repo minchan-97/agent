@@ -349,6 +349,30 @@ create table if not exists push_subscriptions (
   created_at  timestamptz not null default now()
 );
 
+-- ---------- 14-1. 판단 기록 (몰랑이 판단 노드 · 판단 회상) ----------
+-- 비서가 제안·행동·과제 마무리를 할 때마다 어떤 길로(path, at_probs) 무엇을 근거로(evidence)
+-- 어떤 지난 판단을 떠올려(recalled) 판단했는지 남긴다. '왜?' 화면이 이것을 보여 준다.
+create table if not exists judgments (
+  id          bigserial primary key,
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  tree        text not null,
+  path        jsonb not null default '[]',
+  at_probs    jsonb not null default '[]',
+  steps       jsonb not null default '[]',
+  evidence    jsonb not null default '[]',
+  recalled    jsonb not null default '[]',
+  summary     text,
+  context     text,
+  ref_kind    text check (ref_kind in ('daily','action','task')),
+  ref_id      text,
+  tainted     boolean not null default false,
+  feedback    real check (feedback is null or feedback between -1 and 1),
+  decided_at  timestamptz,
+  created_at  timestamptz not null default now()
+);
+create index if not exists judgments_ref on judgments(user_id, ref_kind, ref_id);
+create index if not exists judgments_tree on judgments(user_id, tree, id desc);
+
 -- ---------- 15. 계정별로 자라는 상태 ----------
 -- 마르코프·SOM·사고 트리처럼 입력으로 자라는 것은 반드시 여기, 계정별로.
 -- 공용으로 자라면 한 사람의 말투·단어가 다른 사람 비서로 샌다.
@@ -387,7 +411,8 @@ declare t text;
 begin
   foreach t in array array['agents','facts','quarantine','episodes','events','task_memory',
                            'skills','tasks','actions','action_trust','reminders','shortcuts',
-                           'usage_patterns','outbox','push_subscriptions','agent_state','audit']
+                           'usage_patterns','outbox','push_subscriptions','agent_state','audit',
+                           'judgments']
   loop
     execute format('alter table %I enable row level security', t);
     execute format('drop policy if exists own_rows on %I', t);
