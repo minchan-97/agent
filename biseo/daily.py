@@ -84,9 +84,8 @@ def _hm(iso):
 def gather(sb) -> dict:
     now = _now()
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    evs = sb.table("events").select("title,starts_at,place") \
-            .gte("starts_at", start.isoformat()).lt("starts_at", (start + timedelta(days=4)).isoformat()) \
-            .order("starts_at", desc=False).limit(12).execute().data or []
+    from . import apps
+    evs = apps.events_between(sb, start.isoformat(), (start + timedelta(days=4)).isoformat(), limit=12)
     rems = sb.table("reminders").select("text,due_at").eq("status", "scheduled") \
              .lt("due_at", (start + timedelta(days=2)).isoformat()) \
              .order("due_at", desc=False).limit(8).execute().data or []
