@@ -1,4 +1,4 @@
-[README.md](https://github.com/user-attachments/files/34898952/README.md)
+[README.md](https://github.com/user-attachments/files/34899624/README.md)
 # 비서진 (v0)
 
 몰랑이를 모체로 한 개인·가족 비서. 이름은 사용자가 짓는다.
@@ -130,6 +130,25 @@ Vercel 의 FastAPI 프로젝트 방식(zero-config)을 쓴다. `vercel.json` 이
 - `pyproject.toml` 이 가리키는 `biseo/server.py` 의 `app` 을 Vercel 이 하나의 함수로 띄운다
 - `public/` 의 파일(index.html, 아이콘, manifest)은 Vercel 이 직접 내준다
 - 함수는 원래 주소(`/api/config` 등)를 그대로 받는다
+
+## 외부 공개 전 체크리스트
+
+- [ ] `public/privacy.html`, `public/terms.html` 의 노란 칸(운영자 이름·연락처·시행일·Supabase 지역·OpenAI 보관 정책)을 채운다.
+      초안이므로 공개 전에 전문가 검토를 받는 것이 안전하다
+- [ ] Vercel 환경변수 `HEIR_OWNER_EMAIL` 에 본인 이메일을 넣는다 (다른 사람이 heir 를 가져가지 못하게)
+- [ ] `DEBUG_ERRORS` 를 비워 둔다
+- [ ] UptimeRobot 같은 모니터링에 `https://<앱 주소>/api/health` 를 1~5분 간격으로 건다
+- [ ] Supabase Authentication 에서 "Confirm email" 을 켠다 (아무 이메일로나 가입하지 못하게)
+- [ ] OpenAI 대시보드에 월 사용 한도를 건다 (속도 제한과 별개의 마지막 안전장치)
+- [ ] 상업적으로 운영하면 Vercel Pro 로 옮긴다 (Hobby 는 비상업 전용)
+
+## 시험
+
+```
+pip install pytest
+python -m pytest tests
+```
+실제 Supabase·OpenAI 없이 가짜 DB 와 가짜 LLM 으로 돈다.
 
 ## 알아 둘 점
 
