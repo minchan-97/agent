@@ -142,7 +142,9 @@ def execute(sb, row: dict) -> dict:
             patch = {"status": "done", "done_at": _now(), "result": {"pinned_shortcut": sid}}
         elif kind == "suggest_shortcut":
             from . import shortcuts
-            sk = shortcuts.create(sb, args.get("app"), args.get("label"), args.get("text"))
+            # 버튼 제안은 언제나 비서가 사용 패턴을 보고 낸 것
+            sk = shortcuts.create(sb, args.get("app"), args.get("label"), args.get("text"),
+                                  origin="agent" if row.get("origin") == "self" else "user")
             patch = {"status": "done", "done_at": _now(), "result": {"shortcut_id": sk["id"]}}
         elif kind == "create_skill":
             from . import skills
