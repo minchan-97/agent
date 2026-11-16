@@ -616,6 +616,21 @@ def push_test(authorization: str | None = Header(None)):
                     "알림이 잘 와요. 눌러 보면 확인함이 열려요.", "/?open=inbox")
     if not res["devices"]:
         raise HTTPException(409, "이 계정에 알림을 켠 기기가 없어요")
+    # 실패한 기기가 있으면 왜 실패했는지 사람이 읽을 수 있게 풀어 준다
+    hints = []
+    for f in res.get("failures", []):
+        apple = "apple" in f["host"]
+        if f["code"] in (404, 410):
+            hint = "이 기기의 구독이 만료돼 지웠어요. 그 기기에서 알림을 다시 켜 주세요."
+        elif f["code"] == 403 and apple:
+            hint = ("애플이 서명을 거절했어요(" + (f["why"] or "403") + "). Vercel 환경변수 PUSH_CONTACT 에 "
+                    "실제 이메일을 'mailto:you@example.com' 꼴로 넣고 다시 배포해 주세요.")
+        elif f["code"] in (400, 403):
+            hint = f"알림 서버가 거절했어요 ({f['code']} {f['why']})."
+        else:
+            hint = f"보내지 못했어요 ({f['code'] or '연결 실패'})."
+        hints.append(f"{f['device']}: {hint}")
+    res["hints"] = hints
     return res
 
 
