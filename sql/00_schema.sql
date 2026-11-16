@@ -39,7 +39,10 @@ alter table agents add column if not exists persona text;
 create unique index if not exists agents_one_heir on agents ((true)) where heir;
 
 -- 아무도 heir 가 아닐 때만 uid 를 올린다. 성공하면 uid, 아니면 null.
-create or replace function claim_heir(uid uuid) returns uuid
+-- 예전 71_heir_unique.sql 의 함수는 반환 형식이 달라서 덮어쓸 수 없으므로 먼저 지운다.
+-- (서버는 결과가 비었는지만 보므로 반환 형식이 바뀌어도 그대로 작동한다)
+drop function if exists claim_heir(uuid);
+create function claim_heir(uid uuid) returns uuid
 language plpgsql security definer set search_path = public as $$
 begin
   if exists (select 1 from agents where heir) then
