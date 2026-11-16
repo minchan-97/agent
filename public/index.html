@@ -396,6 +396,27 @@ form.compose .mic svg,form.compose .send svg{width:19px;height:19px;fill:none;st
 form.compose .send{width:44px;height:44px;border-radius:22px;border:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;cursor:pointer;flex:none}
 form.compose .send:disabled{opacity:.5}
 /* ===== 위젯 홈: 쪽 넘기기 + 편집 ===== */
+.home{overflow:hidden!important;padding-top:14px}
+.hhead{padding-bottom:10px}
+.pager{flex:1 1 auto;min-height:0;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.page{height:100%;overflow-y:auto;scrollbar-width:none;overscroll-behavior-y:contain}
+.page::-webkit-scrollbar{display:none}
+.homefoot{position:static;margin-top:0;padding-top:4px;background:none}
+/* 위젯을 조금 더 촘촘하게 (작은 폰에서도 기본 6개가 한 화면에) */
+.bento{gap:10px}
+.bt{padding:14px 16px;border-radius:22px}
+.bt.hero{min-height:100px}
+.hero .n{font-size:2.4rem}
+.hero .n.sm{font-size:1.7rem}
+.hero .t{font-size:1.08rem}
+.bt.small,.bt.pinw.small{min-height:92px}
+.small .n{font-size:1.9rem}
+.bt .ai{width:34px;height:34px;border-radius:11px}
+.bt .ai svg{width:18px;height:18px}
+.bt.plan{padding:12px 16px 4px}
+.plan .pr{padding:7px 0}
+.plan .pxw{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plan .pe{margin:2px 0 10px}
 .pager{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;margin:0 -18px;padding:0 0 4px;overscroll-behavior-x:contain}
 .pager::-webkit-scrollbar{display:none}
 .page{flex:0 0 100%;scroll-snap-align:start;box-sizing:border-box;padding:2px 18px 0}
@@ -965,6 +986,9 @@ function renderWidget(h, w) {
 
 // ---- 페이지 그리기 ----
 function paintHome(h) {
+  // 누르고 있는 동안 화면이 다시 그려지면, 손을 뗀 신호(pointerup)가 사라진 요소로 가서
+  // 길게 누르기 타이머가 안 풀린다 → '건드리기만 해도 편집'이 되던 원인. 다시 그릴 땐 누르기를 취소한다.
+  if (pressT) { clearTimeout(pressT); pressT = null; }
   lastHome = h;
   paintHeader();
   const L = editMode ? editLayout : effectiveLayout(h);
@@ -1019,9 +1043,10 @@ $("pager").addEventListener("scroll", () => {
 /* ---------- 편집 모드: 길게 누르기 → 지우기·크기·끌어서 옮기기 ---------- */
 let pressT = null, suppressClick = false;
 $("pager").addEventListener("pointerdown", (e) => {
-  if (editMode || e.button > 0) return;
+  if (editMode || e.button > 0 || !e.target.closest(".wslot")) return;   // 빈 곳·쪽 넘기기는 편집 아님
   const x0 = e.clientX, y0 = e.clientY;
-  pressT = setTimeout(() => { pressT = null; suppressClick = true; navigator.vibrate?.(12); enterEdit(); }, 550);
+  clearTimeout(pressT);
+  pressT = setTimeout(() => { pressT = null; suppressClick = true; navigator.vibrate?.(12); enterEdit(); }, 650);
   const cancel = (ev) => { if (ev.type !== "pointermove" || Math.hypot(ev.clientX - x0, ev.clientY - y0) > 8) { clearTimeout(pressT); pressT = null; off(); } };
   const off = () => { removeEventListener("pointermove", cancel); removeEventListener("pointerup", cancel); removeEventListener("pointercancel", cancel); };
   addEventListener("pointermove", cancel); addEventListener("pointerup", cancel); addEventListener("pointercancel", cancel);
@@ -1035,6 +1060,9 @@ $("pager").addEventListener("click", (e) => {
   if (editMode && !e.target.closest(".wctl, .addslot")) { e.stopPropagation(); e.preventDefault(); }
 }, true);
 $("pager").addEventListener("contextmenu", (e) => e.preventDefault());
+for (const ev of ["touchend", "touchcancel", "scroll"]) {
+  $("pager").addEventListener(ev, () => { if (pressT) { clearTimeout(pressT); pressT = null; } }, { passive: true, capture: true });
+}
 
 function enterEdit() {
   if (editMode) return;
@@ -1152,8 +1180,22 @@ async function openWidgetPicker(pageIndex = curPage) {
       if (editLayout.pages.length >= MAX_PAGES) return toast("더 넣을 자리가 없어요.", "err");
       editLayout.pages.push([]); pg = editLayout.pages.at(-1);
     }
-    pg.push({ id: newId(), ...w }); closeSheet(); paintHome(lastHome || {});
-    toast(`'${w.label || WIDGETS[w.type].name}' 위젯을 놓았어요. 끌어서 옮길 수 있어요.`);
+    const nw = { id: newId(), ...w };
+    pg.push(nw); closeSheet(); paintHome(lastHome || {});
+    // 화면에 다 안 들어가면 다음 쪽(없으면 새 쪽)으로 옮긴다
+    requestAnimationFrame(() => {
+      const pi = editLayout.pages.indexOf(pg);
+      const node = $("pager").children[pi];
+      if (node && node.scrollHeight > node.clientHeight + 4 && pg.length > 1) {
+        pg.splice(pg.indexOf(nw), 1);
+        let next = editLayout.pages[pi + 1];
+        if (!next) { if (editLayout.pages.length >= MAX_PAGES) { pg.push(nw); return; } editLayout.pages.push([]); next = editLayout.pages.at(-1); }
+        next.push(nw); paintHome(lastHome || {}); setTimeout(() => goPage(pi + 1), 60);
+        toast("이 쪽이 꽉 차서 다음 쪽에 놓았어요.");
+      } else {
+        toast(`'${w.label || WIDGETS[w.type].name}' 위젯을 놓았어요. 끌어서 옮길 수 있어요.`);
+      }
+    });
   };
   let skills = [], scs = [];
   try { skills = (await api("/api/skills")).custom || []; } catch {}
