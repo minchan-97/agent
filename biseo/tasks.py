@@ -115,6 +115,8 @@ def cancel(sb, task_id: int) -> dict:
     t = get(sb, task_id)
     if not t or t["status"] in ("done", "cancelled"):
         raise ValueError("그만둘 수 있는 과제가 아님")
+    from . import judge
+    judge.safe_feedback(sb, "task", task_id, -1.0)
     return _save(sb, task_id, {"status": "cancelled",
                                "log": _append(t, {"by": "user", "outcome": "그만두기"})})
 
@@ -333,7 +335,8 @@ def step(sb, agent: dict, task_id: int, ask_llm) -> dict:
         # 몰랑이식 자기 평가: 끝내기 전에 결과를 스스로 점검한다
         near_limit = t["steps"] + 1 >= t["max_steps"]
         writing_long = writing and t["steps"] + 1 >= 8   # 글쓰기인데 길어지면 그만 끝낸다
-        rf = _reflect(agent, t, out, ask_llm)
+        jw = _judge_walk(sb)
+        rf = _reflect(agent, t, out, ask_llm, jw)
         if rf.get("verdict") == "more" and not near_limit and not writing_long:
             # 아직 부족하다고 스스로 판단 → 끝내지 않고 한 걸음 더
             patch.update(status="open", next_step=str(rf.get("next", ""))[:200] or "보완하기")
@@ -346,6 +349,7 @@ def step(sb, agent: dict, task_id: int, ask_llm) -> dict:
                          quality=rf.get("quality") if isinstance(rf.get("quality"), int) else None)
             gap = str(rf.get("gap", "")).strip()
             notify = f"'{t['goal'][:30]}' 끝났어요." + (" (한계 있음)" if gap else "")
+            _judge_record(sb, jw, t, res, gap)
     elif status == "waiting_approval":
         patch["status"] = "waiting_approval"
 
@@ -356,12 +360,48 @@ def step(sb, agent: dict, task_id: int, ask_llm) -> dict:
     return {"task": t, "notify": notify}
 
 
-def _reflect(agent, t, out, ask_llm) -> dict:
+def _judge_walk(sb):
+    from . import judge
+    try:
+        return judge.walk(sb, "task")
+    except Exception as e:
+        print("JUDGE_WALK_SKIP", type(e).__name__, str(e)[:120])
+        return None
+
+
+def _judge_record(sb, jw, t: dict, result: str, gap: str):
+    """과제를 끝낼 때의 판단: 무엇을 근거로 정리했는지 (검색 자료는 출처와 함께, 바깥 글 표시)."""
+    if not jw:
+        return
+    from . import judge
+    ev, tainted = [], False
+    for e in (t.get("log") or [])[-LOG_KEEP:]:
+        out = str(e.get("outcome") or "")
+        if e.get("by") == "user" and out:
+            ev.append({"tag": f"A{len(ev) + 1}", "kind": "answer", "id": None, "text": out[:160]})
+        elif out.startswith(EXTERNAL_MARK):
+            tainted = True
+            for chunk in out[len(EXTERNAL_MARK):].split(" | ")[:3]:
+                url = chunk[chunk.rfind("(http"):].strip("() ") if "(http" in chunk else None
+                ev.append({"tag": f"W{len(ev) + 1}", "kind": "web", "id": url, "text": chunk.strip()[:160]})
+    try:
+        recalled = judge.recall(sb, "task", t["goal"])
+        judge.record(sb, jw, summary=f"{t['goal'][:80]} → {(result or '').splitlines()[0][:120] if result else ''}"
+                     + (f" (한계: {gap[:60]})" if gap else ""),
+                     context=t["goal"], evidence=ev[:8], recalled=recalled,
+                     ref_kind="task", ref_id=t["id"], tainted=tainted)
+    except Exception as e:
+        print("JUDGE_RECORD_SKIP", type(e).__name__, str(e)[:120])
+
+
+def _reflect(agent, t, out, ask_llm, jw=None) -> dict:
     log = (t.get("log") or [])[-LOG_KEEP:]
     facts = "\n".join(
         f"- {e.get('outcome','')}" for e in log if e.get("outcome"))[:1500]
     draft_result = str(out.get("result") or "")[:4000]
-    msgs = [{"role": "system", "content": REFLECT},
+    from . import judge
+    system = REFLECT + ("\n\n" + judge.directive_text(jw) if jw else "")
+    msgs = [{"role": "system", "content": system},
             {"role": "user", "content":
              f"과제 목표: {t['goal']}\n걸음 {t['steps']}/{t['max_steps']}\n\n"
              f"지금까지 모은 것:\n{facts or '(기록 적음)'}\n\n"
