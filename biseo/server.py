@@ -513,6 +513,18 @@ def home(authorization: str | None = Header(None)):
     data["notes"] = (sb.table("task_memory").select("id,title,content,updated_at").eq("kind", "note")
                      .order("updated_at", desc=True).limit(3).execute().data) or []
     data["layout"] = home_layout.load(sb)          # 없으면 null → 화면이 기본 배치를 쓴다
+    # 기능 위젯이 '최근 결과'를 보여 주도록: 기능(s:id)·버튼(c:id)마다 가장 최근 과제 하나
+    runs = {}
+    recent = (sb.table("tasks").select("id,skill_id,shortcut_id,status,result,updated_at,steps,max_steps")
+              .order("updated_at", desc=True).limit(60).execute().data) or []
+    for t in recent:
+        for key in ((f"s:{t['skill_id']}" if t.get("skill_id") else None),
+                    (f"c:{t['shortcut_id']}" if t.get("shortcut_id") else None)):
+            if key and key not in runs:
+                first = next((ln.strip(" #*-") for ln in str(t.get("result") or "").splitlines() if ln.strip()), "")
+                runs[key] = {"task_id": t["id"], "status": t["status"], "at": t["updated_at"],
+                             "summary": first[:80], "steps": t.get("steps"), "max_steps": t.get("max_steps")}
+    data["pin_runs"] = runs
     return data
 
 
