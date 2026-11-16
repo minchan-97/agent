@@ -28,12 +28,20 @@ create table if not exists agents (
   ntfy_topic  text,                         -- 계정별 알림 주제 (= 비밀번호)
   heir        boolean not null default false,  -- 몰랑이의 자식 (전체에서 한 명)
   persona     text,                         -- heir 계정에서 자라는 나다움
+  think_at    text default '07:30',         -- 매일 비서가 먼저 생각하는 시각 (한국, HH:MM). null 이면 끔
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   constraint name_len check (name is null or char_length(name) between 1 and 12)
 );
 alter table agents add column if not exists heir    boolean not null default false;
 alter table agents add column if not exists persona text;
+alter table agents add column if not exists think_at text default '07:30';
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'think_at_ok') then
+    alter table agents add constraint think_at_ok
+      check (think_at is null or think_at ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$');
+  end if;
+end $$;
 
 -- heir 는 한 명만: 동시에 켜도 유니크 인덱스가 하나만 통과시킨다
 create unique index if not exists agents_one_heir on agents ((true)) where heir;
@@ -282,8 +290,11 @@ create table if not exists shortcuts (
   icon        text,
   uses        int not null default 0,
   pinned      boolean not null default false,
+  -- 'agent' = 비서가 사용 패턴을 보고 만든 것 (홈에서 표시가 다르다)
+  origin      text not null default 'user' check (origin in ('user','agent')),
   created_at  timestamptz not null default now()
 );
+alter table shortcuts add column if not exists origin text not null default 'user';
 
 -- ---------- 12. 사용 패턴 (버튼 제안용 관찰) ----------
 create table if not exists usage_patterns (
