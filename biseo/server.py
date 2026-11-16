@@ -505,6 +505,10 @@ def home(authorization: str | None = Header(None)):
                      "created_at": sk0.get("created_at")})
     data["pins"] = pins
     data["daily"] = daily.today_plan(sb)          # 오늘의 제안 (없으면 null)
+    # 홈의 '진행 중' 카드: 지금 돌고 있는 과제 하나 (없으면 답을 기다리는 것)
+    live = (sb.table("tasks").select("id,goal,status,steps,max_steps")
+            .in_("status", ["open", "waiting_user"]).order("updated_at", desc=True).limit(5).execute().data) or []
+    data["task"] = next((t for t in live if t["status"] == "open"), live[0] if live else None)
     return data
 
 
