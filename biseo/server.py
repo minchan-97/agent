@@ -360,26 +360,27 @@ def decide(action_id: int, verb: str, authorization: str | None = Header(None)):
 
 # ---------- 과제 ----------
 def _kick(sb, task):
-    """과제를 맡기면 다음 크론을 기다리지 않고 첫 걸음을 바로 돌린다 (시작은 즉시)."""
-    try:
-        from biseo import tick
-        tick.run_task_steps(sb, _agent(sb), task["id"], brain._ask, max_steps=1)
-        from biseo import tasks as _tk
-        return _tk.get(sb, task["id"]) or task
-    except Exception:
-        return task  # 첫 걸음이 실패해도 과제는 남고, 크론이 이어서 돌린다
+    """
+    과제를 만들면 바로 돌려준다 (화면이 기다리지 않게).
+    진행은 화면이 곧바로 /api/tasks/{id}/run 을 따로 불러서 시작하고,
+    화면을 닫아도 크론(2분)이 이어 간다.
+    """
+    return task
 
 @app.get("/api/tasks")
 def list_tasks(authorization: str | None = Header(None)):
     sb = _session(authorization)
-    cols = "id,goal,status,next_step,question,result,steps,max_steps,log,updated_at,icon,tint,reflection,quality"
+    cols = ("id,goal,status,next_step,question,result,steps,max_steps,log,updated_at,icon,tint,"
+            "reflection,quality,lease_until")
     live = (sb.table("tasks").select(cols)
             .in_("status", ["open", "waiting_user", "waiting_approval"])
             .order("id", desc=True).limit(10).execute().data) or []
     since = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
     ended = (sb.table("tasks").select(cols).in_("status", ["done", "stopped"])
              .gte("updated_at", since).order("id", desc=True).limit(5).execute().data) or []
+    now_iso = datetime.now(timezone.utc).isoformat()
     for t in live + ended:          # 화면에는 마지막 생각 하나만
+        t["running"] = str(t.pop("lease_until", "") or "") > now_iso   # 지금 누가 진행 중인가
         log = t.pop("log") or []
         last = next((e for e in reversed(log) if e.get("by") != "user"), {})
         t["last_thought"] = last.get("thought", "")
@@ -451,19 +452,26 @@ def task_resume(task_id: int, authorization: str | None = Header(None)):
         raise HTTPException(409, str(e))
 
 
-@app.post("/api/tasks/{task_id}/step")
-def task_step(task_id: int, authorization: str | None = Header(None)):
-    """크론을 기다리지 않고 지금 한 걸음. 등급 규칙은 똑같이 적용된다."""
+RUN_BUDGET = float(os.environ.get("RUN_BUDGET", "22"))   # 초. 한 요청에서 이어 달릴 시간
+RUN_MAX_STEPS = 8
+
+
+@app.post("/api/tasks/{task_id}/run")
+@app.post("/api/tasks/{task_id}/step")          # 예전 화면 호환
+def task_run(task_id: int, authorization: str | None = Header(None)):
+    """
+    크론을 기다리지 않고 지금 진행한다. 한 걸음에서 멈추지 않고, 묻거나·확인이 필요하거나·
+    끝나거나·시간(RUN_BUDGET)이 될 때까지 이어 달린다. 등급 규칙은 똑같이 적용된다.
+    남은 건 크론이 이어 간다.
+    """
     sb = _session(authorization)
     if not tk.get(sb, task_id):
         raise HTTPException(404, "없는 과제")
-    if not tk.lease(sb, task_id):
-        raise HTTPException(409, "지금 이 과제를 진행하는 중이에요. 잠시 뒤 다시 확인해 주세요.")
-    try:
-        res = tk.step(sb, _agent(sb), task_id, brain._ask)
-    finally:
-        tk.release(sb, task_id)
-    return res["task"]
+    res = tick.run_task_steps(sb, _agent(sb), task_id, brain._ask,
+                              max_steps=RUN_MAX_STEPS, budget=RUN_BUDGET)
+    if res.get("status") == "busy":
+        raise HTTPException(409, "이미 진행하는 중이에요.")
+    return {**(tk.get(sb, task_id) or {}), "ran_steps": res.get("steps", 0)}
 
 
 # ---------- 홈 화면 앱 ----------
