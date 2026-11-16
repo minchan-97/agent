@@ -139,16 +139,28 @@ def run_task_steps(sb, agent, tid, ask_llm, max_steps=MAX_STEPS_PER_TICK, budget
     """한 과제를 연속으로 여러 걸음. 'open'이 아니게 되면(묻기·확인·완료·멈춤) 즉시 중단."""
     started = time.monotonic()
     last = {"id": tid, "status": None, "notify": None, "steps": 0}
-    for i in range(max_steps):
-        res = tk.step(sb, agent, tid, ask_llm)
-        task = res.get("task") or {}
-        last = {"id": tid, "status": task.get("status"),
-                "notify": res.get("notify") or last["notify"], "steps": i + 1}
-        # 계속 진행할 수 있는 상태가 아니면 멈춘다 (질문·승인대기·완료·멈춤)
-        if task.get("status") != "open":
-            break
-        if time.monotonic() - started >= budget:
-            break
+    # 다른 틱이나 '지금 한 걸음'이 이미 잡고 있으면 이번엔 건너뛴다
+    if not tk.lease(sb, tid):
+        return {**last, "status": "busy"}
+    try:
+        for i in range(max_steps):
+            try:
+                res = tk.step(sb, agent, tid, ask_llm)
+            except Exception as e:      # LLM·검색·DB 일시 오류: 기록하고 다음 틱에 다시
+                print("TASK_STEP_ERROR", tid, type(e).__name__, str(e)[:200])
+                last["notify"] = tk.record_error(sb, tid, e) or last["notify"]
+                last["status"] = "error"
+                break
+            task = res.get("task") or {}
+            last = {"id": tid, "status": task.get("status"),
+                    "notify": res.get("notify") or last["notify"], "steps": i + 1}
+            # 계속 진행할 수 있는 상태가 아니면 멈춘다 (질문·승인대기·완료·멈춤)
+            if task.get("status") != "open":
+                break
+            if time.monotonic() - started >= budget:
+                break
+    finally:
+        tk.release(sb, tid)
     return last
 
 
