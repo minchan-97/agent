@@ -498,6 +498,24 @@ body.editing .wslot > .bt{opacity:.92}
 .card.mem.unsure{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line)}
 .card.mem.persona .s{color:var(--accent);font-weight:700}
 .card.mem.persona .b{font-weight:400;white-space:pre-wrap}
+.whybtn{display:inline-flex;align-self:flex-start;border:0;background:none;padding:2px 0;margin-top:2px;font:inherit;font-size:.74rem;font-weight:600;color:var(--accent);opacity:.85;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.whybtn:active{opacity:.5}
+.why-sum{font-size:.98rem;line-height:1.5;margin:0 0 4px}
+.why-path{margin:0;padding:0;list-style:none;counter-reset:wp}
+.why-path li{counter-increment:wp;position:relative;padding:8px 0 8px 30px;border-left:2px solid var(--line);margin-left:10px}
+.why-path li::before{content:counter(wp);position:absolute;left:-11px;top:8px;width:20px;height:20px;border-radius:50%;background:var(--surface);border:1px solid var(--line);font-size:.7rem;display:grid;place-items:center;color:var(--muted)}
+.why-path li.grown::before{content:"✦";background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.why-path .wp{display:block;font-size:.9rem}
+.why-path .wm,.why-rc .wm{display:block;font-size:.74rem;color:var(--muted);margin-top:2px}
+.why-path li.grown .wm{color:var(--accent)}
+.why-ev{display:flex;gap:8px;align-items:baseline;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:8px 10px;margin:0 0 6px;font:inherit;font-size:.86rem}
+.why-ev.go{cursor:pointer}.why-ev.go::after{content:"›";margin-left:auto;color:var(--muted)}
+.why-ev .wk{flex:none;font-size:.72rem;font-weight:700;color:var(--accent)}
+.why-ev .wt{overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.why-rc{padding:8px 0;border-bottom:1px dashed var(--line);font-size:.86rem}
+.why-fb{margin:16px 0 0;font-size:.84rem;padding:10px 12px;border-radius:12px;background:var(--surface);color:var(--muted)}
+.why-fb.ok{color:var(--ink)}.why-fb.no{opacity:.8}
+.muted.small{font-size:.76rem}
 </style>
 </head>
 <body>
@@ -877,6 +895,7 @@ function planCard(h) {
     const txt = el("span", "px");
     txt.append(el("span", "pxt", (it.state === "accepted" ? "✓ " : "") + it.title));
     if (it.why) txt.append(el("span", "pxw", it.why));
+    txt.append(whyBtn("daily", it.id, it.title));
     row.append(txt);
     if (it.state === "new") {
       const yes = it.kind === "none" ? "할게요" : "맡기기";
@@ -1699,7 +1718,7 @@ SCREENS.tasks = {
         : t.status === "waiting_approval" ? "확인함에서 결정해 주시면 이어서 할게요." : (t.last_thought || "곧 시작할게요.");
       d.append(el("div", "b", preview + (t.status === "done" && (t.result || "").split("\n").length > 3 ? " …" : "")));
       const row = el("div", "row");
-      if (t.status === "done" && t.result) row.append(button("결과 보기", "small", () => openResult(t.id)));
+      if (t.status === "done" && t.result) row.append(button("결과 보기", "small", () => openResult(t.id)), whyBtn("task", t.id, t.goal));
       if (t.status === "waiting_user") {
         const a = input("text", "", { placeholder: "답을 적어 주세요" }); row.append(a,
           button("답하기", "small", async () => { await post(`/api/tasks/${t.id}/answer`, { text: a.value }); await render(); }));
@@ -1718,6 +1737,99 @@ SCREENS.tasks = {
   },
 };
 
+
+/* ===================== 왜? — 판단 회상 ===================== */
+// 비서가 무언가를 권하거나 해 둘 때 남긴 판단 기록(어떤 판단 노드를 거쳤는지, 무엇을 근거로 삼았는지,
+// 비슷했던 지난 판단 중 무엇을 떠올렸는지)을 사람이 읽을 수 있게 보여 준다.
+function whyBtn(kind, refId, label, text = "왜?") {
+  const b = el("button", "whybtn", text);
+  b.type = "button";
+  b.setAttribute("aria-label", label ? `'${String(label).slice(0, 40)}' 판단 근거 보기` : "판단 근거 보기");
+  b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); openWhy(kind, refId); };
+  return b;
+}
+const EVIDENCE_KIND = {
+  event: ["일정", (ev) => editEvent(ev.id)],
+  reminder: ["알림", () => openApp("reminders")],
+  task: ["맡은 일", () => openApp("tasks")],
+  note: ["메모", () => openApp("notes")],
+  fact: ["기억", () => openApp("memory")],
+  talk: ["대화", () => openApp("chat")],
+  answer: ["내 답", null],
+  web: ["검색 자료", (ev) => { if (/^https?:\/\//.test(ev.id || "")) window.open(ev.id, "_blank", "noopener"); }],
+  calendar: ["오늘", null],
+};
+async function openWhy(kind, refId) {
+  let w;
+  try { w = await api(`/api/why/${kind}/${encodeURIComponent(refId)}`); }
+  catch (e) {
+    return openSheet("왜 이렇게 판단했나요", (s) => {
+      s.append(el("p", "muted", /판단 기록이 없|404/.test(e.message)
+        ? "이 일은 판단 기록을 남기기 전에 만들어졌어요. 앞으로 생기는 일부터 근거를 보여 드릴게요."
+        : e.message));
+      const f = el("div", "actions"); f.append(el("span"), button("닫기", "ghost", closeSheet)); s.append(f);
+    });
+  }
+  openSheet("왜 이렇게 판단했나요", (s) => {
+    s.classList.add("why-sheet");
+    if (w.summary) s.append(el("p", "why-sum", w.summary));
+    if (w.tainted) s.append(el("div", "taint", "검색 자료를 보고 나온 판단이에요. 웹페이지 글이 섞였을 수 있어 자동으로 하지 않고 꼭 물어봐요."));
+
+    // 1) 판단 경로
+    const steps = (w.steps || []).filter((st) => st.prompt);
+    if (steps.length) {
+      const sec = el("div", "sub"); sec.append(el("h3", "", "판단 경로"));
+      const ol = el("ol", "why-path");
+      for (const st of steps) {
+        const li = el("li", st.grown ? "grown" : "");
+        li.append(el("span", "wp", st.prompt));
+        const meta = [];
+        if (st.grown) meta.push("✦ 몰랑이에게서 자란 판단");
+        if (st.p != null && st.alts > 1) meta.push(`갈래 ${st.alts}개 중 ${Math.round(st.p * 100)}%로 골랐어요`);
+        if (meta.length) li.append(el("span", "wm", meta.join(" · ")));
+        ol.append(li);
+      }
+      sec.append(ol); s.append(sec);
+    }
+
+    // 2) 근거
+    const ev = w.evidence || [];
+    const sec2 = el("div", "sub"); sec2.append(el("h3", "", "근거"));
+    if (!ev.length) sec2.append(el("p", "muted", "따로 짚은 근거 없이 판단했어요."));
+    for (const e of ev) {
+      const [name, go] = EVIDENCE_KIND[e.kind] || ["자료", null];
+      const canGo = go && (e.kind !== "web" || /^https?:\/\//.test(e.id || "")) && (e.kind !== "event" || e.id);
+      const chip = el(canGo ? "button" : "div", "why-ev" + (canGo ? " go" : ""));
+      chip.append(el("span", "wk", name), el("span", "wt", e.text || ""));
+      if (canGo) { chip.type = "button"; chip.onclick = () => { if (e.kind !== "web") closeSheet(); go(e); }; }
+      sec2.append(chip);
+    }
+    s.append(sec2);
+
+    // 3) 판단 회상
+    const rc = w.recalled || [];
+    if (rc.length) {
+      const sec3 = el("div", "sub"); sec3.append(el("h3", "", "떠올린 지난 판단"));
+      sec3.append(el("p", "muted small", "비슷한 상황에서 받아들여졌던 판단을 참고했어요."));
+      for (const r of rc) {
+        const d = el("div", "why-rc");
+        d.append(el("span", "wt", r.summary || "(내용 없음)"),
+                 el("span", "wm", [r.at ? ago(r.at) : "", r.feedback >= 1 ? "✓ 받아들임" : r.feedback >= 0.5 ? "✓ 괜찮았음" : ""].filter(Boolean).join(" · ")));
+        sec3.append(d);
+      }
+      s.append(sec3);
+    }
+
+    // 4) 이 판단이 어떻게 받아들여졌는지
+    const fb = w.feedback;
+    const fbText = fb == null ? "아직 답을 기다리고 있어요. 받아들이거나 넘기면 다음 판단이 그만큼 배워요."
+      : fb >= 1 ? "받아들인 판단이에요. 비슷한 때 이 길을 더 자주 고르게 됐어요."
+      : fb >= 0.5 ? "괜찮았던 판단으로 기록됐어요."
+      : "넘긴 판단이에요. 비슷한 때 이 길을 덜 고르게 됐어요.";
+    s.append(el("p", "why-fb" + (fb == null ? "" : fb >= 0.5 ? " ok" : " no"), fbText));
+    const f = el("div", "actions"); f.append(el("span", "muted small", w.at ? ago(w.at) : ""), button("닫기", "ghost", closeSheet)); s.append(f);
+  });
+}
 
 /* ===================== 과제 결과 보기 ===================== */
 function splitResult(text) {
@@ -1739,6 +1851,7 @@ async function openResult(taskId) {
   openSheet(t.goal || "결과", (s) => {
     s.classList.add("result-sheet");
     if (t.reflection) s.append(el("p", "muted", "비서 메모: " + t.reflection + (t.quality ? ` (자평 ${t.quality}/5)` : "")));
+    if (t.status === "done") s.append(whyBtn("task", t.id, t.goal, "어떻게 이 결과를 냈는지 보기"));
     for (const part of splitResult(result)) {
       if (part.type === "code") {
         const box = el("div", "codebox");
@@ -1901,6 +2014,7 @@ SCREENS.inbox = {
       const d = el("div", "card wait"); d.append(actionLead(a), el("div", "b", describe(a)));
       // 검색 결과를 보고 나온 일: 웹페이지 글이 시킨 것일 수 있으니 내용을 한 번 더 보게 한다
       if (a.tainted) d.append(el("div", "taint", "검색 자료를 보고 나온 일이에요. 내용이 맞는지 확인해 주세요."));
+      d.append(whyBtn("action", a.id, describe(a)));
       const row = el("div", "row");
       const decide = (verb) => async () => {
         d.style.opacity = "0.4";                      // 먼저 흐리게 (즉시 반응)
