@@ -24,17 +24,16 @@ biseo/
   tick.py           크론: 사람마다 알림 → 과제 한 걸음 → 확인 알림
   db.py             연결 + Scoped (모든 쿼리에 user_id 자동)
 public/index.html   스마트폰식 화면: 홈(오늘 위젯 + 앱 아이콘) → 각 앱
-sql/00_schema.sql   테이블·제약·RLS
+sql/00_schema.sql   전체 테이블·제약·RLS·heir 함수 (합본, 다시 실행해도 안전)
 sql/10_cron.sql     10분마다 tick 호출
-sql/20_tasks.sql    과제 테이블 (00 다음에 실행)
-sql/30_skills.sql   추가 기능 테이블 (20 다음에 실행)
-sql/40_apps.sql     일정·알림 테이블, 앱끼리 연결 (30 다음에 실행)
+.env.example        Vercel 에 넣을 환경변수 목록
 ```
 
 ## 설치 순서
 
 1. **Supabase**
-   - 새 프로젝트를 만들고 SQL Editor 에서 `sql/00_schema.sql` 실행
+   - 새 프로젝트를 만들고 SQL Editor 에서 `sql/00_schema.sql` 하나만 실행
+     (예전 20·30·40·71 파일을 따로 돌릴 필요 없음. 쓰던 DB에 다시 돌리면 빠진 컬럼만 채운다)
    - Authentication > Providers 에서 Email 켜기
      (혼자 쓸 땐 "Confirm email" 을 꺼 두면 가입 즉시 로그인된다)
 2. **GitHub** 에 이 폴더를 올린다. `.env` 파일은 올리지 않는다.
@@ -44,7 +43,6 @@ sql/40_apps.sql     일정·알림 테이블, 앱끼리 연결 (30 다음에 실
 4. **pg_cron**
    - Supabase > Database > Extensions 에서 `pg_cron`, `pg_net` 켜기
    - `sql/10_cron.sql` 의 `<YOUR_APP>`, `<CRON_SECRET>` 을 바꿔서 실행
-   - `sql/20_tasks.sql`, `sql/30_skills.sql`, `sql/40_apps.sql` 차례로 실행
 5. 폰에 **ntfy** 앱을 깔고, 앱의 설정 화면에 나오는 주제를 구독
 
 ## 자율성 등급
