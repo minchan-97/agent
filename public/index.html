@@ -32,7 +32,7 @@
 }
 *,*::before,*::after{box-sizing:inherit}
 html,body{height:100%;margin:0}
-body{background:var(--bg);color:var(--ink);font:16px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 var(--sans);-webkit-font-smoothing:antialiased;word-break:keep-all;overflow-wrap:anywhere}
 button,input,textarea,select{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 [hidden]{display:none!important}
@@ -183,7 +183,62 @@ code.topic{display:block;background:var(--surface);border:1px solid var(--line);
   .skel::after{animation:shimmer 1.3s infinite}
   @keyframes shimmer{to{transform:translateX(100%)}}
 }
-.card .taint { font-size: 12px; color: #b45309; margin-top: 6px; }
+.card .taint{font-size:.8rem;color:var(--wait);margin:-2px 0 8px}
+
+/* 비밀번호 보기: 입력칸 안쪽 오른쪽 (.field span 규칙을 이기도록 두 단계 선택자) */
+.field .pw-wrap{display:block;position:relative;margin:0;color:inherit;font-size:inherit}
+.field .pw-wrap input{padding-right:64px}
+.field .pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;padding:6px 8px;color:var(--accent);font-weight:600}
+
+/* 가입 동의 */
+.consent{display:flex;gap:10px;align-items:flex-start;font-size:.88rem;color:var(--muted);margin:2px 0 6px;line-height:1.45}
+.consent input{width:18px;height:18px;margin-top:2px;flex:none;accent-color:var(--accent)}
+.consent a,.fineprint a,.legal a{color:var(--accent)}
+
+/* 홈 타일: 자주 쓰는 앱은 남색, 관리용 앱은 밝게 → 한눈에 위계가 보이게 */
+.app-icon .tile{background:linear-gradient(160deg,#0B5C9E 0%,var(--tile) 70%)}
+.app-icon.sys .tile{background:var(--surface);color:var(--accent);border:1px solid var(--line);box-shadow:none}
+@media (prefers-color-scheme: dark){ .app-icon .tile{background:linear-gradient(160deg,#2A64A0 0%,var(--tile) 70%)} }
+
+/* 과제 진행 막대 */
+.progress{height:4px;border-radius:99px;background:var(--line);overflow:hidden;margin:6px 0 2px}
+.progress i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width .3s ease}
+
+/* 생각 중 점 세 개 */
+.bubble.thinking{display:inline-flex;gap:4px;align-items:center;min-height:42px}
+.bubble.thinking i{width:6px;height:6px;border-radius:50%;background:var(--muted);opacity:.4}
+@media (prefers-reduced-motion: no-preference){
+  .bubble.thinking i{animation:blink 1.2s infinite}
+  .bubble.thinking i:nth-child(2){animation-delay:.2s} .bubble.thinking i:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+}
+
+/* 채팅 첫 화면 예시 */
+.examples{display:flex;flex-direction:column;gap:8px;margin:18px auto 0;max-width:340px}
+.examples button{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 14px;text-align:left;cursor:pointer;color:var(--ink)}
+.examples button:active{transform:scale(.98)}
+
+/* 토스트 (브라우저 alert 대신) */
+.toasts{position:fixed;left:0;right:0;bottom:calc(88px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;z-index:50;padding:0 18px}
+.toast{max-width:440px;background:var(--ink);color:var(--bg);padding:11px 16px;border-radius:12px;font-size:.92rem;box-shadow:0 6px 20px rgb(0 0 0 / .18);white-space:pre-wrap;pointer-events:auto}
+.toast.err{background:var(--danger);color:#fff}
+@media (prefers-color-scheme: dark){ .toast.err{color:#3B0A08} }
+@media (prefers-reduced-motion: no-preference){ .toast{animation:rise .18s ease-out} }
+
+/* 확인 창 (브라우저 confirm 대신) */
+dialog.ask{border:0;border-radius:18px;background:var(--surface);color:var(--ink);width:min(340px,calc(100% - 36px));padding:20px}
+dialog.ask::backdrop{background:rgb(0 0 0 / .35)}
+dialog.ask p{margin:0 0 18px;white-space:pre-wrap}
+dialog.ask .row{justify-content:flex-end}
+
+/* 첫 사용 안내 */
+.welcome ol{padding-left:1.2em;margin:0 0 14px}
+.welcome li{margin-bottom:10px}
+.welcome li b{display:block}
+.legal{font-size:.82rem;color:var(--muted);margin-top:26px;display:flex;gap:14px;flex-wrap:wrap}
+.body .sub{border-top:1px solid var(--line);margin-top:18px;padding-top:14px}
+.body .sub h3{font-size:.9rem;margin:0 0 8px;color:var(--muted)}
+details.adv summary{cursor:pointer;color:var(--muted);font-size:.9rem;margin:6px 0}
 </style>
 </head>
 <body>
@@ -217,12 +272,19 @@ code.topic{display:block;background:var(--surface);border:1px solid var(--line);
       </label>
       <label class="field" id="pw2Field" hidden><span>비밀번호 확인</span>
         <input id="pw2" type="password" placeholder="한 번 더" autocomplete="new-password"></label>
+      <label class="consent" id="consentField" hidden>
+        <input type="checkbox" id="consent">
+        <span>(필수) <a href="/terms.html" target="_blank" rel="noopener">이용약관</a>과
+          <a href="/privacy.html" target="_blank" rel="noopener">개인정보처리방침</a>을 읽었고 동의해요.
+          대화 내용은 답을 만들기 위해 AI 서비스(해외)로 전송돼요. 만 14세 이상만 가입할 수 있어요.</span>
+      </label>
       <div class="msg" id="authMsg"></div>
       <button class="btn block" id="authSubmit" type="submit">로그인</button>
     </form>
 
     <button class="linklike" id="forgot">비밀번호를 잊으셨나요?</button>
-    <p class="fineprint">가입하면 서비스 이용에 동의하는 것으로 간주돼요. 기록은 본인만 볼 수 있어요.</p>
+    <p class="fineprint">기록은 본인만 볼 수 있어요. 남에게 닿거나 되돌릴 수 없는 일은 언제나 먼저 물어봐요.<br>
+      <a href="/terms.html" target="_blank" rel="noopener">이용약관</a> · <a href="/privacy.html" target="_blank" rel="noopener">개인정보처리방침</a></p>
   </section>
 
   <section class="naming" id="naming" hidden>
@@ -258,11 +320,33 @@ code.topic{display:block;background:var(--surface);border:1px solid var(--line);
 </div>
 
 <dialog class="sheet" id="sheet"></dialog>
+<dialog class="ask" id="ask"><p id="askMsg"></p><div class="row"><button class="btn ghost" id="askNo">취소</button><button class="btn" id="askYes">확인</button></div></dialog>
+<div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script>
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 let sb, agentName = "", current = null;
+
+/* ---------- 알림말·확인 (브라우저 기본 창 대신) ---------- */
+function toast(msg, kind = "") {
+  const t = el("div", "toast" + (kind ? " " + kind : ""), String(msg ?? ""));
+  $("toasts").append(t);
+  setTimeout(() => t.remove(), kind === "err" ? 4200 : 2400);
+}
+function askConfirm(msg, yes = "확인", danger = false) {
+  return new Promise((done) => {
+    const d = $("ask"); $("askMsg").textContent = msg;
+    const y = $("askYes"); y.textContent = yes; y.className = "btn" + (danger ? " danger" : "");
+    const finish = (v) => { d.close(); done(v); };
+    y.onclick = () => finish(true); $("askNo").onclick = () => finish(false);
+    d.oncancel = (e) => { e.preventDefault(); finish(false); };
+    d.showModal();
+  });
+}
+function ls(key, val) {       // 브라우저 저장소는 막혀 있을 수 있다 → 실패해도 앱은 돈다
+  try { if (val === undefined) return localStorage.getItem(key); localStorage.setItem(key, val); } catch { return null; }
+}
 
 /* ---------- 서버 ---------- */
 let _token = null;
@@ -274,12 +358,23 @@ async function token() {
   return v;
 }
 async function api(path, opts = {}) {
-  const res = await fetch(path, {
-    ...opts,
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${await token()}`, ...(opts.headers || {}) },
-  });
+  if (!navigator.onLine) throw new Error("인터넷에 연결돼 있지 않아요. 연결되면 다시 해 주세요.");
+  let res;
+  try {
+    res = await fetch(path, {
+      ...opts,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${await token()}`, ...(opts.headers || {}) },
+    });
+  } catch { throw new Error("서버에 닿지 못했어요. 잠시 뒤 다시 해 주세요."); }
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.detail || `요청이 실패했어요 (${res.status})`);
+  if (res.status === 401) {               // 로그인이 풀렸으면 로그인 화면으로
+    _token = null; show("auth"); setAuthMsg("다시 로그인해 주세요.");
+    throw new Error(body.detail || "로그인이 필요해요");
+  }
+  if (!res.ok) {
+    const extra = body.error_id ? ` (오류 번호 ${body.error_id})` : "";
+    throw new Error((body.detail || `요청이 실패했어요 (${res.status})`) + extra);
+  }
   return body;
 }
 /* ---------- 화면 데이터 캐시: 먼저 보여 주고, 뒤에서 갱신 ---------- */
@@ -354,6 +449,7 @@ const ICON = {
   eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
   book: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
   bolt: '<path d="M13 3L5 13h5l-1 8 8-10h-5z"/>',
+  search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/>',
 };
 const TINT = { blue: "#2563EB", indigo: "#4F46E5", amber: "#B45309", green: "#15803D", teal: "#0D9488", rose: "#BE123C" };
 function miniIcon(name, tint) {
@@ -367,6 +463,8 @@ const APPS = [
   ["reminders", "알림"], ["tasks", "맡은 일"], ["drafts", "초안"], ["skills", "기능"],
   ["inbox", "확인함"], ["settings", "설정"],
 ];
+
+const SYS_APPS = new Set(["skills", "inbox", "settings"]);   // 관리용: 밝은 타일
 
 /* ---------- 홈 ---------- */
 async function goHome() {
@@ -412,8 +510,8 @@ function paintHome(h) {
   w.append(quick);
 
   const tiles = APPS.map(([key, label]) => {
-    const b = el("button", "app-icon");
-    b.innerHTML = `<div class="tile"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[key]}</svg></div>`;
+    const b = el("button", "app-icon" + (SYS_APPS.has(key) ? " sys" : ""));
+    b.innerHTML = `<div class="tile"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[key] || ICON.dot}</svg></div>`;
     b.append(el("span", "", label));
     if (key === "inbox" && h.pending) b.append(el("div", "badge", String(h.pending)));
     if (key === "tasks" && h.asking) b.append(el("div", "badge", String(h.asking)));
@@ -503,14 +601,14 @@ function field(label, input) { const l = el("label", "field"); l.append(el("span
 function input(type, value, attrs = {}) { const i = el(type === "textarea" ? "textarea" : "input"); if (type !== "textarea") i.type = type; i.value = value ?? ""; Object.assign(i, attrs); return i; }
 function sheetActions(onSave, onDelete) {
   const row = el("div", "actions");
-  if (onDelete) row.append(button("삭제", "danger", async () => { if (confirm("지울까요?")) { await onDelete(); closeSheet(); await render(); } }));
+  if (onDelete) row.append(button("삭제", "danger", async () => { if (await askConfirm("지울까요? 되돌릴 수 없어요.", "삭제", true)) { await onDelete(); closeSheet(); await render(); } }));
   else row.append(el("span"));
   row.append(button("저장", "", async () => { await onSave(); closeSheet(); await render(); }));
   return row;
 }
 function button(label, kind, onClick) {
   const b = el("button", "btn" + (kind ? " " + kind : ""), label);
-  b.onclick = async (e) => { e.preventDefault(); b.disabled = true; try { await onClick(); } catch (err) { alert(err.message); } finally { b.disabled = false; } };
+  b.onclick = async (e) => { e.preventDefault(); b.disabled = true; try { await onClick(); } catch (err) { toast(err.message, "err"); } finally { b.disabled = false; } };
   return b;
 }
 
@@ -673,7 +771,7 @@ function editDraft(d) {
   openSheet("초안", (s) => {
     const content = input("textarea", d.content); content.style.minHeight = "200px";
     s.append(field("내용", content));
-    s.append(button("복사하기", "ghost small", async () => { await navigator.clipboard.writeText(content.value); alert("복사했어요."); }));
+    s.append(button("복사하기", "ghost small", async () => { await navigator.clipboard.writeText(content.value); toast("복사했어요."); }));
     s.append(sheetActions(() => post(`/api/drafts/${d.id}/update`, { content: content.value }), () => post(`/api/drafts/${d.id}/delete`)));
   });
 }
@@ -692,7 +790,12 @@ SCREENS.tasks = {
       const d = el("div", "card" + (t.status === "waiting_user" ? " ask" : "") + (ended ? " ended" : ""));
       const lead = el("div", "lead");
       lead.append(miniIcon(t.icon || "dot", t.tint || "blue"), el("div", "t", t.goal));
-      d.append(lead, el("div", "s", `${TASK_STATE[t.status] || t.status} · ${t.steps}걸음`));
+      d.append(lead, el("div", "s", `${TASK_STATE[t.status] || t.status} · ${t.steps}/${t.max_steps}단계`));
+      if (!ended) {
+        const bar = el("div", "progress"); const fill = el("i");
+        fill.style.width = Math.min(100, Math.round((t.steps / Math.max(1, t.max_steps)) * 100)) + "%";
+        bar.append(fill); d.append(bar);
+      }
       const preview = t.status === "waiting_user" ? t.question
         : t.status === "done" ? (t.result || "").split("\n").slice(0, 3).join("\n")
         : t.status === "waiting_approval" ? "확인함에서 결정해 주시면 이어서 할게요." : (t.last_thought || "곧 시작할게요.");
@@ -703,7 +806,7 @@ SCREENS.tasks = {
         const a = input("text", "", { placeholder: "답을 적어 주세요" }); row.append(a,
           button("답하기", "small", async () => { await post(`/api/tasks/${t.id}/answer`, { text: a.value }); await render(); }));
       }
-      if (t.status === "open") row.append(button("지금 한 걸음", "small", async () => { await post(`/api/tasks/${t.id}/step`); await render(); }));
+      if (t.status === "open") row.append(button("바로 진행", "small", async () => { await post(`/api/tasks/${t.id}/step`); await render(); }));
       if (t.status === "stopped") row.append(button("이어서 하기", "small", async () => { await post(`/api/tasks/${t.id}/resume`); await post(`/api/tasks/${t.id}/step`); await render(); }));
       if (!ended) row.append(button("그만두기", "ghost small", async () => { await post(`/api/tasks/${t.id}/cancel`); await render(); }));
       if (row.children.length) d.append(row);
@@ -729,7 +832,7 @@ function splitResult(text) {
 }
 async function openResult(taskId) {
   let t;
-  try { t = await api(`/api/tasks/${taskId}`); } catch (e) { return alert(e.message); }
+  try { t = await api(`/api/tasks/${taskId}`); } catch (e) { return toast(e.message, "err"); }
   const result = t.result || "";
   openSheet(t.goal || "결과", (s) => {
     s.classList.add("result-sheet");
@@ -739,7 +842,7 @@ async function openResult(taskId) {
         const box = el("div", "codebox");
         const bar = el("div", "codebar");
         bar.append(el("span", "lang", part.lang || "code"),
-          button("복사", "ghost small", async () => { await navigator.clipboard.writeText(part.body); alert("복사했어요."); }));
+          button("복사", "ghost small", async () => { await navigator.clipboard.writeText(part.body); toast("복사했어요."); }));
         const pre = el("pre"); pre.textContent = part.body;
         box.append(bar, pre); s.append(box);
       } else {
@@ -747,7 +850,7 @@ async function openResult(taskId) {
       }
     }
     const foot = el("div", "actions");
-    foot.append(button("전체 복사", "ghost", async () => { await navigator.clipboard.writeText(result); alert("전체 복사했어요."); }),
+    foot.append(button("전체 복사", "ghost", async () => { await navigator.clipboard.writeText(result); toast("전체 복사했어요."); }),
       button("파일로 저장", "", () => {
         const blob = new Blob([result], { type: "text/plain;charset=utf-8" });
         const url = URL.createObjectURL(blob); const a = el("a");
@@ -794,7 +897,7 @@ async function shortcutBar(app) {
     b.append(miniIcon(s.icon || "bolt", s.tint || "blue"), el("span", "", s.label));
     b.onclick = async () => { await post(`/api/shortcuts/${s.id}/run`); await openApp("tasks"); };
     const x = el("span", "x", "×");
-    x.onclick = async (e) => { e.stopPropagation(); if (confirm(`'${s.label}' 버튼을 지울까요?`)) { await post(`/api/shortcuts/${s.id}/remove`); await render(); } };
+    x.onclick = async (e) => { e.stopPropagation(); if (await askConfirm(`'${s.label}' 버튼을 지울까요?`)) { await post(`/api/shortcuts/${s.id}/remove`); await render(); } };
     b.append(x);
     wrap.append(b);
   }
@@ -814,7 +917,7 @@ async function appSkillBar(app) {
     b.append(miniIcon(s.icon || "bolt", s.tint || "indigo"), el("span", "", s.name));
     b.onclick = () => runAppSkill(s);
     const x = el("span", "x", "×");
-    x.onclick = async (e) => { e.stopPropagation(); if (confirm(`'${s.name}' 기능을 지울까요?`)) { await post(`/api/skills/${s.id}/remove`); await render(); } };
+    x.onclick = async (e) => { e.stopPropagation(); if (await askConfirm(`'${s.name}' 기능을 지울까요?`)) { await post(`/api/skills/${s.id}/remove`); await render(); } };
     b.append(x);
     wrap.append(b);
   }
@@ -850,7 +953,7 @@ function addAppSkill(app) {
       try {
         const sk = await post(`/api/apps/${app}/skills/add`, { request: req.value.trim() });
         closeSheet(); await render();
-        setTimeout(() => alert(`'${sk.name}' 기능이 ${appLabel} 앱에 생겼어요.`), 50);
+        setTimeout(() => toast(`'${sk.name}' 기능이 ${appLabel} 앱에 생겼어요.`), 50);
       } catch (e) { msg.textContent = e.message; }
     }));
     s.append(msg, foot);
@@ -900,7 +1003,7 @@ SCREENS.inbox = {
       const decide = (verb) => async () => {
         d.style.opacity = "0.4";                      // 먼저 흐리게 (즉시 반응)
         try { await post(`/api/actions/${a.id}/${verb}`); d.remove(); if (!$("screenBody").querySelector(".card")) await render(false); }
-        catch (e) { d.style.opacity = "1"; alert(e.message); }
+        catch (e) { d.style.opacity = "1"; toast(e.message, "err"); }
       };
       row.append(button("하기", "small", decide("approve")),
                  button("하지 않기", "ghost small", decide("reject")));
@@ -935,7 +1038,7 @@ SCREENS.skills = {
         button(c.pinned ? "홈에서 내리기" : "홈에 아이콘", "ghost small", async () => {
           await post(`/api/skills/${c.id}/${c.pinned ? "unpin" : "pin"}`); await render();
         }),
-        button("지우기", "ghost small", async () => { if (confirm(`'${c.name}' 기능을 지울까요?`)) { await post(`/api/skills/${c.id}/remove`); await render(); } }));
+        button("지우기", "ghost small", async () => { if (await askConfirm(`'${c.name}' 기능을 지울까요?`)) { await post(`/api/skills/${c.id}/remove`); await render(); } }));
       d.append(row); nodes.push(d);
     }
     body.replaceChildren(...nodes);
@@ -979,7 +1082,7 @@ SCREENS.settings = {
     const me = await api("/api/me");
     const name = input("text", agentName, { maxLength: 12 });
     const box = el("div");
-    box.append(field("비서 이름", name), button("이름 바꾸기", "ghost small", async () => { const r = await post("/api/name", { name: name.value.trim() }); agentName = r.name; alert("바꿨어요."); }));
+    box.append(field("비서 이름", name), button("이름 바꾸기", "ghost small", async () => { const r = await post("/api/name", { name: name.value.trim() }); agentName = r.name; toast("바꿨어요."); }));
 
     // 앱 알림
     const p = el("div", "sub"); p.style.marginTop = "22px";
@@ -991,7 +1094,7 @@ SCREENS.settings = {
     if (devices.length) p.append(el("p", "muted", `알림을 켠 기기: ${devices.map((d) => d.device || "기기").join(", ")}`));
     const row = el("div", "row");
     if (sub) {
-      row.append(button("테스트 알림 보내기", "small", async () => { const r = await post("/api/push/test"); alert(`${r.sent}/${r.devices}개 기기로 보냈어요.`); }),
+      row.append(button("테스트 알림 보내기", "small", async () => { const r = await post("/api/push/test"); toast(`${r.sent}/${r.devices}개 기기로 보냈어요.`); }),
                  button("이 기기 알림 끄기", "ghost small", async () => { await disablePush(); await render(); }));
     } else {
       row.append(button("이 기기에서 알림 켜기", "small", async () => { await enablePush(); await render(); }));
@@ -1000,10 +1103,12 @@ SCREENS.settings = {
     if (isIOS() && !isStandalone()) p.append(el("p", "muted", "아이폰은 홈 화면에 추가한 앱에서 열어야 알림을 켤 수 있어요."));
     box.append(p);
 
-    // ntfy 는 예비 수단으로만
-    const t = el("div", "sub");
-    t.append(el("h3", "", "예비: ntfy"), el("p", "muted", "알림을 켠 기기가 하나도 없을 때만 ntfy 로 보내요."), el("code", "topic", me.ntfy_topic || ""));
-    box.append(t, el("div", "sub"));
+    // ntfy 는 예비 수단 → 고급 설정 안에 접어 둔다
+    const t = el("details", "adv sub");
+    t.append(el("summary", "", "고급: 예비 알림(ntfy)"),
+             el("p", "muted", "앱 알림을 켠 기기가 하나도 없을 때만 ntfy 앱으로 보내요. 아래 주제를 ntfy 앱에서 구독하면 돼요. 주제는 비밀번호처럼 남에게 알려 주지 마세요."),
+             el("code", "topic", me.ntfy_topic || ""));
+    box.append(t);
     // 몰랑이의 자식 — 이 비서에 자라는 정체성을 켠다 (개인용)
     try {
       const hs = await api("/api/heir");
@@ -1018,16 +1123,40 @@ SCREENS.settings = {
         const pv = el("div", "resulttext"); pv.style.fontSize = ".9rem"; pv.textContent = hs.persona;
         h.append(el("p", "muted", "지금까지 자란 모습:"), pv);
       }
+      if (!hs.heir && !hs.available) throw new Error("hide");   // 켤 수 없는 계정에는 아예 안 보인다
       if (hs.heir || hs.available) {
         h.append(button(hs.heir ? "끄기" : "켜기", "ghost small", async () => {
-          try { await post("/api/heir", { on: !hs.heir }); } catch (e) { alert(e.message); }
+          try { await post("/api/heir", { on: !hs.heir }); } catch (e) { toast(e.message, "err"); }
           await render();
         }));
       }
       box.append(h);
     } catch { /* 권한·네트워크 문제면 토글 숨김 */ }
 
-    box.append(button("로그아웃", "danger", async () => { await sb.auth.signOut(); location.reload(); }));
+    // 계정
+    const acc = el("div", "sub");
+    acc.append(el("h3", "", "계정"));
+    const accRow = el("div", "row");
+    accRow.append(
+      button("로그아웃", "ghost small", async () => { await sb.auth.signOut(); location.reload(); }),
+      button("계정 삭제", "danger small", async () => {
+        const ok = await askConfirm(
+          "계정을 지우면 대화·일정·메모·알림·맡은 일이 모두 바로 지워지고 되돌릴 수 없어요.\n정말 지울까요?",
+          "모두 지우기", true);
+        if (!ok) return;
+        await post("/api/account/delete");
+        await sb.auth.signOut().catch(() => {});
+        try { localStorage.clear(); } catch {}
+        location.reload();
+      }));
+    acc.append(accRow);
+    box.append(acc);
+
+    const legal = el("div", "legal");
+    for (const [href, label] of [["/terms.html", "이용약관"], ["/privacy.html", "개인정보처리방침"]]) {
+      const a = el("a", "", label); a.href = href; a.target = "_blank"; a.rel = "noopener"; legal.append(a);
+    }
+    box.append(legal);
     body.replaceChildren(box);
   },
 };
@@ -1039,7 +1168,17 @@ SCREENS.chat = {
   async render(body, data) {
     const log = el("div", "log"); log.id = "log"; body.replaceChildren(log);
     const { items } = data || await cache.get("history");
-    if (!items.length) log.append(el("div", "empty-state", `${agentName}에게 부탁할 일을 적어 보세요.\n일정, 알림, 메모로 남길 일은 각 앱에 저장돼요.`));
+    if (!items.length) {
+      const box = el("div", "empty-state", `${agentName}에게 편하게 말해 보세요.\n일정·알림·메모로 남길 일은 각 앱에 저장되고,\n처음 하는 일은 먼저 물어봐요.`);
+      const ex = el("div", "examples");
+      for (const t of ["내일 오후 3시 회의 일정 넣고 30분 전에 알려 줘",
+                       "이번 주 금요일까지 할 일 정리해 줘",
+                       "학부모 안내문 초안 써 줘"]) {
+        const b = el("button", "", t); b.onclick = () => { $("text").value = t; $("text").focus(); };
+        ex.append(b);
+      }
+      box.append(ex); log.append(box);
+    }
     for (const m of items) bubble(m.role === "user" ? "user" : "agent", m.text);
   },
 };
@@ -1062,7 +1201,7 @@ function suggestChips(suggest) {
         c.classList.add("done");
         if (r?.status === "proposed") { c.textContent = "확인함에서 결정하기"; c.onclick = () => openApp("inbox"); c.disabled = false; c.classList.remove("done"); }
         else if (r?.id && r?.goal !== undefined) { c.textContent = "✓ 맡은 일로"; c.onclick = () => openApp("tasks"); c.disabled = false; }
-      } catch (e) { c.disabled = false; alert(e.message); }
+      } catch (e) { c.disabled = false; toast(e.message, "err"); }
     };
     wrap.append(c);
   }
@@ -1087,13 +1226,17 @@ $("compose").addEventListener("submit", async (e) => {
   e.preventDefault();
   const text = $("text").value.trim(); if (!text) return;
   $("text").value = ""; $("send").disabled = true;
-  bubble("user", text); const wait = bubble("agent", "생각하는 중…", "thinking");
+  bubble("user", text); const wait = bubble("agent", "", "thinking");
+  wait.setAttribute("aria-label", "생각하는 중"); wait.append(el("i"), el("i"), el("i"));
   try {
     const res = await post("/api/chat", { text });
-    wait.classList.remove("thinking"); wait.textContent = res.reply;
+    wait.classList.remove("thinking"); wait.removeAttribute("aria-label"); wait.textContent = res.reply;
     linkChips(res.actions || []);
     suggestChips(res.suggest || []);
-  } catch (err) { wait.textContent = err.message; }
+  } catch (err) {
+    wait.classList.remove("thinking"); wait.textContent = err.message;
+    $("text").value = $("text").value || text;     // 실패하면 보낸 말을 되살려 다시 보낼 수 있게
+  }
   finally { $("send").disabled = false; $("text").focus(); }
 });
 $("text").addEventListener("keydown", (e) => {
@@ -1117,7 +1260,7 @@ $("text").addEventListener("keydown", (e) => {
       for (let i = 0; i < e.results.length; i++) txt += e.results[i][0].transcript;
       $("text").value = base + txt;
     };
-    rec.onerror = (e) => { if (e.error === "not-allowed") alert("마이크 권한을 허용해 주세요."); };
+    rec.onerror = (e) => { if (e.error === "not-allowed") toast("마이크 권한을 허용해 주세요."); };
     rec.onend = () => { listening = false; mic.classList.remove("on"); $("text").focus(); };
     try { rec.start(); } catch { /* 이미 돌고 있으면 무시 */ }
   });
@@ -1136,6 +1279,7 @@ function setAuthMode(m) {
   $("tabLogin").classList.toggle("on", m === "login");
   $("tabSignup").classList.toggle("on", m === "signup");
   $("pw2Field").hidden = m !== "signup";
+  $("consentField").hidden = m !== "signup";
   $("pw").setAttribute("autocomplete", m === "signup" ? "new-password" : "current-password");
   $("authSubmit").textContent = m === "signup" ? "회원가입" : "로그인";
   setAuthMsg("");
@@ -1152,6 +1296,7 @@ async function submitAuth() {
   if (!validEmail(email)) return setAuthMsg("이메일 형식을 확인해 주세요.");
   if (password.length < 6) return setAuthMsg("비밀번호는 6자 이상이어야 해요.");
   if (authMode === "signup" && password !== $("pw2").value) return setAuthMsg("비밀번호가 서로 달라요.");
+  if (authMode === "signup" && !$("consent").checked) return setAuthMsg("이용약관과 개인정보처리방침에 동의해 주세요.");
 
   $("authSubmit").disabled = true;
   setAuthMsg(authMode === "signup" ? "계정을 만드는 중…" : "로그인 중…");
@@ -1221,9 +1366,33 @@ $("nameInput").addEventListener("input", (e) => {
   e.target.style.width = Math.max(3, Math.min(12, v.length + 1.5)) + "em";
 });
 $("saveName").addEventListener("click", async () => {
-  try { const { name } = await post("/api/name", { name: $("nameInput").value.trim() }); agentName = name; await goHome(); }
+  try { const { name } = await post("/api/name", { name: $("nameInput").value.trim() }); agentName = name; await goHome(); welcome(); }
   catch (e) { $("nameMsg").textContent = e.message; }
 });
+
+/* ===================== 첫 사용 안내 ===================== */
+function welcome() {
+  if (ls("biseo.welcomed")) return;
+  openSheet(`${agentName}와(과) 시작하기`, (s) => {
+    s.classList.add("welcome");
+    const ol = el("ol");
+    for (const [b, t] of [
+      ["말로 맡기세요", "\u201c내일 3시 회의, 30분 전에 알려 줘\u201d처럼 채팅으로 말하면 일정·알림·메모로 정리돼요."],
+      ["처음 하는 일은 먼저 물어봐요", "확인함에서 \u2018하기\u2019를 누르면 해요. 같은 종류를 다섯 번 그대로 승인하면 그다음부턴 묻지 않고 해 두고, 되돌리면 다시 묻기 시작해요."],
+      ["남에게 닿는 일은 언제나 물어봐요", "메시지 보내기처럼 되돌릴 수 없는 일은 아무리 써도 혼자 하지 않아요."],
+      ["긴 일은 \u2018맡은 일\u2019로", "조사·정리처럼 여러 단계가 필요한 일은 틈틈이 진행하고, 묻거나 끝나면 알려 줘요."],
+    ]) { const li = el("li"); li.append(el("b", "", b), el("span", "muted", t)); ol.append(li); }
+    s.append(ol);
+    const foot = el("div", "actions");
+    foot.append(button("나중에", "ghost", async () => { ls("biseo.welcomed", "1"); closeSheet(); }),
+      button("알림 켜고 시작", "", async () => {
+        ls("biseo.welcomed", "1");
+        try { await enablePush(); toast("알림을 켰어요."); } catch (e) { toast(e.message, "err"); }
+        closeSheet();
+      }));
+    s.append(foot);
+  });
+}
 
 /* ===================== 시작 ===================== */
 (async () => {
@@ -1251,12 +1420,19 @@ $("saveName").addEventListener("click", async () => {
   sb.auth.onAuthStateChange(async (event) => {
     if (event === "PASSWORD_RECOVERY") {
       show("auth");
-      const np = prompt("새 비밀번호를 정해 주세요 (6자 이상)");
-      if (np && np.length >= 6) {
-        const { error } = await sb.auth.updateUser({ password: np });
-        if (error) setAuthMsg(error.message);
-        else { setAuthMsg("비밀번호를 바꿨어요. 이제 로그인돼요.", true); await enter().catch(() => {}); }
-      }
+      openSheet("새 비밀번호 정하기", (s) => {
+        const np = input("password", "", { placeholder: "6자 이상", autocomplete: "new-password" });
+        s.append(field("새 비밀번호", np));
+        const foot = el("div", "actions");
+        foot.append(el("span"), button("바꾸기", "", async () => {
+          if (np.value.length < 6) throw new Error("비밀번호는 6자 이상이어야 해요.");
+          const { error } = await sb.auth.updateUser({ password: np.value });
+          if (error) throw error;
+          closeSheet(); toast("비밀번호를 바꿨어요.");
+          await enter().catch(() => {});
+        }));
+        s.append(foot); setTimeout(() => np.focus(), 50);
+      });
     }
   });
 
