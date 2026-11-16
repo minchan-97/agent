@@ -45,6 +45,7 @@ try:
     from biseo import apps  # noqa: E402
     from biseo import push  # noqa: E402
     from biseo import shortcuts as sc  # noqa: E402
+    from biseo import daily  # noqa: E402
 except Exception:  # noqa: BLE001
     _lines = traceback.format_exc().strip().splitlines()
     _BOOT_ERROR = {"detail": "서버 본체를 불러오지 못했어요",
@@ -252,7 +253,7 @@ def account_delete(authorization: str | None = Header(None)):
 def me(authorization: str | None = Header(None)):
     sb = _session(authorization)
     a = _agent(sb)
-    return {"name": a.get("name"), "ntfy_topic": a.get("ntfy_topic")}
+    return {"name": a.get("name"), "ntfy_topic": a.get("ntfy_topic"), "think_at": daily.think_at(a)}
 
 
 class NameIn(BaseModel):
@@ -494,12 +495,64 @@ def home(authorization: str | None = Header(None)):
     for app_name in ("search", "tasks"):
         for s0 in sc.list_for(sb, app_name):
             if s0.get("pinned"):
-                pins.append({"id": s0["id"], "label": s0["label"], "icon": s0.get("icon"), "tint": s0.get("tint")})
+                pins.append({"id": s0["id"], "label": s0["label"], "icon": s0.get("icon"), "tint": s0.get("tint"),
+                             "origin": s0.get("origin") or "user", "uses": s0.get("uses") or 0,
+                             "created_at": s0.get("created_at")})
     for sk0 in sk.list_pinned(sb):
         pins.append({"id": sk0["id"], "label": sk0["name"], "icon": sk0.get("icon") or "bolt",
-                     "tint": sk0.get("tint") or "indigo", "skill": True})
+                     "tint": sk0.get("tint") or "indigo", "skill": True,
+                     "origin": sk0.get("origin") or "user", "uses": sk0.get("uses") or 0,
+                     "created_at": sk0.get("created_at")})
     data["pins"] = pins
+    data["daily"] = daily.today_plan(sb)          # 오늘의 제안 (없으면 null)
     return data
+
+
+# ---------- 오늘의 생각 (비서가 먼저 건네는 제안) ----------
+@app.get("/api/daily")
+def daily_get(authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    a = _agent(sb)
+    return {"plan": daily.today_plan(sb), "think_at": daily.think_at(a)}
+
+
+class ThinkIn(BaseModel):
+    think_at: str | None = None        # "HH:MM" 또는 null(끄기)
+
+
+@app.post("/api/daily/settings")
+def daily_settings(body: ThinkIn, authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    _agent(sb)
+    v = (body.think_at or "").strip() or None
+    if not daily.valid_time(v):
+        raise HTTPException(400, "시각은 07:30 처럼 적어 주세요")
+    sb.table("agents").update({"think_at": v, "updated_at": datetime.now(timezone.utc).isoformat()}).execute()
+    return {"think_at": v}
+
+
+@app.post("/api/daily/now")
+def daily_now(authorization: str | None = Header(None)):
+    """'지금 생각해 보기': 오늘의 제안을 바로 다시 만든다. 10분 안에 또 누르면 있던 것을 돌려준다."""
+    sb = _session(authorization)
+    a = _agent(sb)
+    p = daily.today_plan(sb)
+    if p and p.get("at"):
+        try:
+            made = datetime.fromisoformat(p["at"])
+            if datetime.now(made.tzinfo) - made < timedelta(minutes=10):
+                return {"plan": p, "reused": True}
+        except ValueError:
+            pass
+    return {"plan": daily.make(sb, a, brain._ask)}
+
+
+@app.post("/api/daily/{item_id}/{verb}")
+def daily_decide(item_id: str, verb: str, authorization: str | None = Header(None)):
+    if verb not in ("accept", "dismiss"):
+        raise HTTPException(404, "없는 동작")
+    sb = _session(authorization)
+    return _run(daily.decide, sb, item_id, verb == "accept")
 
 
 @app.get("/api/events")
