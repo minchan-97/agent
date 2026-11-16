@@ -395,6 +395,70 @@ form.compose .mic.on{background:var(--accent);color:var(--accent-ink)}
 form.compose .mic svg,form.compose .send svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 form.compose .send{width:44px;height:44px;border-radius:22px;border:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;cursor:pointer;flex:none}
 form.compose .send:disabled{opacity:.5}
+/* ===== 위젯 홈: 쪽 넘기기 + 편집 ===== */
+.pager{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;margin:0 -18px;padding:0 0 4px;overscroll-behavior-x:contain}
+.pager::-webkit-scrollbar{display:none}
+.page{flex:0 0 100%;scroll-snap-align:start;box-sizing:border-box;padding:2px 18px 0}
+.page .bento{padding-bottom:8px}
+.wslot{position:relative;min-width:0;display:flex}
+.wslot.w2{grid-column:span 2}
+.wslot > .bt{flex:1;min-width:0}
+#homeTop .bt{margin-bottom:12px}
+.dots{display:flex;justify-content:center;gap:2px;min-height:20px;align-items:center}
+.dot-p{width:22px;height:22px;border:0;background:none;padding:0;display:grid;place-items:center;cursor:pointer}
+.dot-p::after{content:"";width:7px;height:7px;border-radius:4px;background:var(--line)}
+.dot-p.on::after{background:var(--ink);width:18px}
+/* 편집 모드 */
+.editbar{display:flex;gap:6px}
+.pill.soft{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);margin:0}
+.editbar .pill{margin:0}
+body.editing .homefoot{display:none}
+body.editing .wslot:not(.addslot){touch-action:none;cursor:grab}
+body.editing .wslot > .bt{pointer-events:none}
+@media (prefers-reduced-motion: no-preference){
+  body.editing .wslot:not(.addslot):not(.dragging){animation:jiggle .32s ease-in-out infinite alternate}
+  body.editing .wslot:nth-child(2n){animation-delay:-.16s}
+  @keyframes jiggle{from{transform:rotate(-.6deg)}to{transform:rotate(.6deg)}}
+}
+.wslot.dragging{z-index:20;cursor:grabbing;filter:drop-shadow(0 14px 24px rgb(14 26 43 / .22))}
+.wctl{position:absolute;z-index:3;border:0;cursor:pointer;font:inherit}
+.wctl.rm{top:6px;left:6px;width:28px;height:28px;border-radius:14px;background:#C0392B;color:#fff;display:grid;place-items:center;box-shadow:0 2px 6px rgb(0 0 0 / .2)}
+.wctl.rm::before{content:"";position:absolute;inset:-8px}
+.wctl.rm svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round}
+.wctl.sz{top:6px;right:6px;height:28px;padding:0 10px;border-radius:14px;background:var(--ink);color:var(--surface);font-size:.72rem;font-weight:700;box-shadow:0 2px 6px rgb(0 0 0 / .2)}
+body.editing .page{padding-top:4px}
+body.editing .wslot > .bt{opacity:.92}
+.addslot{border:2px dashed var(--line);border-radius:26px;background:transparent;color:var(--muted);font:inherit;font-weight:600;min-height:72px;justify-content:center;align-items:center;cursor:pointer}
+/* 새 위젯 종류 */
+.bt.list{flex-direction:column;gap:6px;cursor:pointer}
+.list .lh{font-size:.82rem;font-weight:700;color:var(--muted)}
+.list .le{font-size:.86rem;color:var(--muted)}
+.list .lt{font-size:1.02rem;font-weight:700}
+.list .lr{display:flex;gap:10px;border:0;background:none;font:inherit;color:var(--ink);padding:3px 0;text-align:left;cursor:pointer}
+.list .lr b{color:var(--accent);font-variant-numeric:tabular-nums;min-width:4.4em}
+.list .ln{font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.small .big{font-size:1.5rem;font-weight:800;letter-spacing:-.02em}
+.bt .ai{width:40px;height:40px;border-radius:13px;background:var(--soft);color:var(--accent);display:grid;place-items:center;flex:none}
+.bt .ai.fill{background:var(--accent);color:var(--accent-ink)}
+.bt .ai svg,.pitem .ai svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.bt.appw{align-items:flex-start;justify-content:space-between}
+.bt.appw .al{font-size:.9rem;font-weight:700}
+.bt.pinw.small{flex-direction:column;justify-content:space-between;min-height:112px}
+.bt.pinw.wide{align-items:center;gap:12px}
+.pinw .pl{display:flex;flex-direction:column;min-width:0}
+.pinw .al{font-size:.92rem;font-weight:700}
+.pinw .pd{font-size:.74rem;color:var(--muted)}
+/* 위젯 고르기 시트 */
+.picker .ph3{font-size:.8rem;color:var(--muted);margin:16px 2px 8px;font-weight:700}
+.picker .ph3:first-of-type{margin-top:4px}
+.plist{display:flex;flex-direction:column;gap:8px}
+.pitem{display:flex;align-items:center;gap:12px;border:0;background:var(--surface);border-radius:16px;padding:10px 12px;text-align:left;font:inherit;color:var(--ink);cursor:pointer;box-shadow:var(--shadow);min-height:60px}
+.pitem .ai{width:38px;height:38px;border-radius:12px;background:var(--soft);color:var(--accent);display:grid;place-items:center;flex:none}
+.pitem .pt{flex:1;min-width:0;display:flex;flex-direction:column}
+.pitem .pn{font-weight:600;font-size:.94rem}
+.pitem .pd{font-size:.78rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pitem .pp{width:30px;height:30px;border-radius:15px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:700;flex:none}
+.pempty{color:var(--muted);font-size:.86rem;white-space:pre-wrap;margin:0 2px}
 </style>
 </head>
 <body>
@@ -456,8 +520,15 @@ form.compose .send:disabled{opacity:.5}
     <div class="hhead">
       <div><div class="date" id="today"></div><h1 id="agentName"></h1></div>
       <button class="avatar" id="avatar" aria-label="설정"></button>
+      <div class="editbar" id="editbar" hidden>
+        <button class="pill soft" id="addPage">+ 쪽</button>
+        <button class="pill soft" id="addWidget">+ 위젯</button>
+        <button class="pill dark" id="editDone">완료</button>
+      </div>
     </div>
-    <div class="bento" id="bento"></div>
+    <div id="homeTop"></div>
+    <div class="pager" id="pager"></div>
+    <div class="dots" id="dots"></div>
     <div class="homefoot">
       <form class="homebar" id="homebar">
         <label for="homeText" class="sr">비서에게 맡기기</label>
@@ -777,28 +848,349 @@ function taskCard(h) {
   return b;
 }
 
+/* ===================== 위젯 홈: 페이지를 넘기고, 위젯을 깔고 옮긴다 ===================== */
+// 위젯 종류 (서버 biseo/layout.py 의 TYPES 와 같아야 한다)
+const WIDGETS = {
+  hero:     { name: "지금 가장 중요한 것", desc: "곧 시작할 일정이나 다음 알림을 크게", sizes: ["wide"] },
+  plan:     { name: "오늘 하면 좋을 것", desc: "비서가 매일 먼저 고른 제안", sizes: ["wide"] },
+  inbox:    { name: "확인함", desc: "비서가 묻고 기다리는 일", sizes: ["small", "wide"] },
+  task:     { name: "진행 중인 일", desc: "맡긴 일이 어디까지 갔는지", sizes: ["small", "wide"] },
+  events:   { name: "오늘 일정", desc: "오늘 남은 일정 목록", sizes: ["wide"] },
+  reminder: { name: "다음 알림", desc: "곧 울릴 알림 하나", sizes: ["small", "wide"] },
+  notes:    { name: "최근 메모", desc: "마지막으로 남긴 메모", sizes: ["small", "wide"] },
+  app:      { name: "앱 바로가기", desc: "", sizes: ["small"] },
+  pin:      { name: "새 기능", desc: "", sizes: ["small", "wide"] },
+};
+const DEFAULT_LAYOUT = { pages: [[
+  { id: "w1", type: "hero", size: "wide" }, { id: "w2", type: "plan", size: "wide" },
+  { id: "w3", type: "inbox", size: "small" }, { id: "w4", type: "task", size: "small" },
+]], removed_pins: [] };
+const MAX_PER_PAGE = 8, MAX_PAGES = 5;
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const newId = () => "w" + Math.random().toString(36).slice(2, 9);
+const pinKey = (p) => `${p.skill ? "s" : "c"}:${p.ref ?? p.id}`;
+
+let editMode = false, editLayout = null, curPage = 0;
+
+// 비서가 '홈에 두기'로 올린 버튼은, 사용자가 지운 적이 없으면 저절로 자리를 잡는다
+function effectiveLayout(h) {
+  const L = clone(h.layout && h.layout.pages?.length ? h.layout : DEFAULT_LAYOUT);
+  L.removed_pins = L.removed_pins || [];
+  const have = new Set(L.pages.flat().filter((w) => w.type === "pin").map(pinKey));
+  for (const p of (h.pins || [])) {
+    const key = pinKey(p);
+    if (have.has(key) || L.removed_pins.includes(key)) continue;
+    const w = { id: newId(), type: "pin", size: "small", ref: p.id, skill: !!p.skill, label: p.label,
+                icon: p.icon || "bolt", origin: p.origin || "user" };
+    const page = L.pages.find((pg) => pg.length < MAX_PER_PAGE) || (L.pages.length < MAX_PAGES ? (L.pages.push([]), L.pages.at(-1)) : null);
+    if (page) page.push(w);
+  }
+  return L;
+}
+
+// ---- 위젯 그리기 (종류마다) ----
+function smallInfo(key, n, unit, onclick, cls = "card-w") {
+  const b = el("button", "bt small " + cls);
+  b.append(el("span", "sk", key));
+  const v = el("span", "sv"); v.append(el("span", "n", String(n)), el("span", "u", unit)); b.append(v);
+  b.onclick = onclick; return b;
+}
+function eventsCard(h) {
+  const c = el("div", "bt card-w list");
+  c.append(el("span", "lh", "오늘 일정"));
+  const left = (h.events || []).filter((e) => new Date(e.starts_at).getTime() > Date.now() - 30 * 60e3);
+  if (!left.length) c.append(el("span", "le", "남은 일정이 없어요"));
+  for (const e of left.slice(0, 4)) {
+    const r = el("button", "lr"); r.append(el("b", "", hm(e.starts_at)), el("span", "", e.title));
+    r.onclick = () => openApp("events").then(() => editEvent(e.id)); c.append(r);
+  }
+  return c;
+}
+function reminderCard(h, size) {
+  const r = h.next_reminder;
+  if (size === "wide") {
+    const b = el("button", "bt card-w list");
+    b.append(el("span", "lh", "다음 알림"), el("span", "lt", r ? r.text : "걸어 둔 알림이 없어요"));
+    if (r) b.append(el("span", "le", when(r.due_at)));
+    b.onclick = () => openApp("reminders"); return b;
+  }
+  const b = el("button", "bt small card-w");
+  b.append(el("span", "sk", "다음 알림"));
+  const v = el("span", "sv col");
+  v.append(el("span", "big", r ? hm(r.due_at) : "—"), el("span", "tt", r ? r.text : "없어요"));
+  b.append(v); b.onclick = () => openApp("reminders"); return b;
+}
+function notesCard(h, size) {
+  const ns = h.notes || [];
+  const b = el("button", "bt card-w " + (size === "wide" ? "list" : "small"));
+  if (size === "wide") {
+    b.append(el("span", "lh", "최근 메모"));
+    if (!ns.length) b.append(el("span", "le", "아직 메모가 없어요"));
+    for (const n of ns.slice(0, 3)) b.append(el("span", "ln", (n.title ? n.title + " — " : "") + n.content));
+  } else {
+    b.append(el("span", "sk", "최근 메모"));
+    const v = el("span", "sv col"); v.append(el("span", "tt", ns[0] ? (ns[0].title || ns[0].content) : "아직 없어요")); b.append(v);
+  }
+  b.onclick = () => openApp("notes"); return b;
+}
+function appWidget(w) {
+  const label = (APPS.find((a) => a[0] === w.app) || [w.app, w.app])[1];
+  const b = el("button", "bt small card-w appw");
+  const ic = el("span", "ai"); ic.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[w.app] || ICON.dot}</svg>`;
+  b.append(ic, el("span", "al", label)); b.onclick = () => openApp(w.app); return b;
+}
+function pinWidget(w) {
+  const b = el("button", "bt card-w pinw " + (w.size === "wide" ? "wide" : "small"));
+  const ic = el("span", "ai fill"); ic.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[w.icon] || ICON.bolt}</svg>`;
+  const t = el("span", "pl"); t.append(el("span", "al", w.label || "기능"),
+    el("span", "pd", w.origin === "agent" ? "✦ 비서가 만든 기능" : (w.size === "wide" ? "눌러서 바로 실행" : "실행")));
+  b.append(ic, t);
+  b.onclick = () => runPin({ id: w.ref, skill: w.skill, label: w.label });
+  return b;
+}
+function renderWidget(h, w) {
+  switch (w.type) {
+    case "hero": return heroCard(h);
+    case "plan": return planCard(h);
+    case "inbox": return inboxCard(h);
+    case "task": return taskCard(h);
+    case "events": return eventsCard(h);
+    case "reminder": return reminderCard(h, w.size);
+    case "notes": return notesCard(h, w.size);
+    case "app": return appWidget(w);
+    case "pin": return pinWidget(w);
+  }
+  return el("div", "bt card-w", "알 수 없는 위젯");
+}
+
+// ---- 페이지 그리기 ----
 function paintHome(h) {
   lastHome = h;
   paintHeader();
-  const cells = [];
-  if (homeResult) cells.push(homeResult);
-  cells.push(heroCard(h), planCard(h), inboxCard(h), taskCard(h));
-  // 비서가 스스로 만든 버튼 알림 (사흘 동안)
-  const fresh = (h.pins || []).find((p) => p.origin === "agent" && p.created_at &&
-    Date.now() - new Date(p.created_at).getTime() < 3 * 864e5);
-  if (fresh) {
-    const n = span2(el("button", "ainote"));
-    n.append(el("b", "", "✦"), el("span", "", `자주 쓰셔서 '${fresh.label}' 버튼을 만들어 뒀어요`));
-    n.onclick = () => runPin(fresh);
-    cells.push(n);
-  }
-  $("bento").replaceChildren(...cells);
+  const L = editMode ? editLayout : effectiveLayout(h);
+  const pages = L.pages.map((ws, pi) => {
+    const page = el("div", "page"); page.dataset.page = pi;
+    const grid = el("div", "bento");
+    for (const w of ws) {
+      const node = renderWidget(h, w);
+      node.classList.toggle("w2", w.size === "wide");
+      node.classList.remove("w2"); // 크기는 slot 이 잡는다
+      const slot = el("div", "wslot" + (w.size === "wide" ? " w2" : ""));
+      slot.dataset.wid = w.id; slot.append(node);
+      if (editMode) addEditControls(slot, w);
+      grid.append(slot);
+    }
+    if (editMode && ws.length < MAX_PER_PAGE) {
+      const add = el("button", "wslot w2 addslot", "+ 위젯 추가");
+      add.onclick = () => openWidgetPicker(pi); grid.append(add);
+    }
+    page.append(grid);
+    return page;
+  });
+  const pager = $("pager");
+  const keep = curPage;
+  pager.replaceChildren(...pages);
+  paintDots(L.pages.length);
+  requestAnimationFrame(() => goPage(Math.min(keep, L.pages.length - 1), false));
   // 독 배지
   const tb = $("dockTasks").querySelector(".badge"); if (tb) tb.remove();
   if (h.asking) $("dockTasks").append(el("span", "badge", String(h.asking)));
   const ab = $("dockAll").querySelector(".badge"); if (ab) ab.remove();
   if (h.pending) $("dockAll").append(el("span", "badge", String(h.pending)));
 }
+function paintDots(n) {
+  const d = $("dots"); d.replaceChildren();
+  if (n < 2) return;
+  for (let i = 0; i < n; i++) {
+    const b = el("button", "dot-p" + (i === curPage ? " on" : "")); b.setAttribute("aria-label", `${i + 1}쪽`);
+    b.onclick = () => goPage(i); d.append(b);
+  }
+}
+function goPage(i, smooth = true) {
+  const pager = $("pager"); const page = pager.children[i]; if (!page) return;
+  pager.scrollTo({ left: page.offsetLeft - pager.offsetLeft, behavior: smooth ? "smooth" : "auto" });
+  curPage = i; [...$("dots").children].forEach((d, k) => d.classList.toggle("on", k === i));
+}
+$("pager").addEventListener("scroll", () => {
+  const p = $("pager"); const i = Math.round(p.scrollLeft / Math.max(1, p.clientWidth));
+  if (i !== curPage) { curPage = i; [...$("dots").children].forEach((d, k) => d.classList.toggle("on", k === i)); }
+}, { passive: true });
+
+/* ---------- 편집 모드: 길게 누르기 → 지우기·크기·끌어서 옮기기 ---------- */
+let pressT = null, suppressClick = false;
+$("pager").addEventListener("pointerdown", (e) => {
+  if (editMode || e.button > 0) return;
+  const x0 = e.clientX, y0 = e.clientY;
+  pressT = setTimeout(() => { pressT = null; suppressClick = true; navigator.vibrate?.(12); enterEdit(); }, 550);
+  const cancel = (ev) => { if (ev.type !== "pointermove" || Math.hypot(ev.clientX - x0, ev.clientY - y0) > 8) { clearTimeout(pressT); pressT = null; off(); } };
+  const off = () => { removeEventListener("pointermove", cancel); removeEventListener("pointerup", cancel); removeEventListener("pointercancel", cancel); };
+  addEventListener("pointermove", cancel); addEventListener("pointerup", cancel); addEventListener("pointercancel", cancel);
+});
+// 길게 누른 그 손가락이 떼질 때의 '클릭'만 막는다. 화면이 다시 그려져 클릭이 안 생기는 경우가 많으니,
+// 다음 손가락이 닿으면 막기를 풀어 다음 동작(빼기·크기)이 먹히게 한다.
+document.addEventListener("pointerdown", () => { suppressClick = false; }, true);
+// 길게 눌러 편집 모드로 들어간 그 손가락의 '클릭'만 막는다 (편집 모드의 빼기·크기 버튼은 살린다)
+$("pager").addEventListener("click", (e) => {
+  if (suppressClick) { e.stopPropagation(); e.preventDefault(); suppressClick = false; return; }
+  if (editMode && !e.target.closest(".wctl, .addslot")) { e.stopPropagation(); e.preventDefault(); }
+}, true);
+$("pager").addEventListener("contextmenu", (e) => e.preventDefault());
+
+function enterEdit() {
+  if (editMode) return;
+  editLayout = effectiveLayout(lastHome || {});
+  editMode = true; document.body.classList.add("editing");
+  $("editbar").hidden = false; $("avatar").hidden = true;
+  paintHome(lastHome || {});
+}
+async function exitEdit(save = true) {
+  if (!editMode) return;
+  const L = { pages: editLayout.pages.filter((p) => p.length), removed_pins: editLayout.removed_pins || [] };
+  if (!L.pages.length) L.pages = clone(DEFAULT_LAYOUT.pages);
+  editMode = false; document.body.classList.remove("editing");
+  $("editbar").hidden = true; $("avatar").hidden = false;
+  if (save) {
+    try {
+      const saved = await post("/api/home/layout", L);
+      if (lastHome) lastHome.layout = saved;
+      const c = cache.peek("home"); if (c) c.layout = saved;
+      toast("홈을 저장했어요.");
+    } catch (e) { toast(e.message, "err"); }
+  }
+  curPage = Math.min(curPage, Math.max(0, L.pages.length - 1));
+  paintHome(lastHome || {});
+}
+function addEditControls(slot, w) {
+  const rm = el("button", "wctl rm"); rm.setAttribute("aria-label", `${WIDGETS[w.type]?.name || "위젯"} 빼기`);
+  rm.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg>';
+  rm.onclick = (e) => {
+    e.stopPropagation();
+    for (const pg of editLayout.pages) { const i = pg.findIndex((x) => x.id === w.id); if (i >= 0) pg.splice(i, 1); }
+    if (w.type === "pin") editLayout.removed_pins.push(pinKey(w));
+    paintHome(lastHome || {});
+  };
+  slot.append(rm);
+  const sizes = WIDGETS[w.type]?.sizes || [];
+  if (sizes.length > 1) {
+    const sz = el("button", "wctl sz", w.size === "wide" ? "작게" : "크게");
+    sz.onclick = (e) => { e.stopPropagation(); w.size = w.size === "wide" ? "small" : "wide"; paintHome(lastHome || {}); };
+    slot.append(sz);
+  }
+  slot.addEventListener("pointerdown", (e) => startDrag(e, slot));
+}
+
+// 끌어서 옮기기: 같은 쪽 안에서는 자리 바꾸기, 화면 가장자리에 잠깐 대면 옆 쪽으로 넘어간다
+let drag = null;
+function startDrag(e, slot) {
+  if (!editMode || e.target.closest(".wctl")) return;
+  const r = slot.getBoundingClientRect();
+  drag = { slot, gx: e.clientX - r.left, gy: e.clientY - r.top, x0: e.clientX, y0: e.clientY, moved: false, edgeT: null };
+  slot.setPointerCapture(e.pointerId);
+  slot.addEventListener("pointermove", onDrag);
+  slot.addEventListener("pointerup", endDrag, { once: true });
+  slot.addEventListener("pointercancel", endDrag, { once: true });
+}
+function placeDragged(e) {
+  const s = drag.slot; s.style.transform = "none";
+  const n = s.getBoundingClientRect();
+  s.style.transform = `translate(${e.clientX - drag.gx - n.left}px, ${e.clientY - drag.gy - n.top}px) scale(1.03)`;
+}
+function onDrag(e) {
+  if (!drag) return;
+  if (!drag.moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 6) return;
+  drag.moved = true; drag.slot.classList.add("dragging");
+  placeDragged(e);
+  // 끌고 있는 위젯 자신은 빼고 그 아래에 무엇이 있는지 본다
+  drag.slot.style.pointerEvents = "none";
+  const under = document.elementFromPoint(e.clientX, e.clientY)?.closest(".wslot:not(.addslot)");
+  drag.slot.style.pointerEvents = "";
+  if (under && under !== drag.slot && under.parentElement === drag.slot.parentElement) {
+    const r = under.getBoundingClientRect();
+    const before = e.clientY < r.top + r.height / 2 && (e.clientX < r.left + r.width / 2 || r.width < 200);
+    under.parentElement.insertBefore(drag.slot, before ? under : under.nextSibling);
+    placeDragged(e);
+  }
+  const edge = e.clientX < 28 ? -1 : e.clientX > innerWidth - 28 ? 1 : 0;
+  if (edge && !drag.edgeT) {
+    drag.edgeT = setTimeout(() => {
+      drag.edgeT = null;
+      let target = curPage + edge;
+      if (target < 0) return;
+      if (target >= editLayout.pages.length) {
+        if (editLayout.pages.length >= MAX_PAGES) return;
+        editLayout.pages.push([]); syncFromDom(); paintHome(lastHome || {}); drag = null; return;
+      }
+      const grid = $("pager").children[target]?.querySelector(".bento");
+      if (!grid || grid.querySelectorAll(".wslot:not(.addslot)").length >= MAX_PER_PAGE) return;
+      grid.insertBefore(drag.slot, grid.querySelector(".addslot"));
+      goPage(target); placeDragged(e);
+    }, 550);
+  } else if (!edge && drag.edgeT) { clearTimeout(drag.edgeT); drag.edgeT = null; }
+}
+function endDrag() {
+  if (!drag) return;
+  const { slot, moved, edgeT } = drag; clearTimeout(edgeT);
+  slot.removeEventListener("pointermove", onDrag);
+  slot.classList.remove("dragging"); slot.style.transform = "";
+  drag = null;
+  if (moved) { syncFromDom(); paintHome(lastHome || {}); }
+}
+function syncFromDom() {
+  const byId = new Map(editLayout.pages.flat().map((w) => [w.id, w]));
+  const pages = [...$("pager").children].map((pg) =>
+    [...pg.querySelectorAll(".wslot[data-wid]")].map((sl) => byId.get(sl.dataset.wid)).filter(Boolean));
+  while (pages.length < editLayout.pages.length) pages.push([]);
+  editLayout.pages = pages;
+}
+
+/* ---------- 위젯 고르기: 기본 위젯 · 새 기능 · 앱 바로가기 ---------- */
+async function openWidgetPicker(pageIndex = curPage) {
+  const page = () => editLayout.pages[pageIndex] || editLayout.pages[curPage];
+  const addW = (w) => {
+    let pg = page();
+    if (pg.length >= MAX_PER_PAGE) {
+      if (editLayout.pages.length >= MAX_PAGES) return toast("더 넣을 자리가 없어요.", "err");
+      editLayout.pages.push([]); pg = editLayout.pages.at(-1);
+    }
+    pg.push({ id: newId(), ...w }); closeSheet(); paintHome(lastHome || {});
+    toast(`'${w.label || WIDGETS[w.type].name}' 위젯을 놓았어요. 끌어서 옮길 수 있어요.`);
+  };
+  let skills = [], scs = [];
+  try { skills = (await api("/api/skills")).custom || []; } catch {}
+  try { scs = [...(await api("/api/shortcuts?app=tasks")).items || [], ...(await api("/api/shortcuts?app=search")).items || []]; } catch {}
+  openSheet("위젯 추가", (s) => {
+    s.classList.add("picker");
+    const sec = (title) => { s.append(el("h3", "ph3", title)); const g = el("div", "plist"); s.append(g); return g; };
+    const row = (g, iconName, title, desc, onAdd, badge) => {
+      const b = el("button", "pitem");
+      const ic = el("span", "ai"); ic.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[iconName] || ICON.dot}</svg>`;
+      const t = el("span", "pt"); t.append(el("span", "pn", title + (badge ? " ✦" : "")));
+      if (desc) t.append(el("span", "pd", desc));
+      const plus = el("span", "pp", "+");
+      b.append(ic, t, plus); b.onclick = onAdd; g.append(b);
+    };
+    const used = new Set(editLayout.pages.flat().map((w) => w.type));
+    const g1 = sec("기본 위젯");
+    const ICONS_W = { hero: "events", plan: "bolt", inbox: "inbox", task: "tasks", events: "events", reminder: "reminders", notes: "notes" };
+    for (const t of ["hero", "plan", "inbox", "task", "events", "reminder", "notes"]) {
+      row(g1, ICONS_W[t], WIDGETS[t].name, WIDGETS[t].desc + (used.has(t) ? " · 이미 있어요" : ""),
+          () => addW({ type: t, size: WIDGETS[t].sizes[0] }));
+    }
+    const g2 = sec("새 기능");
+    const feats = [...skills.map((k) => ({ ref: k.id, skill: true, label: k.name, icon: k.icon || "bolt", origin: k.origin === "agent" ? "agent" : "user", desc: k.description })),
+                   ...scs.map((c) => ({ ref: c.id, skill: false, label: c.label, icon: c.icon || "bolt", origin: c.origin || "user", desc: c.text }))];
+    if (!feats.length) g2.append(el("p", "pempty", "아직 만든 기능이 없어요.\n채팅에서 “매주 금요일 주간 정리해 주는 기능 만들어 줘”처럼 말하면, 비서가 기능을 만들고 여기서 위젯으로 깔 수 있어요."));
+    for (const f of feats) row(g2, f.icon, f.label, f.desc || "", () => addW({ type: "pin", size: "small", ref: f.ref, skill: f.skill, label: f.label, icon: f.icon, origin: f.origin }), f.origin === "agent");
+    const g3 = sec("앱 바로가기");
+    for (const [key, label] of APPS) row(g3, key, label, "", () => addW({ type: "app", size: "small", app: key, label }));
+  });
+}
+$("addWidget").onclick = () => openWidgetPicker(curPage);
+$("addPage").onclick = () => {
+  if (editLayout.pages.length >= MAX_PAGES) return toast(`쪽은 ${MAX_PAGES}개까지예요.`, "err");
+  editLayout.pages.push([]); paintHome(lastHome || {}); setTimeout(() => goPage(editLayout.pages.length - 1), 50);
+};
+$("editDone").onclick = () => exitEdit(true);
 
 /* ---------- 모든 앱: 독의 마지막 칸 ---------- */
 function openAllApps() {
@@ -814,14 +1206,9 @@ function openAllApps() {
       b.onclick = () => { closeSheet(); openApp(key); };
       grid.append(b);
     }
-    for (const pin of (h.pins || [])) {           // 홈에 올린 기능·버튼 (비서가 만든 건 ✦)
-      const b = el("button", "app-icon" + (pin.origin === "agent" ? " ai" : ""));
-      b.innerHTML = `<div class="tile accent"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[pin.icon] || ICON.bolt}</svg></div>`;
-      b.append(el("span", "", pin.label));
-      b.onclick = () => { closeSheet(); runPin(pin); };
-      grid.append(b);
-    }
     s.append(grid);
+    const ed = button("홈 위젯 편집", "ghost", async () => { closeSheet(); enterEdit(); });
+    ed.style.width = "100%"; s.append(ed);
   });
 }
 $("dockChat").onclick = () => openApp("chat");
@@ -843,9 +1230,10 @@ $("homebar").addEventListener("submit", async (e) => {
   const x = el("button", "iconbtn x"); x.setAttribute("aria-label", "닫기");
   x.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   x.onclick = () => { homeResult = null; c.remove(); };
+  c.classList.remove("w2");
   const wait = el("div", "bubble thinking"); wait.append(el("i"), el("i"), el("i"));
   c.append(x, el("p", "you", text), wait);
-  homeResult = c; $("bento").prepend(c); $("home").scrollTop = 0;
+  homeResult = c; $("homeTop").replaceChildren(c); $("home").scrollTop = 0;
   try {
     const res = await post("/api/chat", { text });
     for (const a of res.actions || []) if (a.result?.task_id) driveTask(a.result.task_id);
