@@ -64,7 +64,7 @@ def pick_icon(goal: str):
     return DEFAULT_ICON
 
 
-def create(sb, goal: str, skill_id=None, icon=None, tint=None) -> dict:
+def create(sb, goal: str, skill_id=None, icon=None, tint=None, shortcut_id=None) -> dict:
     from . import skills
     goal = mask(goal.strip())[:500]
     if len(goal) < 2:
@@ -73,6 +73,8 @@ def create(sb, goal: str, skill_id=None, icon=None, tint=None) -> dict:
         icon, tint = pick_icon(goal)
     row = {"goal": goal, "status": "open", "next_step": "어떻게 할지 정하기",
            "icon": icon, "tint": tint}
+    if shortcut_id:
+        row["shortcut_id"] = int(shortcut_id)          # 홈 위젯이 이 버튼의 '최근 결과'를 찾을 수 있게
     sk = skills.get(sb, skill_id) if skill_id else None
     if sk:
         row["skill_id"] = sk["id"]
@@ -164,7 +166,7 @@ STEP_CONTRACT = """
 도구
   search    {"query": "..."}                  최신 정보가 필요할 때. 같은 검색을 반복하지 말 것
   note      {"text": "..."}                   중간 결과를 사용자 메모로 남길 때
-  reminder  {"text": "...", "due_at": "2026-11-03T15:00:00+09:00"}
+  reminder  {"text": "...", "due_at": "2026-11-03T15:00:00+09:00", "repeat": 선택(daily|weekdays|weekly|monthly)}
   draft     {"to": "...", "text": "..."}       글 초안
   event     {"title": "...", "starts_at": "2026-11-05T15:00:00+09:00", "place": "...", "remind_before_min": 30}
 
