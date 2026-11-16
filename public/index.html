@@ -490,6 +490,14 @@ body.editing .wslot > .bt{opacity:.92}
 .lastrun .lv{font-size:.92rem}
 .lastrun .btn{align-self:flex-start;margin-top:6px}
 .field select{width:100%;padding:10px 12px;border:0;border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 1px var(--line)}
+/* 기억 화면 */
+.memintro{color:var(--muted);font-size:.88rem;margin:4px 2px 6px}
+.memhint{font-size:.8rem;margin:-2px 2px 8px}
+.card.mem .b{margin:0 0 2px;font-weight:600}
+.card.mem .s{margin-bottom:8px}
+.card.mem.unsure{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line)}
+.card.mem.persona .s{color:var(--accent);font-weight:700}
+.card.mem.persona .b{font-weight:400;white-space:pre-wrap}
 </style>
 </head>
 <body>
@@ -741,6 +749,7 @@ const ICON = {
   book: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
   bolt: '<path d="M13 3L5 13h5l-1 8 8-10h-5z"/>',
   search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/>',
+  memory: '<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/><path d="M18.5 4.5l1 1M20.5 9h-1.4"/>',
 };
 const TINT = { blue: "#2563EB", indigo: "#4F46E5", amber: "#B45309", green: "#15803D", teal: "#0D9488", rose: "#BE123C" };
 function miniIcon(name, tint) {
@@ -752,7 +761,7 @@ function miniIcon(name, tint) {
 const APPS = [
   ["chat", "채팅"], ["search", "검색"], ["events", "일정"], ["notes", "메모"],
   ["reminders", "알림"], ["tasks", "맡은 일"], ["drafts", "초안"], ["skills", "기능"],
-  ["inbox", "확인함"], ["settings", "설정"],
+  ["inbox", "확인함"], ["memory", "기억"], ["settings", "설정"],
 ];
 
 const SYS_APPS = new Set(["skills", "inbox", "settings"]);   // 관리용: 밝은 타일
@@ -2086,6 +2095,100 @@ SCREENS.settings = {
     body.replaceChildren(box);
   },
 };
+
+/* ===================== 기억: 비서가 나에 대해 아는 것 ===================== */
+// 비서의 기억은 블랙박스가 아니다. 무엇을 알고 있는지 보여 주고, 사용자가 확인·고치기·지우기를 한다.
+const KIND_LABEL = { fact: "사실", preference: "취향", state: "요즘 상태" };
+SCREENS.memory = {
+  async render(body) {
+    const m = await api("/api/memory");
+    const nodes = [];
+    nodes.push(el("p", "memintro", `${agentName}이(가) 대화에서 알게 된 것들이에요. 내가 '맞아요'라고 한 것만 확실한 사실로 써요. 무엇이든 고치거나 지울 수 있어요.`));
+
+    const factRow = (f, sure) => {
+      const d = el("div", "card mem" + (sure ? "" : " unsure"));
+      d.append(el("div", "b", f.text));
+      d.append(el("div", "s", `${KIND_LABEL[f.kind] || f.kind}${f.seen > 1 ? ` · ${f.seen}번 들었어요` : ""}${f.kind === "state" && f.expires_at ? " · 곧 잊어요" : ""}`));
+      const row = el("div", "row");
+      if (!sure) row.append(button("맞아요", "small", async () => { await post(`/api/memory/facts/${f.id}/approve`); await render(); }));
+      row.append(button("고치기", "ghost small", () => editFact(f)),
+                 button("지우기", "ghost small", async () => {
+                   if (!(await askConfirm(`'${f.text}'\n이걸 잊을까요?`, "잊기", true))) return;
+                   await post(`/api/memory/facts/${f.id}/delete`); toast("잊었어요."); await render();
+                 }));
+      d.append(row); return d;
+    };
+
+    nodes.push(el("div", "group", `확실히 아는 것 · ${m.sure.length}`));
+    if (!m.sure.length) nodes.push(el("p", "muted memhint", "아직 없어요. 아래에서 '맞아요'를 누르거나, 오른쪽 위 +로 직접 알려 줄 수 있어요."));
+    for (const f of m.sure) nodes.push(factRow(f, true));
+
+    if (m.unsure.length) {
+      nodes.push(el("div", "group", `아직 확실하지 않은 것 · ${m.unsure.length}`));
+      nodes.push(el("p", "muted memhint", "대화에서 짐작한 거라 단정하지 않고 써요. 맞으면 확인해 주세요."));
+      for (const f of m.unsure) nodes.push(factRow(f, false));
+    }
+
+    if (m.quarantine.length) {
+      nodes.push(el("div", "group", `보류해 둔 것 · ${m.quarantine.length}`));
+      nodes.push(el("p", "muted memhint", "비서 자신의 말이 섞였을 수 있어서 기억하지 않고 따로 둔 거예요."));
+      for (const q of m.quarantine) {
+        const d = el("div", "card wait mem"); d.append(el("div", "b", q.text));
+        const row = el("div", "row");
+        row.append(button("제 얘기 맞아요", "small", async () => { await post(`/api/memory/quarantine/${q.id}/accept`); toast("기억했어요."); await render(); }),
+                   button("버리기", "ghost small", async () => { await post(`/api/memory/quarantine/${q.id}/discard`); await render(); }));
+        d.append(row); nodes.push(d);
+      }
+    }
+
+    if (m.growth.length || m.persona !== undefined) {
+      nodes.push(el("div", "group", "나에게 맞춰 가는 방식"));
+      for (const g of m.growth) {
+        const d = el("div", "card mem"); d.append(el("div", "s", g.label), el("div", "b", g.text));
+        const row = el("div", "row");
+        row.append(button("처음부터 다시 배우기", "ghost small", async () => {
+          if (!(await askConfirm(`'${g.label}'을(를) 지우고 처음부터 다시 맞춰 갈까요?`, "지우기", true))) return;
+          await post("/api/memory/reset", { key: g.key }); await render();
+        }));
+        d.append(row); nodes.push(d);
+      }
+      if (m.persona !== undefined) {
+        const d = el("div", "card mem persona"); d.append(el("div", "s", "✦ 지금까지 자란 나다움 (몰랑이의 자식)"), el("div", "b", m.persona || "아직 흐릿해요. 함께 지내며 또렷해져요."));
+        if (m.persona) {
+          const row = el("div", "row");
+          row.append(button("나다움 초기화", "ghost small", async () => {
+            if (!(await askConfirm("자란 나다움을 지우면 처음부터 다시 자라요. 되돌릴 수 없어요.", "초기화", true))) return;
+            await post("/api/memory/reset", { key: "persona" }); await render();
+          }));
+          d.append(row);
+        }
+        nodes.push(d);
+      }
+    }
+
+    const all = button("전부 잊게 하기", "danger", async () => {
+      if (!(await askConfirm("비서가 나에 대해 아는 것과 맞춰 온 방식을 모두 지울까요?\n일정·메모·대화 같은 내 기록은 남아요.", "모두 잊기", true))) return;
+      await post("/api/memory/forget-all"); toast("모두 잊었어요."); await render();
+    });
+    all.style.marginTop = "22px"; nodes.push(all);
+    body.replaceChildren(...nodes);
+  },
+  add: () => editFact(null),
+};
+function editFact(f) {
+  openSheet(f ? "고치기" : "직접 알려 주기", (s) => {
+    const t = input("textarea", f ? f.text : "", { placeholder: "예) 나는 초등학교 영어·도덕 전담 교사야" });
+    t.style.minHeight = "90px";
+    s.append(field("내용", t), el("p", "muted", "내가 쓴 문장은 바로 확실한 사실이 돼요."));
+    const foot = el("div", "actions");
+    foot.append(el("span"), button("저장", "", async () => {
+      if (f) await post(`/api/memory/facts/${f.id}/update`, { text: t.value });
+      else await post("/api/memory/facts/new", { text: t.value });
+      closeSheet(); toast("기억했어요."); await render();
+    }));
+    s.append(foot); setTimeout(() => t.focus(), 50);
+  });
+}
 
 /* ===================== 채팅 ===================== */
 const OPEN_LINK = { event_id: ["events", "일정 보기"], reminder_id: ["reminders", "알림 보기"], memory_id: ["notes", "메모 보기"], task_id: ["tasks", "맡은 일 보기"], skill_id: ["skills", "기능 보기"] };
