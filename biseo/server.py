@@ -47,6 +47,7 @@ try:
     from biseo import shortcuts as sc  # noqa: E402
     from biseo import daily  # noqa: E402
     from biseo import layout as home_layout  # noqa: E402
+    from biseo import memory as mem  # noqa: E402
 except Exception:  # noqa: BLE001
     _lines = traceback.format_exc().strip().splitlines()
     _BOOT_ERROR = {"detail": "서버 본체를 불러오지 못했어요",
@@ -526,6 +527,60 @@ def home(authorization: str | None = Header(None)):
                              "summary": first[:80], "steps": t.get("steps"), "max_steps": t.get("max_steps")}
     data["pin_runs"] = runs
     return data
+
+
+# ---------- 비서가 나에 대해 아는 것 (투명한 기억) ----------
+@app.get("/api/memory")
+def memory_get(authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    return mem.overview(sb, _agent(sb))
+
+
+class TextIn(BaseModel):
+    text: str = Field(min_length=1, max_length=400)
+
+
+@app.post("/api/memory/facts/new")
+def memory_add(body: TextIn, authorization: str | None = Header(None)):
+    return _run(mem.add, _session(authorization), body.text)
+
+
+@app.post("/api/memory/facts/{fact_id}/approve")
+def memory_approve(fact_id: int, authorization: str | None = Header(None)):
+    return _run(mem.approve, _session(authorization), fact_id)
+
+
+@app.post("/api/memory/facts/{fact_id}/update")
+def memory_update(fact_id: int, body: TextIn, authorization: str | None = Header(None)):
+    return _run(mem.update, _session(authorization), fact_id, body.text)
+
+
+@app.post("/api/memory/facts/{fact_id}/delete")
+def memory_delete(fact_id: int, authorization: str | None = Header(None)):
+    return _run(mem.remove, _session(authorization), fact_id)
+
+
+@app.post("/api/memory/quarantine/{qid}/{verb}")
+def memory_quarantine(qid: int, verb: str, authorization: str | None = Header(None)):
+    if verb not in ("accept", "discard"):
+        raise HTTPException(404, "없는 동작")
+    return _run(mem.quarantine_decide, _session(authorization), qid, verb == "accept")
+
+
+class KeyIn(BaseModel):
+    key: str
+
+
+@app.post("/api/memory/reset")
+def memory_reset(body: KeyIn, authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    return _run(mem.reset_growth, sb, _agent(sb), body.key)
+
+
+@app.post("/api/memory/forget-all")
+def memory_forget_all(authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    return mem.forget_all(sb, _agent(sb))
 
 
 # ---------- 홈 위젯 배치 ----------
