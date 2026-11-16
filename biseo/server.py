@@ -46,6 +46,7 @@ try:
     from biseo import push  # noqa: E402
     from biseo import shortcuts as sc  # noqa: E402
     from biseo import daily  # noqa: E402
+    from biseo import layout as home_layout  # noqa: E402
 except Exception:  # noqa: BLE001
     _lines = traceback.format_exc().strip().splitlines()
     _BOOT_ERROR = {"detail": "서버 본체를 불러오지 못했어요",
@@ -509,7 +510,32 @@ def home(authorization: str | None = Header(None)):
     live = (sb.table("tasks").select("id,goal,status,steps,max_steps")
             .in_("status", ["open", "waiting_user"]).order("updated_at", desc=True).limit(5).execute().data) or []
     data["task"] = next((t for t in live if t["status"] == "open"), live[0] if live else None)
+    data["notes"] = (sb.table("task_memory").select("id,title,content,updated_at").eq("kind", "note")
+                     .order("updated_at", desc=True).limit(3).execute().data) or []
+    data["layout"] = home_layout.load(sb)          # 없으면 null → 화면이 기본 배치를 쓴다
     return data
+
+
+# ---------- 홈 위젯 배치 ----------
+@app.get("/api/home/layout")
+def layout_get(authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    return home_layout.load(sb) or home_layout.DEFAULT
+
+
+@app.post("/api/home/layout")
+async def layout_set(request: Request, authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    raw = await request.body()
+    if len(raw) > 16000:
+        raise HTTPException(413, "배치가 너무 커요")
+    import json as _json
+    try:
+        body = _json.loads(raw or b"{}")
+    except ValueError:
+        raise HTTPException(400, "배치 모양이 아니에요")
+    return _run(home_layout.save, sb, body)
+
 
 
 # ---------- 오늘의 생각 (비서가 먼저 건네는 제안) ----------
