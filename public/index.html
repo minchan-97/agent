@@ -67,6 +67,7 @@ button,input,textarea,select{font:inherit;color:inherit}
 .tabs{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:18px}
 .tab{flex:1;border:0;background:none;color:var(--muted);font-weight:600;padding:9px;border-radius:9px;cursor:pointer}
 .tab.on{background:var(--accent);color:var(--accent-ink)}
+.theme-seg{margin:6px 0 4px}.theme-seg .tab{font-size:.875rem;padding:8px 6px}
 .pw-wrap{display:flex;gap:8px}
 .pw-wrap input{flex:1;min-width:0}
 .pw-eye{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:0 12px;color:var(--muted);cursor:pointer;font-size:.875rem}
@@ -736,6 +737,48 @@ form.homebar,form.compose{box-shadow:0 1px 2px rgb(22 35 58 / .05),0 8px 22px rg
 .m-ok{position:relative;z-index:1;align-self:flex-start;display:flex;align-items:center;gap:5px;font-size:.6875rem;color:#D8B46A;letter-spacing:.02em;margin-left:4px}
 @media (prefers-reduced-motion: reduce){.tr-track{transition:none}#tour{transition:none}}
 </style>
+<script>
+/* 화면 테마: 자동(기기 따라) · 밝게 · 어둡게.
+   다크 규칙은 모두 @media (prefers-color-scheme: dark) 안에 있다 → 고른 테마에 따라 그 조건을 켜고 끈다. */
+(function () {
+  // 다크/라이트 조건 규칙과 원래 조건을 한 번만 모아 붙잡아 둔다 (규칙 객체를 다시 얻으면 기록이 사라질 수 있다)
+  let RULES = null;
+  function rules() {
+    if (RULES) return RULES;
+    RULES = [];
+    for (const sh of document.styleSheets) {
+      let rs; try { rs = sh.cssRules; } catch { continue; }
+      for (const r of rs) if (r.media && /prefers-color-scheme/.test(r.media.mediaText)) RULES.push({ r, orig: r.media.mediaText });
+    }
+    return RULES;
+  }
+  function apply(t) {
+    for (const { r, orig } of rules()) {
+      const dark = /dark/.test(orig);
+      r.media.mediaText = t === "dark" ? (dark ? "all" : "not all")
+                        : t === "light" ? (dark ? "not all" : "all") : orig;
+    }
+    const sys = matchMedia("(prefers-color-scheme: dark)").matches;
+    const isDark = t === "dark" || (t !== "light" && sys);
+    document.documentElement.dataset.theme = isDark ? "dark" : "light";
+    document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+    for (const m of document.querySelectorAll('meta[name="theme-color"]')) {
+      if (!m.dataset.orig) m.dataset.orig = m.getAttribute("media") || "";
+      const forDark = /dark/.test(m.dataset.orig);
+      m.setAttribute("media", t === "auto" || !t ? m.dataset.orig : ((t === "dark") === forDark ? "all" : "not all"));
+    }
+  }
+  let saved = "auto"; try { saved = localStorage.getItem("biseo.theme") || "auto"; } catch {}
+  apply(saved);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => {
+    let t = "auto"; try { t = localStorage.getItem("biseo.theme") || "auto"; } catch {}
+    if (t === "auto") apply("auto");
+  });
+  window.setTheme = function (t) { try { localStorage.setItem("biseo.theme", t); } catch {} apply(t); };
+  window.getTheme = function () { try { return localStorage.getItem("biseo.theme") || "auto"; } catch { return "auto"; } };
+})();
+</script>
+
 </head>
 <body>
 <div id="splash" aria-hidden="true">
@@ -2979,6 +3022,22 @@ SCREENS.settings = {
     const name = input("text", agentName, { maxLength: 12 });
     const box = el("div");
     box.append(field("비서 이름", name), button("이름 바꾸기", "ghost small", async () => { const r = await post("/api/name", { name: name.value.trim() }); agentName = r.name; toast("바꿨어요."); }));
+
+    // 화면: 자동 · 밝게 · 어둡게
+    const thm = el("div", "sub");
+    thm.append(el("h3", "", "화면"));
+    const seg = el("div", "tabs theme-seg"); seg.setAttribute("role", "radiogroup"); seg.setAttribute("aria-label", "화면 테마");
+    const paintSeg = () => [...seg.children].forEach((b) => {
+      const on = b.dataset.t === getTheme(); b.classList.toggle("on", on); b.setAttribute("aria-checked", on);
+    });
+    for (const [t, label] of [["auto", "기기 설정 따라"], ["light", "밝게"], ["dark", "어둡게"]]) {
+      const b = el("button", "tab", label); b.type = "button"; b.dataset.t = t; b.setAttribute("role", "radio");
+      b.onclick = () => { setTheme(t); paintSeg(); };
+      seg.append(b);
+    }
+    paintSeg();
+    thm.append(seg);
+    box.append(thm);
 
     // 오늘의 생각: 매일 비서가 먼저 생각하는 시각
     const th = el("div", "sub");
