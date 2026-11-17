@@ -221,6 +221,18 @@ def feedback(sb, ref_kind: str, ref_id, fb: float):
     return j["id"]
 
 
+def learn_walk(sb, w: dict, fb: float):
+    """기록 없이 이번 걷기 경로만 배운다 (예: 모순 검사에 걸린 답 → 그 길을 약하게)."""
+    try:
+        trees = load_trees(sb)
+        t = trees.get(w["tree"])
+        if t:
+            _learn(t["transitions"], w.get("path") or [], fb)
+            _save_trees(sb, trees)
+    except Exception as e:
+        print("JUDGE_LEARN_SKIP", type(e).__name__, str(e)[:120])
+
+
 def safe_feedback(sb, ref_kind, ref_id, fb):
     """판단 기록이 없거나 표가 아직 없어도 본래 동작은 멈추지 않게."""
     try:
