@@ -373,6 +373,57 @@ create table if not exists judgments (
 create index if not exists judgments_ref on judgments(user_id, ref_kind, ref_id);
 create index if not exists judgments_tree on judgments(user_id, tree, id desc);
 
+-- ---------- 14-2. 문서함 (올린 문서 · 고친 버전) ----------
+-- 파일 자체는 Storage 의 docs 버킷({user_id}/무작위.확장자)에, 뽑은 글과 구조는 여기에.
+-- 고친 파일은 원본을 덮지 않고 parent_id = 원본 id 인 새 행(버전)으로 남는다.
+create table if not exists docs (
+  id          bigserial primary key,
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  name        text not null,
+  kind        text not null check (kind in ('xlsx','docx','pdf','hwp','hwpx','image')),
+  mime        text,
+  size        bigint not null default 0,
+  path        text not null,
+  text        text,
+  outline     jsonb not null default '{}',
+  pages       int,
+  note        text,
+  summary     text,
+  parent_id   bigint references docs(id) on delete cascade,
+  version     int not null default 1,
+  changes     jsonb,
+  created_at  timestamptz not null default now(),
+  constraint docs_path_own check (path like (user_id::text || '/%'))
+);
+create index if not exists docs_user on docs(user_id, id desc);
+create index if not exists docs_parent on docs(parent_id);
+
+-- 저장소 버킷과 정책: 자기 폴더({auth.uid()}/...)의 파일만 읽고 쓰고 지운다.
+-- (Supabase 가 아닌 Postgres 에서 돌리면 storage 스키마가 없으므로 건너뛴다)
+do $$
+begin
+  if exists (select 1 from pg_namespace where nspname = 'storage')
+     and exists (select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                 where n.nspname = 'storage' and c.relname = 'buckets') then
+    execute $q$insert into storage.buckets (id, name, public, file_size_limit)
+               values ('docs', 'docs', false, 20971520)
+               on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit$q$;
+    execute 'drop policy if exists docs_own_select on storage.objects';
+    execute 'drop policy if exists docs_own_insert on storage.objects';
+    execute 'drop policy if exists docs_own_update on storage.objects';
+    execute 'drop policy if exists docs_own_delete on storage.objects';
+    execute $q$create policy docs_own_select on storage.objects for select to authenticated
+               using (bucket_id = 'docs' and (storage.foldername(name))[1] = auth.uid()::text)$q$;
+    execute $q$create policy docs_own_insert on storage.objects for insert to authenticated
+               with check (bucket_id = 'docs' and (storage.foldername(name))[1] = auth.uid()::text)$q$;
+    execute $q$create policy docs_own_update on storage.objects for update to authenticated
+               using (bucket_id = 'docs' and (storage.foldername(name))[1] = auth.uid()::text)
+               with check (bucket_id = 'docs' and (storage.foldername(name))[1] = auth.uid()::text)$q$;
+    execute $q$create policy docs_own_delete on storage.objects for delete to authenticated
+               using (bucket_id = 'docs' and (storage.foldername(name))[1] = auth.uid()::text)$q$;
+  end if;
+end $$;
+
 -- ---------- 15. 계정별로 자라는 상태 ----------
 -- 마르코프·SOM·사고 트리처럼 입력으로 자라는 것은 반드시 여기, 계정별로.
 -- 공용으로 자라면 한 사람의 말투·단어가 다른 사람 비서로 샌다.
@@ -412,7 +463,7 @@ begin
   foreach t in array array['agents','facts','quarantine','episodes','events','task_memory',
                            'skills','tasks','actions','action_trust','reminders','shortcuts',
                            'usage_patterns','outbox','push_subscriptions','agent_state','audit',
-                           'judgments']
+                           'judgments','docs']
   loop
     execute format('alter table %I enable row level security', t);
     execute format('drop policy if exists own_rows on %I', t);
