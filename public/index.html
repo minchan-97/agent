@@ -549,6 +549,21 @@ body.editing .wslot > .bt{opacity:.92}
 .dresult{margin-top:10px}.doc-sheet textarea{width:100%;margin-bottom:4px}
 .doc-sheet .drow input,.doc-sheet textarea{font:inherit;color:var(--ink);padding:11px 13px;border:0;background:var(--surface);box-shadow:inset 0 0 0 1px var(--line);border-radius:12px}
 .doc-sheet textarea{min-height:64px;resize:vertical}
+.dseg{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:3px;margin-bottom:12px}
+.dseg button{flex:1;border:0;background:none;color:var(--muted);font:inherit;font-weight:600;font-size:.88rem;padding:8px;border-radius:9px}
+.dseg button.on{background:var(--accent);color:var(--accent-ink)}
+.tplcta{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;margin-top:14px;border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line));background:color-mix(in srgb,var(--accent) 6%,var(--surface));color:var(--ink);border-radius:14px;padding:12px 14px;font:inherit}
+.tplcta .t{font-weight:700;color:var(--accent)}.tplcta .s{font-size:.78rem;color:var(--muted)}
+.tplfields{display:flex;flex-direction:column;gap:8px;margin:10px 0}
+.tplf{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.tplf-top{display:flex;gap:6px;align-items:center}.tplf-top input{flex:1;min-width:0;font:inherit;font-weight:600;border:0;background:none;padding:4px 2px;color:var(--ink)}
+.tplf-top select{font:inherit;font-size:.78rem;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);padding:3px 4px}
+.tplf-w{font-size:.74rem;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tpladd{margin:6px 0 4px}.tpladd summary{color:var(--accent);font-weight:600;font-size:.86rem;cursor:pointer;margin-bottom:8px}
+.tpladd input[type=text]{width:100%;margin-bottom:6px;font:inherit;padding:10px 12px;border:0;background:var(--surface);box-shadow:inset 0 0 0 1px var(--line);border-radius:12px;color:var(--ink)}
+.chk{display:flex;gap:6px;align-items:center;font-size:.8rem;color:var(--muted);margin-bottom:8px}
+.doc-sheet .field input.filled,.doc-sheet .field textarea.filled{box-shadow:inset 0 0 0 1.5px var(--accent)}
+.doc-sheet .field textarea{min-height:80px}
 </style>
 </head>
 <body>
@@ -716,7 +731,7 @@ const cache = {
   paths: { home: "/api/home", events: "/api/events", reminders: "/api/reminders",
            notes: "/api/notes", drafts: "/api/drafts", tasks: "/api/tasks",
            actions: "/api/actions", skills: "/api/skills", history: "/api/history",
-           docs: "/api/docs" },
+           docs: "/api/docs", templates: "/api/templates" },
   has(k) { return this.store.has(k); },
   peek(k) { return this.store.get(k); },
   async get(k) { return this.store.has(k) ? this.store.get(k) : this.fresh(k); },
@@ -731,6 +746,7 @@ const CACHE_TOUCH = [
   [/\/api\/(reminders)\b/, ["reminders", "home"]],
   [/\/api\/(notes)\b/, ["notes"]],
   [/\/api\/(docs)\b/, ["docs"]],
+  [/\/api\/(templates)\b/, ["templates", "docs"]],
   [/\/api\/(drafts)\b/, ["drafts"]],
   [/\/api\/(tasks)\b/, ["tasks", "home"]],
   [/\/api\/(actions|skills)\b.*\/(approve|reject|undo|run|remove|pin|unpin)/, ["actions", "tasks", "skills", "home", "events", "reminders", "notes", "drafts"]],
@@ -1802,11 +1818,23 @@ function docMeta(d) {
   return [fsize(d.size || 0), d.pages && d.kind !== "image" ? `${d.pages}${d.kind === "xlsx" ? "개 시트" : "쪽"}` : "", ago(d.created_at)].filter(Boolean).join(" · ");
 }
 
+let docsTab = "files";
+function docsTabs(nTpl) {
+  const seg = el("div", "dseg");
+  for (const [k, label] of [["files", "문서"], ["tpl", nTpl ? `양식 ${nTpl}` : "양식"]]) {
+    const b = el("button", docsTab === k ? "on" : "", label); b.type = "button";
+    b.onclick = async () => { docsTab = k; $("addBtn").onclick = SCREENS.docs.add; await render(false); };
+    seg.append(b);
+  }
+  return seg;
+}
 SCREENS.docs = {
   cacheKey: "docs",
   async render(body, data) {
+    const tpls = await cache.get("templates").catch(() => ({ items: [] }));
+    if (docsTab === "tpl") return renderTemplates(body, tpls.items);
     const { items, used, quota } = data || await cache.get("docs");
-    const nodes = [];
+    const nodes = [docsTabs(tpls.items.length)];
     const drop = el("button", "dropzone");
     drop.type = "button";
     drop.append(el("span", "dz-t", "문서 올리기"), el("span", "dz-s", "엑셀 · PDF · 워드 · 한글(hwp·hwpx) · 사진"));
@@ -1832,7 +1860,7 @@ SCREENS.docs = {
       nodes.push(el("div", "empty-state", "올린 문서가 없어요.\n가정통신문, 성적표, 공문, 칠판 사진…\n올리면 읽고, 묻는 말에 답하고, 고쳐 드려요."));
     body.replaceChildren(...nodes);
   },
-  add: () => pickDocs(),
+  add: () => (docsTab === "tpl" ? pickDocs({ asTemplate: true }) : pickDocs()),
 };
 
 let docUploading = [];          // 올리는 중인 파일 (화면에 바로 보이게)
@@ -1843,9 +1871,10 @@ function uploadRow(u) {
   lead.append(docBadge(u.kind), txt); d.append(lead);
   return d;
 }
-function pickDocs() {
-  const inp = el("input"); inp.type = "file"; inp.multiple = true; inp.accept = DOC_ACCEPT;
-  inp.onchange = () => uploadDocs([...inp.files]);
+function pickDocs(opt = {}) {
+  const inp = el("input"); inp.type = "file"; inp.multiple = !opt.asTemplate;
+  inp.accept = opt.asTemplate ? ".xlsx,.xlsm,.docx,.hwpx,.pdf" : DOC_ACCEPT;
+  inp.onchange = () => uploadDocs([...inp.files], opt);
   inp.click();
 }
 function docKind(name, type) {
@@ -1872,7 +1901,7 @@ async function shrinkImage(file) {
     return file;
   }
 }
-async function uploadDocs(files) {
+async function uploadDocs(files, opt = {}) {
   if (!files.length) return;
   const { data } = await sb.auth.getSession();
   const uid = data?.session?.user?.id;
@@ -1894,8 +1923,9 @@ async function uploadDocs(files) {
       if (up.error) throw new Error("파일을 올리지 못했어요. 잠시 뒤 다시 해 주세요.");
       j.state = j.kind === "image" ? "사진을 보는 중…" : "읽는 중…";
       if (current === "docs") await render(false);
-      await post("/api/docs", { path, name: f.name, mime: f.type || "", size: f.size });
+      const made = await post("/api/docs", { path, name: f.name, mime: f.type || "", size: f.size });
       ok++;
+      if (opt.asTemplate) { docUploading = docUploading.filter((x) => x !== j); cache.drop("docs"); return openTplDraft({ doc: made }); }
     } catch (e) {
       toast(`${j.name}: ${e.message}`, "err");
     } finally {
@@ -1992,6 +2022,14 @@ async function openDoc(id) {
       s.append(c);
     }
     const pv = el("div", "sub"); pv.append(el("h3", "", "미리보기"), docPreview(d)); s.append(pv);
+    if (["xlsx", "docx", "hwpx", "pdf"].includes(d.kind)) {
+      const tb = el("button", "tplcta"); tb.type = "button";
+      tb.append(el("span", "t", "이 문서를 양식으로 저장"), el("span", "s", "모양은 그대로 두고, 다음엔 내용만 넣어 새 문서를 만들어요"));
+      tb.onclick = () => openTplDraft({ doc: d });
+      s.append(tb);
+    } else if (d.kind === "hwp") {
+      s.append(el("p", "muted small", "옛 한글(.hwp)은 양식으로 만들 수 없어요. 한글에서 .hwpx 로 저장해 올리면 돼요."));
+    }
 
     // 묻기
     const askSec = el("div", "sub"); askSec.append(el("h3", "", "물어보기"));
@@ -2050,6 +2088,162 @@ async function openDoc(id) {
       await post(`/api/docs/${d.id}/delete`); closeSheet(); toast("지웠어요.");
       if (current === "docs") await render();
     }), button("내려받기", "", () => docDownload(d.id)));
+    s.append(foot);
+  });
+}
+
+/* ===================== 양식함: 문서 → 양식 → 내용만 넣어 새 문서 ===================== */
+const TPL_TYPES = [["text", "짧은 글"], ["long", "여러 줄"], ["date", "날짜"], ["number", "숫자"]];
+function tplWhere(f) {
+  if (f.mode === "cell") return `${f.sheet ? f.sheet + "!" : ""}${f.cell}${f.example ? ` · 지금 '${f.example}'` : ""}`;
+  if (f.mode === "form") return `PDF 칸 '${f.find}'`;
+  if (f.mode === "after") return `'${f.find}' 뒤에`;
+  if (/^\{\{.*\}\}$/.test(f.find || "")) return "문서에 적어 둔 자리";
+  return `'${(f.find || "").slice(0, 40)}' 자리`;
+}
+function renderTemplates(body, items) {
+  const nodes = [docsTabs(items.length)];
+  const cta = el("button", "dropzone"); cta.type = "button";
+  cta.append(el("span", "dz-t", "파일 올려서 양식 만들기"), el("span", "dz-s", "워드 · 한글(hwpx) · 엑셀 · PDF 양식"));
+  cta.onclick = () => pickDocs({ asTemplate: true });
+  nodes.push(cta);
+  for (const t of items) {
+    const b = el("button", "item doc"); const lead = el("div", "lead"); const txt = el("div", "dtxt");
+    txt.append(el("div", "t", t.name), el("div", "s", [`칸 ${t.fields.length}개`, t.uses ? `${t.uses}번 씀` : "아직 안 씀", ago(t.updated_at || t.created_at)].join(" · ")));
+    lead.append(docBadge(t.kind), txt); b.append(lead);
+    b.onclick = () => openTemplate(t.id);
+    nodes.push(b);
+  }
+  if (!items.length) nodes.push(el("div", "empty-state", "저장한 양식이 없어요.\n가정통신문, 공문, 신청서처럼 자주 쓰는 문서를\n양식으로 저장해 두면 내용만 넣어 바로 만들어요.\n\n문서를 열고 '이 문서를 양식으로 저장'을 눌러도 돼요."));
+  body.replaceChildren(...nodes);
+}
+
+// 칸 정하기: 새 양식(doc) 또는 칸 고치기(tpl)
+async function openTplDraft({ doc, tpl }) {
+  let name, fields, kind = doc?.kind || tpl?.kind;
+  if (tpl) { name = tpl.name; fields = tpl.fields.map((f) => ({ ...f })); }
+  else {
+    openSheet("양식 만들기", (s) => s.append(el("p", "muted", "문서를 읽고 바뀌는 자리를 찾는 중… (10초쯤)")));
+    try { const p = await post("/api/templates/propose", { doc_id: doc.id }); name = p.name; fields = p.fields; }
+    catch (e) { return openSheet("양식 만들기", (s) => { s.append(el("p", "dnote", e.message)); const f = el("div", "actions"); f.append(el("span"), button("닫기", "ghost", closeSheet)); s.append(f); }); }
+  }
+  openSheet(tpl ? "칸 고치기" : "양식 만들기", (s) => {
+    s.classList.add("doc-sheet");
+    const nm = input("text", name, { placeholder: "양식 이름 (예: 체험학습 안내)" });
+    s.append(field("양식 이름", nm));
+    s.append(el("p", "muted small", "바뀌는 자리를 '칸'으로 만들어요. 문서의 모양·글꼴·표는 그대로 두고 칸만 바꿔요."));
+    const list = el("div", "tplfields");
+    const paint = () => {
+      list.replaceChildren();
+      if (!fields.length) list.append(el("p", "muted", "칸이 없어요. 아래에서 추가해 주세요."));
+      fields.forEach((f, i) => {
+        const row = el("div", "tplf");
+        const lab = input("text", f.label, { placeholder: "칸 이름" }); lab.oninput = () => { f.label = lab.value; };
+        const typ = el("select"); for (const [k, l] of TPL_TYPES) { const o = el("option", "", l); o.value = k; if ((f.type || "text") === k) o.selected = true; typ.append(o); }
+        typ.onchange = () => { f.type = typ.value; };
+        const rm = el("button", "iconbtn"); rm.type = "button"; rm.setAttribute("aria-label", `'${f.label}' 칸 빼기`);
+        rm.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+        rm.onclick = () => { fields.splice(i, 1); paint(); };
+        const top = el("div", "tplf-top"); top.append(lab, typ, rm);
+        row.append(top, el("div", "tplf-w", tplWhere(f)));
+        list.append(row);
+      });
+    };
+    paint();
+    s.append(list);
+    if (kind !== "pdf") {
+      const add = el("details", "tpladd"); add.append(el("summary", "", "+ 칸 직접 추가"));
+      const a1 = input("text", "", { placeholder: kind === "xlsx" ? "칸 주소 (예: B3 또는 성적!B3)" : "문서에서 바꿀 글 (문서에 있는 그대로)" });
+      const a2 = input("text", "", { placeholder: "칸 이름 (예: 날짜)" });
+      const after = el("label", "chk"); const cb = el("input"); cb.type = "checkbox"; after.append(cb, el("span", "", "이 글 뒤에 붙이기 (빈칸 양식: '성명:' 같은)"));
+      add.append(a1, a2);
+      if (kind !== "xlsx") add.append(after);
+      add.append(button("추가", "small", () => {
+        const w = a1.value.trim(), lb = a2.value.trim();
+        if (!w || !lb) return toast("두 칸을 모두 적어 주세요.", "err");
+        if (kind === "xlsx") { const [sh, c] = w.includes("!") ? w.split("!") : ["", w]; fields.push({ label: lb, mode: "cell", sheet: sh, cell: c.toUpperCase(), type: "text" }); }
+        else fields.push({ label: lb, find: w, mode: cb.checked ? "after" : "replace", type: "text" });
+        a1.value = a2.value = ""; cb.checked = false; paint();
+      }));
+      add.append(el("p", "muted small", "팁: 한글·워드에서 칸 자리에 {{칸 이름}} 을 적어 올리면 그 자리를 정확히 칸으로 써요."));
+      s.append(add);
+    }
+    const foot = el("div", "actions");
+    foot.append(button("취소", "ghost", closeSheet), button(tpl ? "저장" : "양식 저장", "", async () => {
+      const body = { name: nm.value.trim(), fields };
+      const r = tpl ? await post(`/api/templates/${tpl.id}/update`, body) : await post("/api/templates", { ...body, doc_id: doc.id });
+      if (r.lost?.length) toast(`문서에서 자리를 못 찾아 뺀 칸: ${r.lost.join(", ")}`, "err");
+      else toast(tpl ? "칸을 고쳤어요." : "양식으로 저장했어요.");
+      docsTab = "tpl";
+      if (current === "docs") await render(false);
+      await openTemplate(r.template.id);
+    }));
+    s.append(foot);
+  });
+}
+
+async function openTemplate(tid) {
+  let t;
+  try { t = await api(`/api/templates/${tid}`); } catch (e) { return toast(e.message, "err"); }
+  openSheet(t.name, (s) => {
+    s.classList.add("doc-sheet");
+    const head = el("div", "dhead"); head.append(docBadge(t.kind), el("span", "muted small", `칸 ${t.fields.length}개 · ${t.uses ? `${t.uses}번 씀` : "아직 안 씀"}`));
+    s.append(head);
+
+    // 한 번에 말하기
+    const say = el("div", "sub"); say.append(el("h3", "", "한 번에 말하기"));
+    const said = input("textarea", "", { rows: 2, placeholder: "예: 6월 3일 수요일에 국립중앙박물관으로 가요. 준비물은 도시락이랑 물" });
+    const inputs = {};
+    say.append(said, button("칸 채우기", "small", async () => {
+      if (!said.value.trim()) return said.focus();
+      const r = await post(`/api/templates/${t.id}/fill`, { text: said.value.trim() });
+      const n = Object.keys(r.values).length;
+      for (const [k, v] of Object.entries(r.values)) if (inputs[k]) { inputs[k].value = v; inputs[k].classList.add("filled"); }
+      toast(n ? `칸 ${n}개를 채웠어요. 확인해 주세요.` : "채울 내용을 찾지 못했어요.", n ? "" : "err");
+    }));
+    s.append(say);
+
+    // 칸
+    const form = el("div", "sub"); form.append(el("h3", "", "내용"));
+    const last = t.last_values || {};
+    for (const f of t.fields) {
+      const i = input(f.type === "long" ? "textarea" : "text", last[f.label] || "", { placeholder: f.hint ? `예: ${f.hint}` : (f.mode === "replace" && !/^\{\{/.test(f.find || "") ? `원래 문서: ${(f.find || "").slice(0, 40)}` : (f.example ? `원래: ${f.example}` : "")) });
+      if (f.type === "number") i.inputMode = "decimal";
+      inputs[f.label] = i;
+      form.append(field(f.label, i));
+    }
+    if (Object.keys(last).length) form.append(button("지난번 값 비우기", "ghost small", () => { for (const i of Object.values(inputs)) i.value = ""; }));
+    s.append(form);
+
+    const res = el("div");
+    const go = button("문서 만들기", "", async () => {
+      const values = Object.fromEntries(Object.entries(inputs).map(([k, i]) => [k, i.value]));
+      const r = await post(`/api/templates/${t.id}/make`, { values });
+      const card = el("div", "card dresult");
+      card.append(el("div", "b", r.doc.name));
+      if (r.empty.length) card.append(el("p", "dnote", `비워 둔 칸: ${r.empty.join(", ")}`));
+      const row = el("div", "row");
+      row.append(button("내려받기", "small", () => docDownload(r.doc.id)), button("열어 보기", "ghost small", () => openDoc(r.doc.id)));
+      card.append(row); res.replaceChildren(card);
+      card.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+    s.append(go, res);
+
+    if (t.recent?.length) {
+      const rc = el("div", "sub"); rc.append(el("h3", "", "이 양식으로 만든 문서"));
+      for (const d of t.recent) rc.append(itemBtn(d.name, ago(d.created_at), () => openDoc(d.id)));
+      s.append(rc);
+    }
+    const foot = el("div", "actions");
+    foot.append(button("삭제", "danger", async () => {
+      if (!(await askConfirm(`'${t.name}' 양식을 지울까요? 이 양식으로 만든 문서는 남아요.`, "삭제", true))) return;
+      await post(`/api/templates/${t.id}/delete`); closeSheet(); toast("지웠어요.");
+      if (current === "docs") await render(false);
+    }));
+    const right = el("div", "row");
+    right.append(button("양식 원본", "ghost", async () => { const { url } = await api(`/api/templates/${t.id}/url`); location.href = url; }),
+                 button("칸 고치기", "ghost", () => openTplDraft({ tpl: t })));
+    foot.append(right);
     s.append(foot);
   });
 }
