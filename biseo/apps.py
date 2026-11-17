@@ -131,6 +131,9 @@ def create_event(sb, data: dict, by="user") -> dict:
         row["ends_at"] = _iso(data["ends_at"], "끝 시각")
     if data.get("place"):
         row["place"] = mask(str(data["place"]))[:100]
+    if data.get("doc_id"):
+        _one(sb, "docs", data["doc_id"])
+        row["doc_id"] = int(data["doc_id"])
     ev = sb.table("events").insert(row).execute().data[0]
     # 연동: 만들 때 "몇 분 전 알림"을 같이 걸 수 있다
     if data.get("remind_before_min") not in (None, ""):
@@ -226,6 +229,9 @@ def create_reminder(sb, data: dict, by="user") -> dict:
     if data.get("event_id"):
         _one(sb, "events", data["event_id"])          # 내 일정인지 확인
         row["event_id"] = int(data["event_id"])
+    if data.get("doc_id"):
+        _one(sb, "docs", data["doc_id"])              # 내 문서인지 확인 → 알림을 누르면 문서가 열린다
+        row["doc_id"] = int(data["doc_id"])
     return sb.table("reminders").insert(row).execute().data[0]
 
 
