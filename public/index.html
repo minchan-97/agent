@@ -516,6 +516,39 @@ body.editing .wslot > .bt{opacity:.92}
 .why-fb{margin:16px 0 0;font-size:.84rem;padding:10px 12px;border-radius:12px;background:var(--surface);color:var(--muted)}
 .why-fb.ok{color:var(--ink)}.why-fb.no{opacity:.8}
 .muted.small{font-size:.76rem}
+.dropzone{display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;border:1.5px dashed color-mix(in srgb,var(--accent) 45%,var(--line));background:color-mix(in srgb,var(--accent) 5%,var(--surface));color:var(--ink);border-radius:18px;padding:20px 12px;margin-bottom:12px;font:inherit;cursor:pointer}
+.dropzone .dz-t{font-weight:700;color:var(--accent)}.dropzone .dz-s{font-size:.8rem;color:var(--muted)}
+.dquota{display:flex;align-items:center;gap:10px;font-size:.74rem;color:var(--muted);margin:0 2px 10px}
+.dquota b{flex:1;height:4px;border-radius:4px;background:var(--line);overflow:hidden}.dquota b i{display:block;height:100%;background:var(--accent)}
+.item.doc .lead{align-items:center}.item.doc .dtxt{min-width:0;flex:1}
+.item.doc .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item.doc.up{opacity:.65;cursor:default}.item.doc.up .s{animation:dpulse 1.2s ease-in-out infinite}
+@keyframes dpulse{50%{opacity:.4}}
+.dbadge{flex:none;display:inline-grid;place-items:center;width:38px;height:38px;border-radius:10px;font-size:.66rem;font-weight:800;letter-spacing:.02em;color:#fff}
+.dbadge.x{background:#15803D}.dbadge.w{background:#2563EB}.dbadge.p{background:#BE123C}.dbadge.h{background:#0D9488}.dbadge.i{background:#B45309}
+.dhead{display:flex;align-items:center;gap:10px;margin:-6px 0 10px}.dhead .dbadge{width:30px;height:30px;font-size:.58rem;border-radius:8px}
+.dprev{max-height:300px;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.dprev img{display:block;max-width:100%;border-radius:8px;margin:0 auto}
+.dpara{margin:0 0 6px;font-size:.86rem;line-height:1.5;white-space:pre-wrap}.dpara.head{font-weight:700;font-size:.95rem}
+.dk{font-size:.7rem;font-weight:700;color:var(--accent);margin:8px 0 2px}
+.dtable,.dgrid table{border-collapse:collapse;font-size:.76rem;margin:4px 0 8px}
+.dtable td,.dgrid td,.dgrid th{border:1px solid var(--line);padding:3px 6px;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.dgrid th{background:var(--bg);color:var(--muted);font-weight:600}
+.dtabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:8px}.dtabs button{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:4px 10px;font:inherit;font-size:.76rem;white-space:nowrap}
+.dtabs button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.dfields{font-size:.82rem;margin-bottom:6px}
+.drow{display:flex;gap:8px;align-items:center}.drow input{flex:1;min-width:0}
+.danswer .dans{white-space:pre-wrap;font-size:.92rem;line-height:1.55;margin:10px 0 6px}
+.dcites{display:flex;flex-direction:column;gap:4px}.dcite summary{font-size:.78rem;color:var(--accent);cursor:pointer}
+.dcite p{font-size:.78rem;color:var(--muted);white-space:pre-wrap;margin:4px 0 6px;padding-left:10px;border-left:2px solid var(--line)}
+.dchanges{display:flex;flex-direction:column;gap:5px;margin:8px 0}
+.dch{font-size:.82rem;display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
+.dch .dw{font-size:.7rem;font-weight:700;color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);border-radius:6px;padding:1px 6px}
+.dch s{color:var(--muted)}.dch .arr{color:var(--muted)}.dch.miss{opacity:.7}.dch.miss .dw{color:var(--wait);background:color-mix(in srgb,var(--wait) 12%,transparent)}
+.dnote{font-size:.8rem;color:var(--wait);margin:6px 0 0}
+.dresult{margin-top:10px}.doc-sheet textarea{width:100%;margin-bottom:4px}
+.doc-sheet .drow input,.doc-sheet textarea{font:inherit;color:var(--ink);padding:11px 13px;border:0;background:var(--surface);box-shadow:inset 0 0 0 1px var(--line);border-radius:12px}
+.doc-sheet textarea{min-height:64px;resize:vertical}
 </style>
 </head>
 <body>
@@ -682,7 +715,8 @@ const cache = {
   store: new Map(),
   paths: { home: "/api/home", events: "/api/events", reminders: "/api/reminders",
            notes: "/api/notes", drafts: "/api/drafts", tasks: "/api/tasks",
-           actions: "/api/actions", skills: "/api/skills", history: "/api/history" },
+           actions: "/api/actions", skills: "/api/skills", history: "/api/history",
+           docs: "/api/docs" },
   has(k) { return this.store.has(k); },
   peek(k) { return this.store.get(k); },
   async get(k) { return this.store.has(k) ? this.store.get(k) : this.fresh(k); },
@@ -696,6 +730,7 @@ const CACHE_TOUCH = [
   [/\/api\/(events)\b/, ["events", "home", "reminders", "notes"]],   // 일정은 알림·메모와 얽힘
   [/\/api\/(reminders)\b/, ["reminders", "home"]],
   [/\/api\/(notes)\b/, ["notes"]],
+  [/\/api\/(docs)\b/, ["docs"]],
   [/\/api\/(drafts)\b/, ["drafts"]],
   [/\/api\/(tasks)\b/, ["tasks", "home"]],
   [/\/api\/(actions|skills)\b.*\/(approve|reject|undo|run|remove|pin|unpin)/, ["actions", "tasks", "skills", "home", "events", "reminders", "notes", "drafts"]],
@@ -767,6 +802,7 @@ const ICON = {
   book: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
   bolt: '<path d="M13 3L5 13h5l-1 8 8-10h-5z"/>',
   search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/>',
+  docs: '<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5L12 11l2.5 2.5"/>',
   memory: '<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/><path d="M18.5 4.5l1 1M20.5 9h-1.4"/>',
 };
 const TINT = { blue: "#2563EB", indigo: "#4F46E5", amber: "#B45309", green: "#15803D", teal: "#0D9488", rose: "#BE123C" };
@@ -779,7 +815,7 @@ function miniIcon(name, tint) {
 const APPS = [
   ["chat", "채팅"], ["search", "검색"], ["events", "일정"], ["notes", "메모"],
   ["reminders", "알림"], ["tasks", "맡은 일"], ["drafts", "초안"], ["skills", "기능"],
-  ["inbox", "확인함"], ["memory", "기억"], ["settings", "설정"],
+  ["inbox", "확인함"], ["memory", "기억"], ["docs", "문서"], ["settings", "설정"],
 ];
 
 const SYS_APPS = new Set(["skills", "inbox", "settings"]);   // 관리용: 밝은 타일
@@ -1737,6 +1773,286 @@ SCREENS.tasks = {
   },
 };
 
+
+/* ===================== 문서함: 올리기 · 읽기 · 묻기 · 고치기 ===================== */
+const DOC_ACCEPT = ".xlsx,.xlsm,.docx,.pdf,.hwp,.hwpx,.png,.jpg,.jpeg,.webp,.gif,.bmp,.heic,.heif,image/*";
+const DOC_MAX = 20 * 1024 * 1024;
+const DOC_BADGE = { xlsx: ["XLS", "x"], docx: ["DOC", "w"], pdf: ["PDF", "p"], hwp: ["HWP", "h"], hwpx: ["HWP", "h"], image: ["IMG", "i"] };
+const DOC_NOTE = {
+  scanned: "글자가 없는 스캔본이에요.",
+  ocr: "스캔본이라 앞 4쪽은 사진으로 읽었어요. 글자가 틀릴 수 있어요.",
+  distributed: "배포용 한글 문서라 본문이 잠겨 있어 미리보기 글만 읽혔어요.",
+  preview: "본문을 못 읽어 미리보기 글만 읽혔어요.",
+  unread: "아직 사진을 읽지 못했어요. 물어보면 그때 다시 봐요.",
+};
+const DOC_HINT = {
+  xlsx: "예: 합계 열을 만들어 줘 · 이서연 수학 점수를 90으로 · 맨 아래에 평균 행 추가",
+  docx: "예: 날짜를 6월 3일로 바꿔 줘 · 준비물 뒤에 '복장: 체육복' 넣어 줘",
+  hwpx: "예: 날짜를 6월 3일로 바꿔 줘 · 마지막에 문의처 문단 추가",
+  hwp: "예: 날짜를 바꿔 줘 — 옛 한글(.hwp)은 고친 결과가 워드 파일로 나와요",
+  pdf: "예: 2쪽 지워 줘 · 1쪽 돌려 줘 · 이름 칸에 김민수 — 글을 고치면 워드 파일로 나와요",
+  image: "예: 오른쪽으로 돌려 줘 · 위쪽 절반만 잘라 줘 · 흑백으로 · png 로",
+};
+const fsize = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)}MB` : `${Math.max(1, Math.round(n / 1024))}KB`);
+function docBadge(kind) {
+  const [t, c] = DOC_BADGE[kind] || ["FILE", "i"];
+  return el("span", "dbadge " + c, t);
+}
+function docMeta(d) {
+  return [fsize(d.size || 0), d.pages && d.kind !== "image" ? `${d.pages}${d.kind === "xlsx" ? "개 시트" : "쪽"}` : "", ago(d.created_at)].filter(Boolean).join(" · ");
+}
+
+SCREENS.docs = {
+  cacheKey: "docs",
+  async render(body, data) {
+    const { items, used, quota } = data || await cache.get("docs");
+    const nodes = [];
+    const drop = el("button", "dropzone");
+    drop.type = "button";
+    drop.append(el("span", "dz-t", "문서 올리기"), el("span", "dz-s", "엑셀 · PDF · 워드 · 한글(hwp·hwpx) · 사진"));
+    drop.onclick = pickDocs;
+    nodes.push(drop, ...docUploading.map(uploadRow));
+    if (items.length) {
+      const bar = el("div", "dquota");
+      const fill = el("i"); fill.style.width = `${Math.min(100, (used / quota) * 100).toFixed(1)}%`;
+      bar.append(el("span", "", `${fsize(used)} / ${fsize(quota)}`), el("b", "", "")); bar.lastChild.append(fill);
+      nodes.push(bar);
+    }
+    for (const d of items) {
+      const b = el("button", "item doc");
+      const lead = el("div", "lead");
+      const txt = el("div", "dtxt");
+      txt.append(el("div", "t", d.name), el("div", "s", docMeta(d) + (d.versions?.length ? ` · 고친 버전 ${d.versions.length}` : "")));
+      lead.append(docBadge(d.kind), txt);
+      b.append(lead);
+      b.onclick = () => openDoc(d.id);
+      nodes.push(b);
+    }
+    if (!items.length && !docUploading.length)
+      nodes.push(el("div", "empty-state", "올린 문서가 없어요.\n가정통신문, 성적표, 공문, 칠판 사진…\n올리면 읽고, 묻는 말에 답하고, 고쳐 드려요."));
+    body.replaceChildren(...nodes);
+  },
+  add: () => pickDocs(),
+};
+
+let docUploading = [];          // 올리는 중인 파일 (화면에 바로 보이게)
+function uploadRow(u) {
+  const d = el("div", "item doc up");
+  const lead = el("div", "lead"); const txt = el("div", "dtxt");
+  txt.append(el("div", "t", u.name), el("div", "s", u.state));
+  lead.append(docBadge(u.kind), txt); d.append(lead);
+  return d;
+}
+function pickDocs() {
+  const inp = el("input"); inp.type = "file"; inp.multiple = true; inp.accept = DOC_ACCEPT;
+  inp.onchange = () => uploadDocs([...inp.files]);
+  inp.click();
+}
+function docKind(name, type) {
+  const ext = (name.split(".").pop() || "").toLowerCase();
+  if (["xlsx", "xlsm"].includes(ext)) return "xlsx";
+  if (["docx", "pdf", "hwp", "hwpx"].includes(ext)) return ext;
+  if ((type || "").startsWith("image/") || ["png", "jpg", "jpeg", "webp", "gif", "bmp", "heic", "heif"].includes(ext)) return "image";
+  return null;
+}
+// 아이폰 사진(HEIC)·아주 큰 사진은 올리기 전에 JPEG 로 줄인다 (서버가 못 여는 형식 + 저장 용량)
+async function shrinkImage(file) {
+  const heic = /heic|heif/i.test(file.type) || /\.(heic|heif)$/i.test(file.name);
+  if (!heic && file.size < 3 * 1024 * 1024) return file;
+  try {
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas"); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.88));
+    if (!blob) throw new Error("x");
+    return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+  } catch {
+    if (heic) throw new Error("이 사진 형식(HEIC)을 열지 못했어요. 사진 앱에서 '호환성 우선'으로 저장해 올려 주세요.");
+    return file;
+  }
+}
+async function uploadDocs(files) {
+  if (!files.length) return;
+  const { data } = await sb.auth.getSession();
+  const uid = data?.session?.user?.id;
+  if (!uid) return toast("다시 로그인해 주세요.", "err");
+  const jobs = files.map((f) => ({ file: f, name: f.name, kind: docKind(f.name, f.type), state: "올리는 중…" }));
+  docUploading.push(...jobs);
+  if (current === "docs") await render(false);
+  let ok = 0;
+  for (const j of jobs) {
+    try {
+      if (!j.kind) throw new Error(/\.(xls|doc|ppt|pptx)$/i.test(j.name) ? "옛 형식이에요. 새 형식(.xlsx·.docx)으로 저장해 올려 주세요." : "엑셀·PDF·워드·한글·사진만 올릴 수 있어요.");
+      let f = j.file;
+      if (j.kind === "image") f = await shrinkImage(f);
+      if (f.size > DOC_MAX) throw new Error("20MB 보다 큰 파일은 올릴 수 없어요.");
+      const ext = (f.name.split(".").pop() || "bin").toLowerCase();
+      const rand = [...crypto.getRandomValues(new Uint8Array(12))].map((x) => x.toString(16).padStart(2, "0")).join("");
+      const path = `${uid}/${rand}.${ext}`;
+      const up = await sb.storage.from("docs").upload(path, f, { contentType: f.type || "application/octet-stream", upsert: false });
+      if (up.error) throw new Error("파일을 올리지 못했어요. 잠시 뒤 다시 해 주세요.");
+      j.state = j.kind === "image" ? "사진을 보는 중…" : "읽는 중…";
+      if (current === "docs") await render(false);
+      await post("/api/docs", { path, name: f.name, mime: f.type || "", size: f.size });
+      ok++;
+    } catch (e) {
+      toast(`${j.name}: ${e.message}`, "err");
+    } finally {
+      docUploading = docUploading.filter((x) => x !== j);
+    }
+  }
+  cache.drop("docs");
+  if (ok) toast(ok > 1 ? `${ok}개를 올렸어요.` : "올렸어요. 눌러서 묻거나 고쳐 보세요.");
+  if (current === "docs") await render(false); else if (ok) await openApp("docs");
+}
+
+async function docDownload(id) {
+  const { url } = await api(`/api/docs/${id}/url`);
+  location.href = url;              // 저장소가 '내려받기'로 응답하므로 화면은 그대로 남는다
+}
+
+function docPreview(d) {
+  const box = el("div", "dprev");
+  const o = d.outline || {};
+  if (d.kind === "image") {
+    const img = el("img"); img.alt = d.name; box.append(img);
+    api(`/api/docs/${d.id}/url`).then((u) => { img.src = u.view; }).catch(() => img.remove());
+    if (d.summary) box.append(el("p", "muted small", d.summary));
+    return box;
+  }
+  if (d.kind === "xlsx" && o.sheets?.length) {
+    const tabs = el("div", "dtabs"); const holder = el("div", "dgrid");
+    const show = (sh, btn) => {
+      tabs.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === btn));
+      const t = el("table"); const cols = Math.max(0, ...sh.rows.map((r) => r.length));
+      const head = el("tr"); head.append(el("th", "", ""));
+      for (let c = 0; c < cols; c++) head.append(el("th", "", String.fromCharCode(65 + c)));
+      t.append(head);
+      sh.rows.forEach((r, i) => { const tr = el("tr"); tr.append(el("th", "", String(i + 1))); for (let c = 0; c < cols; c++) tr.append(el("td", "", r[c] ?? "")); t.append(tr); });
+      holder.replaceChildren(t);
+      if (sh.max_row > sh.rows.length) holder.append(el("p", "muted small", `… ${sh.max_row}행 중 앞 ${sh.rows.length}행만 보여요`));
+    };
+    o.sheets.forEach((sh, i) => { const b = el("button", "", sh.name); b.type = "button"; b.onclick = () => show(sh, b); tabs.append(b); if (!i) setTimeout(() => show(sh, b)); });
+    if (o.sheets.length > 1) box.append(tabs);
+    box.append(holder);
+    return box;
+  }
+  if (d.kind === "pdf") {
+    const f = Object.entries(o.fields || {});
+    if (f.length) {
+      const fl = el("div", "dfields"); fl.append(el("div", "dk", "채울 칸"));
+      for (const [k, v] of f.slice(0, 20)) fl.append(el("div", "", `${k}: ${v || "(비어 있음)"}`));
+      box.append(fl);
+    }
+    for (const pg of (o.pages || []).slice(0, 6)) {
+      box.append(el("div", "dk", `${pg.n}쪽`), el("p", "dpara", pg.text || "(글자 없음)"));
+    }
+    if ((o.pages || []).length > 6) box.append(el("p", "muted small", `… ${d.pages}쪽 중 앞 6쪽만 보여요`));
+    return box;
+  }
+  for (const b of (o.blocks || []).slice(0, 60)) {
+    if (b.table) {
+      const t = el("table", "dtable");
+      for (const r of b.rows || []) { const tr = el("tr"); for (const c of r) tr.append(el("td", "", c)); t.append(tr); }
+      box.append(t);
+    } else box.append(el("p", "dpara" + (b.head ? " head" : ""), b.text));
+  }
+  if ((o.blocks || []).length > 60) box.append(el("p", "muted small", "… 앞부분만 보여요"));
+  if (!(o.blocks || []).length) box.append(el("p", "muted", "읽힌 글이 없어요."));
+  return box;
+}
+
+function changeList(changes, notes) {
+  const wrap = el("div", "dchanges");
+  for (const c of changes || []) {
+    const r = el("div", "dch" + (c.ok ? "" : " miss"));
+    if (!c.ok) r.append(el("span", "dw", "못 함"), el("span", "", c.why || c.before));
+    else {
+      if (c.where) r.append(el("span", "dw", c.where));
+      if (c.before) r.append(el("s", "", c.before), el("span", "arr", "→"));
+      r.append(el("b", "", c.after || "(지움)"));
+    }
+    wrap.append(r);
+  }
+  for (const n of notes || []) wrap.append(el("p", "dnote", n));
+  return wrap;
+}
+
+async function openDoc(id) {
+  let d;
+  try { d = await api(`/api/docs/${id}`); } catch (e) { return toast(e.message, "err"); }
+  openSheet(d.name, (s) => {
+    s.classList.add("doc-sheet");
+    const head = el("div", "dhead"); head.append(docBadge(d.kind), el("span", "muted small", docMeta(d) + (d.version > 1 ? ` · 고침 ${d.version - 1}` : "")));
+    s.append(head);
+    if (d.note && DOC_NOTE[d.note]) s.append(el("div", "taint", DOC_NOTE[d.note]));
+    if (d.changes?.request) {
+      const c = el("div", "sub"); c.append(el("h3", "", `이렇게 고쳤어요 · "${d.changes.request}"`), changeList(d.changes.items, d.changes.notes));
+      s.append(c);
+    }
+    const pv = el("div", "sub"); pv.append(el("h3", "", "미리보기"), docPreview(d)); s.append(pv);
+
+    // 묻기
+    const askSec = el("div", "sub"); askSec.append(el("h3", "", "물어보기"));
+    const q = input("text", "", { placeholder: d.kind === "xlsx" ? "예: 수학 평균이 몇 점이야?" : "예: 준비물이 뭐야? · 세 줄로 요약해 줘" });
+    const out = el("div", "danswer");
+    const askBtn = button("묻기", "small", async () => {
+      if (!q.value.trim()) return q.focus();
+      out.replaceChildren(el("p", "muted small", "문서를 읽는 중…"));
+      try {
+        const a = await post(`/api/docs/${d.id}/ask`, { text: q.value.trim() });
+        out.replaceChildren(el("p", "dans", a.answer));
+        if (a.cites?.length) {
+          const cw = el("div", "dcites"); cw.append(el("span", "dk", "근거"));
+          for (const c of a.cites) { const ch = el("details", "dcite"); ch.append(el("summary", "", `#${c.n} ${c.text.split("\n")[0].replace(/^¶\d+\s*/, "").slice(0, 40)}`), el("p", "", c.text)); cw.append(ch); }
+          out.append(cw);
+        }
+      } catch (e) { out.replaceChildren(el("p", "dnote", e.message)); }
+    });
+    q.onkeydown = (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); askBtn.click(); } };
+    const ar = el("div", "drow"); ar.append(q, askBtn);
+    askSec.append(ar, out); s.append(askSec);
+
+    // 고치기
+    const ed = el("div", "sub"); ed.append(el("h3", "", "고치기"));
+    const ins = input("textarea", "", { placeholder: DOC_HINT[d.kind] || "어떻게 고칠까요?", rows: 2 });
+    const res = el("div");
+    ed.append(ins, el("p", "muted small", "원본은 그대로 두고, 고친 파일을 새 버전으로 만들어요."));
+    const go = button("고친 파일 만들기", "", async () => {
+      if (!ins.value.trim()) return ins.focus();
+      res.replaceChildren(el("p", "muted small", "고치는 중… (10~20초)"));
+      try {
+        const r = await post(`/api/docs/${d.id}/edit`, { text: ins.value.trim() });
+        const card = el("div", "card dresult");
+        card.append(el("div", "b", r.summary || "고쳤어요."), changeList(r.changes, r.notes));
+        const row = el("div", "row");
+        row.append(button("내려받기", "small", () => docDownload(r.doc.id)), button("열어 보기", "ghost small", () => openDoc(r.doc.id)));
+        card.append(row);
+        res.replaceChildren(card);
+        cache.drop("docs");
+      } catch (e) { res.replaceChildren(el("p", "dnote", e.message)); }
+    });
+    ed.append(go, res); s.append(ed);
+
+    // 버전
+    const others = (d.versions || []).filter((v) => v.id !== d.id);
+    if (others.length || d.parent_id) {
+      const vs = el("div", "sub"); vs.append(el("h3", "", "버전"));
+      if (d.parent_id) vs.append(itemBtn("원본", "처음 올린 파일", () => openDoc(d.parent_id)));
+      for (const v of others) vs.append(itemBtn(`고침 ${v.version - 1} · ${v.name.split(".").pop().toUpperCase()}`, `${v.summary || ""}\n${ago(v.created_at)}`, () => openDoc(v.id)));
+      s.append(vs);
+    }
+    const foot = el("div", "actions");
+    foot.append(button("삭제", "danger", async () => {
+      const msg = d.parent_id ? "이 버전을 지울까요?" : (others.length ? `원본과 고친 버전 ${others.length}개를 모두 지울까요?` : "이 문서를 지울까요?");
+      if (!(await askConfirm(msg + " 되돌릴 수 없어요.", "삭제", true))) return;
+      await post(`/api/docs/${d.id}/delete`); closeSheet(); toast("지웠어요.");
+      if (current === "docs") await render();
+    }), button("내려받기", "", () => docDownload(d.id)));
+    s.append(foot);
+  });
+}
 
 /* ===================== 왜? — 판단 회상 ===================== */
 // 비서가 무언가를 권하거나 해 둘 때 남긴 판단 기록(어떤 판단 노드를 거쳤는지, 무엇을 근거로 삼았는지,
