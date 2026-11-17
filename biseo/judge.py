@@ -170,6 +170,29 @@ def record(sb, w: dict, *, summary: str, context: str, evidence: list, recalled:
     return sb.table("judgments").insert(row).execute().data[0]
 
 
+def brief(sb, ref_kind: str, ref_ids) -> dict:
+    """화면의 '왜' 한 줄용: 판단마다 근거 두세 개(종류·짧은 글), 자란 노드를 거쳤는지, 떠올린 지난 판단 수.
+    한 번의 조회로 여러 제안을 같이 가져온다. {ref_id: {...}}"""
+    ids = [str(i) for i in ref_ids if i is not None]
+    if not ids:
+        return {}
+    try:
+        rows = sb.table("judgments").select("ref_id,path,evidence,recalled,id").eq("ref_kind", ref_kind) \
+                 .in_("ref_id", ids).order("id", desc=True).limit(len(ids) * 3).execute().data or []
+    except Exception:
+        return {}
+    out = {}
+    for r in rows:                      # 같은 대상의 판단이 여럿이면 가장 최근 것
+        if r["ref_id"] in out:
+            continue
+        ev = [{"kind": e.get("kind"), "text": str(e.get("text") or "")[:40]}
+              for e in (r.get("evidence") or []) if e.get("kind") != "talk"][:3]
+        out[r["ref_id"]] = {"because": ev,
+                            "grown": any(str(p).startswith("grown_") for p in (r.get("path") or [])),
+                            "recalled": len(r.get("recalled") or [])}
+    return out
+
+
 def _learn(trans: dict, path: list, fb: float, lr: float = LR):
     for a, b in zip(path, path[1:]):
         opts = trans.get(a) or {}
