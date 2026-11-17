@@ -670,6 +670,8 @@ form.homebar,form.compose{box-shadow:0 1px 2px rgb(22 35 58 / .05),0 8px 22px rg
 .item .t{font-size:.9375rem} .item .s{font-size:.8125rem}
 .muted{font-size:.875rem} .muted.small{font-size:.75rem}
 .btn{letter-spacing:-.005em}
+.clock{display:flex;align-items:center;gap:8px;margin:12px 0 4px;font-size:.8125rem}
+.ck-dot{width:8px;height:8px;border-radius:50%;flex:none}.ck-dot.on{background:var(--live)}.ck-dot.off{background:var(--danger)}
 </style>
 </head>
 <body>
@@ -2938,7 +2940,8 @@ SCREENS.settings = {
     const p = el("div", "sub"); p.style.marginTop = "22px";
     p.append(el("h3", "", "알림"));
     const sub = await currentSub().catch(() => null);
-    const { devices } = await api("/api/push/status").catch(() => ({ devices: [] }));
+    const ps = await api("/api/push/status").catch(() => ({ devices: [] }));
+    const { devices } = ps;
     const state = el("p", "", sub ? "이 기기에서 알림을 받고 있어요." : "이 기기는 아직 알림이 꺼져 있어요.");
     p.append(state);
     if (devices.length) p.append(el("p", "muted", `알림을 켠 기기: ${devices.map((d) => d.device || "기기").join(", ")}`));
@@ -2953,6 +2956,18 @@ SCREENS.settings = {
     }
     p.append(row);
     if (isIOS() && !isStandalone()) p.append(el("p", "muted", "아이폰은 홈 화면에 추가한 앱에서 열어야 알림을 켤 수 있어요."));
+    // 알림 시계: 서버가 1분마다 '보낼 알림이 있나' 확인하러 오는지
+    const clock = el("div", "clock");
+    const mins = ps.cron_last ? Math.round((Date.now() - new Date(ps.cron_last)) / 60000) : null;
+    const ok = mins != null && mins <= 3;
+    clock.append(el("span", "ck-dot " + (ok ? "on" : "off")),
+      el("span", "ck-t", mins == null ? "알림 시계가 아직 한 번도 돌지 않았어요"
+        : ok ? `알림 시계가 돌고 있어요 · ${mins < 1 ? "방금" : `${mins}분 전`} 확인`
+        : `알림 시계가 ${mins < 120 ? `${mins}분` : `${Math.round(mins / 60)}시간`}째 멈춰 있어요`));
+    p.append(clock);
+    if (!ok) p.append(el("p", "muted small", "정해 둔 시각의 알림은 서버 예약 작업(크론)이 1분마다 확인해서 보내요. 멈춰 있으면 Supabase 의 10_cron.sql 설정(앱 주소·CRON_SECRET)을 확인해 주세요. 테스트 알림은 크론 없이 바로 가기 때문에 따로 와요."));
+    if (ps.overdue) p.append(el("p", "dnote", `시각이 지났는데 아직 못 보낸 알림이 ${ps.overdue}개 있어요.`));
+    else if (ps.next) p.append(el("p", "muted small", `다음 알림: ${when(ps.next.due_at)} · ${ps.next.text}`));
     const help = el("details", "adv");
     help.append(el("summary", "", "알림이 안 와요"), el("p", "muted",
       "아이폰\n" +
