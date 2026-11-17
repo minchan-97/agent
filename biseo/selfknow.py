@@ -28,6 +28,8 @@ CAPABILITIES = [
     ("daily", "오늘의 제안", "매일 정한 시각에 일정·맡은 일·최근 이야기를 보고 '오늘 하면 좋을 것'을 먼저 건넨다", "설정 → 오늘의 생각 시각"),
     ("doc", "문서", "엑셀·워드·PDF·한글·사진을 읽고, 물으면 근거와 함께 답하고, 고친 새 버전을 만든다. 올리면 마감·일정을 찾아 제안한다", "문서 → 올리기, 또는 \"통신문 날짜 6월 3일로 고쳐 줘\""),
     ("template", "양식", "자주 쓰는 문서를 양식으로 저장해, 내용만 말하면 같은 모양의 새 문서를 만든다", "\"체험학습 양식으로 6월 3일 박물관 써 줘\""),
+    ("think", "판단 구조", "답·제안마다 판단 트리(요청 파악 → 할 일 정하기 → 확인된 것으로 답하기)를 걷고, 비슷했던 지난 판단을 회상한다. "
+     "받아들이면 그 길이 강해지고, 넘기거나 되돌리면 약해진다 — 쓸수록 이 사람에 맞게 판단 습관이 바뀐다", "'왜' 화면의 판단 경로"),
     ("why", "왜", "제안·행동마다 이유 한 줄과 근거(일정·메모·문서…), 판단 경로를 보여 준다", "제안 아래 '왜' 줄을 누르기"),
     ("memory", "기억", "사용자가 말한 자기 사실을 기억하되, 확인한 것만 확실하게 쓴다. 보고·고치고·지울 수 있다", "기억 앱"),
     ("skill", "기능·버튼 만들기", "반복되는 부탁을 기능이나 홈 버튼으로 만든다 (기본 도구 범위 안에서만)", "\"회의 준비하는 기능 만들어 줘\""),
@@ -42,6 +44,8 @@ CANNOT = [
 ]
 _STOP = {"오늘", "내일", "어제", "이번", "지금", "현재", "최근", "알려", "알려줘", "어때", "뭐야", "있어", "정보",
          "관련", "검색", "찾아", "찾아줘", "요즘", "최신", "기준", "년", "월", "일"}
+# 쓰임이 따로 기록되지 않는, 늘 켜져 있는 기능
+ALWAYS_ON = {"think", "why", "memory", "voice"}
 LABEL = {k: n for k, n, _, _ in CAPABILITIES}
 ACTION_TO_CAP = {"event": "schedule", "reminder": "reminder", "note": "note", "draft": "draft",
                  "start_task": "task", "self_task": "task", "search": "search", "doc_edit": "doc",
@@ -130,7 +134,7 @@ def evidence_lines(u: dict) -> list:
     if used:
         top = sorted(used.items(), key=lambda x: -x[1])
         lines.append("자주 쓴 기능: " + ", ".join(f"{LABEL.get(k, k)} {v}번" for k, v in top[:5] if v))
-    never = [LABEL[k] for k, *_ in CAPABILITIES if not used.get(k) and k not in ("why", "memory", "voice")]
+    never = [LABEL[k] for k, *_ in CAPABILITIES if not used.get(k) and k not in ("why", "memory", "voice", "think")]
     if never:
         lines.append("최근에 한 번도 안 쓴 기능: " + ", ".join(never))
     d = u.get("decided") or {}
@@ -172,7 +176,7 @@ def for_prompt(sb, text: str) -> tuple:
   근거가 없으면 '아직 쓰임 기록이 적어 판단하기 이르다'고 솔직히 말한다. 3개 이하로.
 - 보안·서버·성능처럼 만드는 사람의 일은 사용자 기능으로 제안하지 않는다.
 - 다른 AI(GPT·클로드 등)와 비교하면: 내 안쪽 두뇌도 {model_name()} 라는 걸 먼저 솔직히 말한다. 똑똑함 자체로 앞선다고 하지 않는다.
-  차이는 위 기능 목록의 구조(실제로 넣고 알리기·한글 문서·양식·'왜' 근거·위험한 일은 묻기)로만, K 쓰임 숫자를 곁들여 말한다.
+  차이는 위 기능 목록의 구조(판단 구조·실제로 넣고 알리기·한글 문서·양식·'왜' 근거·위험한 일은 묻기)로만, K 쓰임 숫자를 곁들여 말한다.
   '맞춤형·다정함·정직함·노력' 같은 성격 자랑은 하지 않는다. 큰 모델이 더 나은 일(긴 글·깊은 추론·코딩)도 한 줄로 인정한다.
 - 안 쓰는 기능이 있으면 그중 이 사람에게 도움이 될 하나를 골라 써 보는 법을 알려 줘도 좋다."""
     evidence = {k: {"tag": k, "kind": "usage", "id": None, "text": t[:160]} for k, t in ev}
@@ -183,7 +187,11 @@ def overview(sb) -> dict:
     """설정 화면 '할 수 있는 일': 기능마다 최근 30일 쓰인 횟수."""
     u = usage(sb)
     used = u.get("by_cap") or {}
-    return {"capabilities": [{"key": k, "name": n, "what": what, "how": how, "used": used.get(k, 0)}
+    d = u.get("decided") or {}
+    learned = sum(d.get(x, 0) for x in ("accepted", "rejected", "undone"))
+    return {"capabilities": [{"key": k, "name": n, "what": what, "how": how,
+                              "used": learned if k == "think" else used.get(k, 0),
+                              "always": k in ALWAYS_ON}
                              for k, n, what, how in CAPABILITIES],
             "cannot": CANNOT, "days": u["days"], "unmet": u.get("unmet") or []}
 
@@ -307,14 +315,20 @@ def compare_answer(sb, u: dict | None = None) -> str:
     pts = [
         ("reminder", f"• 말로 끝나지 않고 해 둬요 — 일정·알림을 실제로 넣고, 정한 시각에 휴대폰으로 알려요{n('reminder') or n('schedule')}."),
         ("doc", f"• 한글·엑셀·PDF를 읽고, 고친 새 파일을 만들어요. 자주 쓰는 문서는 양식으로 두고 내용만 바꿔 다시 만들어요{n('doc')}."),
+        ("think", "• 판단하는 구조가 따로 있어요 — 답마다 '요청 파악 → 할 일 정하기 → 확인된 것으로 답하기' 길을 걷고, "
+                  "비슷했던 지난 판단을 떠올려요. 받아들이신 판단은 강해지고 되돌리신 판단은 약해져서, 쓸수록 판단 습관이 바뀌어요."),
         ("why", "• 이유를 보여 줘요 — 제안마다 '왜' 줄에 근거(일정·메모·문서)와 판단 경로가 붙어요."),
         ("safe", "• 위험한 일은 묻고 해요 — 검색·문서에서 읽은 글이 시킨 듯한 일은 꼭 확인받고, 메시지를 대신 보내지는 않아요."),
         ("daily", f"• 먼저 말을 걸어요 — 매일 정한 시각에 오늘 할 만한 일을 건네요{n('daily')}."),
         ("memory", "• 기억을 보여 줘요 — 제가 기억한 걸 직접 보고 고치고 지울 수 있어요."),
     ]
     # 실제로 쓰인 기능을 앞에
-    pts.sort(key=lambda p: 0 if used.get(p[0]) else 1)
-    body = "\n".join(t for _, t in pts[:4])
+    d = u.get("decided") or {}
+    learned = sum(d.get(k, 0) for k in ("accepted", "rejected", "undone"))
+    if learned:
+        pts[2] = ("think", pts[2][1][:-1] + f" (최근 {u.get('days', 30)}일 {learned}번의 받아들임·넘김에서 배웠어요).")
+    pts.sort(key=lambda p: 0 if (used.get(p[0]) or p[0] == "think") else 1)
+    body = "\n".join(t for _, t in pts[:5])
     return (f"솔직히, 제 안쪽에서 생각하는 건 {model_name()} 모델이에요. 그래서 똑똑함 자체로는 ChatGPT나 Claude를 앞서지 않아요.\n"
             f"차이는 그 모델을 감싼 구조에 있어요.\n{body}\n"
             "반대로 긴 글쓰기·깊은 추론·코딩은 큰 모델이 더 나아요. 그런 일은 그쪽을 쓰시는 게 맞아요.")
