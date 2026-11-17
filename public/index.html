@@ -564,6 +564,10 @@ body.editing .wslot > .bt{opacity:.92}
 .chk{display:flex;gap:6px;align-items:center;font-size:.8rem;color:var(--muted);margin-bottom:8px}
 .doc-sheet .field input.filled,.doc-sheet .field textarea.filled{box-shadow:inset 0 0 0 1.5px var(--accent)}
 .doc-sheet .field textarea{min-height:80px}
+.dtools{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 2px}
+.dtools .btn.ready{background:var(--accent);color:var(--accent-ink)}
+.docchip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--surface);color:var(--accent);border-radius:999px;padding:4px 10px;font:inherit;font-size:.78rem;font-weight:600;margin:4px 6px 4px 0;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item.pend{border-color:color-mix(in srgb,var(--wait) 45%,var(--line))}.item.pend .t{color:var(--wait)}
 </style>
 </head>
 <body>
@@ -749,9 +753,10 @@ const CACHE_TOUCH = [
   [/\/api\/(templates)\b/, ["templates", "docs"]],
   [/\/api\/(drafts)\b/, ["drafts"]],
   [/\/api\/(tasks)\b/, ["tasks", "home"]],
-  [/\/api\/(actions|skills)\b.*\/(approve|reject|undo|run|remove|pin|unpin)/, ["actions", "tasks", "skills", "home", "events", "reminders", "notes", "drafts"]],
+  [/\/api\/(actions|skills)\b.*\/(approve|reject|undo|run|remove|pin|unpin)/, ["actions", "tasks", "skills", "home", "events", "reminders", "notes", "drafts", "docs"]],
+  [/\/api\/drafts\/\d+\/to_doc|\/api\/docs\/\d+\/(draft|scan)/, ["docs", "drafts", "actions", "home"]],
   [/\/api\/(shortcuts|search|apps\/[a-z]+\/skills)\b/, ["tasks", "home"]],
-  [/\/api\/(chat)\b/, ["history", "actions", "tasks", "home", "events", "reminders", "notes", "drafts", "skills"]],
+  [/\/api\/(chat)\b/, ["history", "actions", "tasks", "home", "events", "reminders", "notes", "drafts", "skills", "docs"]],
   [/\/api\/(name)\b/, ["home"]],
   [/\/api\/(daily)\b/, ["home", "tasks", "actions", "reminders", "events", "notes"]],
 ];
@@ -1427,7 +1432,7 @@ $("homebar").addEventListener("submit", async (e) => {
     const res = await post("/api/chat", { text });
     for (const a of res.actions || []) if (a.result?.task_id) driveTask(a.result.task_id);
     wait.replaceWith(el("div", "reply", res.reply));
-    linkChips(res.actions || [], c);
+    linkChips(res.actions || [], c, res.docs_read);
     suggestChips(res.suggest || [], c);
     cache.fresh("home").then((h) => { if (!current) paintHome(h); }).catch(() => {});
   } catch (err) {
@@ -1557,6 +1562,7 @@ async function editEvent(id) {
     const rpt = repeatSelect(ev.repeat);
     s.append(field("반복", rpt));
     if (ev.repeat) s.append(el("p", "muted", "반복 일정의 시작·이름을 바꾸면 앞으로의 모든 회차가 바뀌어요."));
+    if (ev.doc_id) { const c = el("button", "docchip", "📎 연결된 문서 열기"); c.type = "button"; c.onclick = () => openDoc(ev.doc_id); s.append(c); }
     let remindNew = null;
     if (!id) {
       remindNew = el("select");
@@ -1670,8 +1676,10 @@ function editReminder(r) {
     const rpt = repeatSelect(r.repeat);
     s.append(field("반복", rpt));
     if (r.event_id) s.append(el("p", "muted", "일정에 붙은 알림이에요. 시각을 직접 바꾸면 일정과 따로 움직여요."));
+    if (r.doc_id) { const c = el("button", "docchip", `📎 ${r.doc_name || "연결된 문서"} 열기`); c.type = "button"; c.onclick = () => openDoc(r.doc_id); s.append(c); }
     s.append(sheetActions(async () => {
       const data = { text: text.value, due_at: fromLocalInput(due.value), repeat: rpt.value || null };
+      if (!r.id && r.doc_id) data.doc_id = r.doc_id;
       if (r.id) await post(`/api/reminders/${r.id}/update`, data); else await post("/api/reminders/new", data);
     }, r.id ? () => post(`/api/reminders/${r.id}/delete`) : null));
   });
@@ -1691,7 +1699,14 @@ function editDraft(d) {
   openSheet("초안", (s) => {
     const content = input("textarea", d.content); content.style.minHeight = "200px";
     s.append(field("내용", content));
-    s.append(button("복사하기", "ghost small", async () => { await navigator.clipboard.writeText(content.value); toast("복사했어요."); }));
+    const tools = el("div", "row");
+    tools.append(button("복사하기", "ghost small", async () => { await navigator.clipboard.writeText(content.value); toast("복사했어요."); }),
+                 button("문서로 만들기", "small", async () => {
+                   if (content.value !== d.content) await post(`/api/drafts/${d.id}/update`, { content: content.value });
+                   return draftToDoc({ ...d, content: content.value });
+                 }));
+    if (d.doc_id) { const c = el("button", "docchip", "📎 이 초안의 원본 문서"); c.type = "button"; c.onclick = () => openDoc(d.doc_id); tools.append(c); }
+    s.append(tools);
     s.append(sheetActions(() => post(`/api/drafts/${d.id}/update`, { content: content.value }), () => post(`/api/drafts/${d.id}/delete`)));
   });
 }
@@ -1909,7 +1924,7 @@ async function uploadDocs(files, opt = {}) {
   const jobs = files.map((f) => ({ file: f, name: f.name, kind: docKind(f.name, f.type), state: "올리는 중…" }));
   docUploading.push(...jobs);
   if (current === "docs") await render(false);
-  let ok = 0;
+  let ok = 0, found = 0;
   for (const j of jobs) {
     try {
       if (!j.kind) throw new Error(/\.(xls|doc|ppt|pptx)$/i.test(j.name) ? "옛 형식이에요. 새 형식(.xlsx·.docx)으로 저장해 올려 주세요." : "엑셀·PDF·워드·한글·사진만 올릴 수 있어요.");
@@ -1925,6 +1940,7 @@ async function uploadDocs(files, opt = {}) {
       if (current === "docs") await render(false);
       const made = await post("/api/docs", { path, name: f.name, mime: f.type || "", size: f.size });
       ok++;
+      if (made.found) { found += made.found; cache.drop("actions", "home"); }
       if (opt.asTemplate) { docUploading = docUploading.filter((x) => x !== j); cache.drop("docs"); return openTplDraft({ doc: made }); }
     } catch (e) {
       toast(`${j.name}: ${e.message}`, "err");
@@ -1933,7 +1949,8 @@ async function uploadDocs(files, opt = {}) {
     }
   }
   cache.drop("docs");
-  if (ok) toast(ok > 1 ? `${ok}개를 올렸어요.` : "올렸어요. 눌러서 묻거나 고쳐 보세요.");
+  if (ok) toast((ok > 1 ? `${ok}개를 올렸어요.` : "올렸어요. 눌러서 묻거나 고쳐 보세요.")
+                + (found ? ` 문서에서 챙길 일 ${found}개를 찾아 확인함에 올렸어요.` : ""));
   if (current === "docs") await render(false); else if (ok) await openApp("docs");
 }
 
@@ -2031,6 +2048,10 @@ async function openDoc(id) {
       s.append(el("p", "muted small", "옛 한글(.hwp)은 양식으로 만들 수 없어요. 한글에서 .hwpx 로 저장해 올리면 돼요."));
     }
 
+    s.append(docTools(d));
+    const lk = docLinks(d);
+    if (lk) s.append(lk);
+
     // 묻기
     const askSec = el("div", "sub"); askSec.append(el("h3", "", "물어보기"));
     const q = input("text", "", { placeholder: d.kind === "xlsx" ? "예: 수학 평균이 몇 점이야?" : "예: 준비물이 뭐야? · 세 줄로 요약해 줘" });
@@ -2089,6 +2110,97 @@ async function openDoc(id) {
       if (current === "docs") await render();
     }), button("내려받기", "", () => docDownload(d.id)));
     s.append(foot);
+  });
+}
+
+/* ===================== 문서 ↔ 비서: 보내기 · 알림 · 초안 · 할 일 찾기 ===================== */
+function docTools(d) {
+  const row = el("div", "dtools");
+  const send = button("보내기", "small", () => shareDoc(d, send));
+  row.append(send,
+    button("알림 걸기", "ghost small", () => editReminder({ text: `'${d.name.replace(/\.[^.]+$/, "")}' 챙기기`, due_at: inHour(24), doc_id: d.id, doc_name: d.name })),
+    button("초안 쓰기", "ghost small", () => draftFromDoc(d)));
+  if (d.kind !== "xlsx") row.append(button("할 일 찾기", "ghost small", async () => {
+    const r = await post(`/api/docs/${d.id}/scan`);
+    toast(r.found ? `챙길 일 ${r.found}개를 확인함에 올렸어요.` : "따로 챙길 마감·일정을 찾지 못했어요.");
+    if (r.found) await openDoc(d.id);
+  }));
+  return row;
+}
+// 휴대폰 공유 창으로 직접 보낸다 (카톡·메일·메시지). 비서가 대신 보내지는 않는다.
+// iOS 는 공유를 '누른 그 순간'에만 허락하므로: 첫 누름에 파일을 받아 두고, 버튼이 '지금 보내기'로 바뀐다.
+async function shareDoc(d, btn) {
+  if (btn._file) {
+    try { await navigator.share({ files: [btn._file], title: d.name }); }
+    catch (e) { if (e.name !== "AbortError") { toast("공유하지 못했어요. 내려받아 보내 주세요.", "err"); await docDownload(d.id); } }
+    return;
+  }
+  const { url } = await api(`/api/docs/${d.id}/url`);
+  if (!navigator.canShare) { location.href = url; return; }
+  const blob = await (await fetch(url)).blob();
+  const file = new File([blob], d.name, { type: blob.type || "application/octet-stream" });
+  if (!navigator.canShare({ files: [file] })) { location.href = url; return; }
+  btn._file = file; btn.textContent = "지금 보내기"; btn.classList.add("ready");
+  toast("준비됐어요. '지금 보내기'를 눌러 보낼 곳을 고르세요.");
+}
+function draftFromDoc(d) {
+  openSheet("이 문서로 초안 쓰기", (s) => {
+    s.classList.add("doc-sheet");
+    const ask = input("textarea", "", { rows: 3, placeholder: "예: 학부모님께 보낼 안내 문자, 3줄로 · 교감 선생님께 회신 메일 · 반 아이들에게 알릴 말" });
+    s.append(field("어떤 글을 쓸까요?", ask), el("p", "muted small", "문서에 적힌 내용만으로 써요. 초안은 '초안'에 저장되고, 보내기는 직접 해요."));
+    const foot = el("div", "actions");
+    foot.append(button("취소", "ghost", closeSheet), button("초안 쓰기", "", async () => {
+      const r = await post(`/api/docs/${d.id}/draft`, { text: ask.value.trim() });
+      cache.drop("drafts");
+      editDraft({ id: r.draft_id, content: r.text, doc_id: d.id });
+    }));
+    s.append(foot);
+  });
+}
+function docLinks(d) {
+  const L = d.links || {};
+  const n = (L.pending || []).length + (L.reminders || []).length + (L.events || []).length + (L.drafts || []).length;
+  if (!n) return null;
+  const sec = el("div", "sub"); sec.append(el("h3", "", "이 문서와 연결된 것"));
+  for (const a of L.pending || []) {
+    const b = itemBtn(`확인 기다림 · ${(ACTION_LABEL[a.kind] || a.kind)}`, describe({ ...a, args: a.args }), () => { closeSheet(); openApp("inbox"); });
+    b.classList.add("pend"); sec.append(b);
+  }
+  for (const r of L.reminders || []) sec.append(itemBtn(`알림 · ${r.text}`, when(r.due_at) + (r.repeat ? ` · ↻ ${repeatLabel(r.repeat)}` : ""), () => editReminder({ ...r, doc_id: d.id, doc_name: d.name })));
+  for (const e of L.events || []) sec.append(itemBtn(`일정 · ${e.title}`, when(e.starts_at), () => editEvent(e.id)));
+  for (const r of L.drafts || []) sec.append(itemBtn(`초안 · ${r.content.split("\n")[0].slice(0, 30)}`, ago(r.updated_at), () => editDraft({ ...r, doc_id: d.id })));
+  return sec;
+}
+const ACTION_LABEL = { reminder: "알림", event: "일정", draft: "초안", doc_edit: "문서 고치기", doc_make: "양식으로 만들기", doc_new: "문서 파일", note: "메모" };
+
+// 초안 → 문서: 새 워드 파일 / 내 양식에 넣기 / 기존 문서에 반영
+async function draftToDoc(d) {
+  const [tpls, dl] = await Promise.all([cache.get("templates").catch(() => ({ items: [] })), cache.get("docs").catch(() => ({ items: [] }))]);
+  openSheet("초안으로 문서 만들기", (s) => {
+    s.classList.add("doc-sheet");
+    const res = el("div");
+    const done = (r) => {
+      const card = el("div", "card dresult");
+      card.append(el("div", "b", r.doc.name));
+      if (r.empty?.length) card.append(el("p", "dnote", `비워 둔 칸: ${r.empty.join(", ")}`));
+      if (r.changes) card.append(changeList(r.changes, r.notes));
+      const row = el("div", "row");
+      row.append(button("내려받기", "small", () => docDownload(r.doc.id)), button("열어 보기", "ghost small", () => openDoc(r.doc.id)));
+      card.append(row); res.replaceChildren(card); cache.drop("docs");
+    };
+    const opt = (title, sub, fn) => { const b = el("button", "item"); b.type = "button"; b.append(el("div", "t", title), el("div", "s", sub)); b.onclick = async () => { b.disabled = true; res.replaceChildren(el("p", "muted small", "만드는 중…")); try { done(await fn()); } catch (e) { res.replaceChildren(el("p", "dnote", e.message)); } finally { b.disabled = false; } }; return b; };
+    s.append(opt("새 워드 파일로", "# 제목, - 목록 줄은 모양을 살려요", () => post(`/api/drafts/${d.id}/to_doc`, { mode: "new" })));
+    if (tpls.items.length) {
+      s.append(el("div", "group", "내 양식에 넣기"));
+      for (const t of tpls.items.slice(0, 6)) s.append(opt(`양식 · ${t.name}`, `초안 내용을 칸 ${t.fields.length}개에 나눠 넣어요`, () => post(`/api/drafts/${d.id}/to_doc`, { mode: "template", template_id: t.id })));
+    }
+    const editable = (dl.items || []).filter((x) => ["docx", "hwpx", "xlsx"].includes(x.kind)).slice(0, 6);
+    if (editable.length) {
+      s.append(el("div", "group", "기존 문서에 반영"));
+      for (const x of editable) s.append(opt(`고치기 · ${x.name}`, "모양은 그대로, 초안과 다른 내용만 바꿔 새 버전으로", () => post(`/api/drafts/${d.id}/to_doc`, { mode: "edit", doc_id: x.id })));
+    }
+    s.append(res);
+    const foot = el("div", "actions"); foot.append(el("span"), button("닫기", "ghost", closeSheet)); s.append(foot);
   });
 }
 
@@ -2266,6 +2378,7 @@ const EVIDENCE_KIND = {
   fact: ["기억", () => openApp("memory")],
   talk: ["대화", () => openApp("chat")],
   answer: ["내 답", null],
+  doc: ["문서", (ev) => openDoc(ev.id)],
   web: ["검색 자료", (ev) => { if (/^https?:\/\//.test(ev.id || "")) window.open(ev.id, "_blank", "noopener"); }],
   calendar: ["오늘", null],
 };
@@ -2308,7 +2421,7 @@ async function openWhy(kind, refId) {
     if (!ev.length) sec2.append(el("p", "muted", "따로 짚은 근거 없이 판단했어요."));
     for (const e of ev) {
       const [name, go] = EVIDENCE_KIND[e.kind] || ["자료", null];
-      const canGo = go && (e.kind !== "web" || /^https?:\/\//.test(e.id || "")) && (e.kind !== "event" || e.id);
+      const canGo = go && (e.kind !== "web" || /^https?:\/\//.test(e.id || "")) && (!["event", "doc"].includes(e.kind) || e.id);
       const chip = el(canGo ? "button" : "div", "why-ev" + (canGo ? " go" : ""));
       chip.append(el("span", "wk", name), el("span", "wt", e.text || ""));
       if (canGo) { chip.type = "button"; chip.onclick = () => { if (e.kind !== "web") closeSheet(); go(e); }; }
@@ -2498,7 +2611,8 @@ function newShortcut(app) {
 }
 
 /* ===================== 확인함 ===================== */
-const ACTION_ICON = { event: ["events", "indigo"], reminder: ["reminders", "amber"], note: ["notes", "green"], draft: ["drafts", "teal"], create_skill: ["skills", "rose"], search: ["search", "blue"] };
+const ACTION_ICON = { event: ["events", "indigo"], reminder: ["reminders", "amber"], note: ["notes", "green"], draft: ["drafts", "teal"], create_skill: ["skills", "rose"], search: ["search", "blue"],
+  doc_edit: ["docs", "rose"], doc_make: ["docs", "green"], doc_new: ["docs", "blue"] };
 function actionLead(a) {
   const [ic, tint] = ACTION_ICON[a.kind] || ["dot", "blue"];
   const lead = el("div", "lead"); lead.append(miniIcon(ic, tint), el("div", "t", a.label)); return lead;
@@ -2512,6 +2626,9 @@ function describe(a) {
   if (a.kind === "pin_shortcut") return a.reason || `\u2018${g.label || ""}\u2019 버튼을 홈에 둘까요?`;
   if (a.kind === "self_task") return `${g.goal || ""}\n${a.reason || ""}`.trim();
   if (a.kind === "draft") return `${g.to ? g.to + "에게 · " : ""}${g.text || ""}`;
+  if (a.kind === "doc_edit") return `'${g.doc_name || "문서"}' — ${g.instruction || ""}\n원본은 그대로, 고친 새 버전으로`;
+  if (a.kind === "doc_make") return `'${g.template_name || "양식"}' 양식으로 — ${g.text || Object.values(g.values || {}).join(", ")}`;
+  if (a.kind === "doc_new") return `'${g.title || "새 문서"}.docx' — ${(g.text || "").split("\n").slice(0, 2).join(" ")}`;
   return g.text || g.query || a.reason || "";
 }
 SCREENS.inbox = {
@@ -2523,7 +2640,8 @@ SCREENS.inbox = {
     for (const a of pending) {
       const d = el("div", "card wait"); d.append(actionLead(a), el("div", "b", describe(a)));
       // 검색 결과를 보고 나온 일: 웹페이지 글이 시킨 것일 수 있으니 내용을 한 번 더 보게 한다
-      if (a.tainted) d.append(el("div", "taint", "검색 자료를 보고 나온 일이에요. 내용이 맞는지 확인해 주세요."));
+      if (a.tainted) d.append(el("div", "taint", a.args?.doc_id ? "문서 내용을 보고 나온 일이에요. 문서에 적힌 대로인지 확인해 주세요." : "검색 자료를 보고 나온 일이에요. 내용이 맞는지 확인해 주세요."));
+      if (a.args?.doc_id) { const c = el("button", "docchip", `📎 ${a.args.doc_name || "문서"}`); c.type = "button"; c.onclick = () => openDoc(a.args.doc_id); d.append(c); }
       d.append(whyBtn("action", a.id, describe(a)));
       const row = el("div", "row");
       const decide = (verb) => async () => {
@@ -2862,9 +2980,13 @@ function suggestChips(suggest, target = null) {
   if (target) { target.append(wrap); return; }
   $("log").append(wrap); $("screenBody").scrollTop = $("screenBody").scrollHeight;
 }
-function linkChips(actions, target = null) {
+function linkChips(actions, target = null, docsRead = []) {
   const wrap = el("div", "links");
+  for (const d of docsRead || []) {            // 이번 답에 읽은 문서 → 눌러서 열기
+    const c = el("button", "docchip", `📎 ${d.name || "문서"}`); c.onclick = () => openDoc(d.id); wrap.append(c);
+  }
   for (const a of actions) {
+    if (a.result?.made_doc_id) { const c = el("button", "", "만든 문서 열기"); c.onclick = () => openDoc(a.result.made_doc_id); wrap.append(c); continue; }
     if (a.status === "proposed") { const c = el("button", "", "확인함에서 결정하기"); c.onclick = () => openApp("inbox"); wrap.append(c); continue; }
     for (const [k, [app, label]] of Object.entries(OPEN_LINK)) {
       if (a.result?.[k] != null) {
@@ -2890,7 +3012,7 @@ $("compose").addEventListener("submit", async (e) => {
     // 대화에서 과제를 맡았으면 크론을 기다리지 않고 바로 시작
     for (const a of res.actions || []) if (a.result?.task_id) driveTask(a.result.task_id);
     wait.classList.remove("thinking"); wait.removeAttribute("aria-label"); wait.textContent = res.reply;
-    linkChips(res.actions || []);
+    linkChips(res.actions || [], null, res.docs_read);
     suggestChips(res.suggest || []);
   } catch (err) {
     wait.classList.remove("thinking"); wait.textContent = err.message;
@@ -3001,6 +3123,7 @@ async function openTarget(target) {
   if (!SCREENS[app]) return false;
   await openApp(app);
   if (app === "events" && id) await editEvent(Number(id));
+  if (app === "docs" && id) await openDoc(Number(id));
   return true;
 }
 async function enter() {
