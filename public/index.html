@@ -3051,8 +3051,10 @@ SCREENS.settings = {
       const cap = el("details", "caps"); cap.append(el("summary", "", "이 비서가 할 수 있는 일"));
       const ul = el("div", "caplist");
       for (const c of me2.capabilities) {
-        const r = el("div", "cap" + (c.used ? "" : " unused"));
-        const top = el("div", "cap-t"); top.append(el("b", "", c.name), el("span", "cap-n", c.used ? `최근 ${me2.days}일 ${c.used}번` : "아직 안 써 봤어요"));
+        const r = el("div", "cap" + (c.used || c.always ? "" : " unused"));
+        const cnt = c.key === "think" ? (c.used ? `최근 ${me2.days}일 ${c.used}번 배움` : "늘 켜져 있어요")
+                  : c.used ? `최근 ${me2.days}일 ${c.used}번` : c.always ? "늘 켜져 있어요" : "아직 안 써 봤어요";
+        const top = el("div", "cap-t"); top.append(el("b", "", c.name), el("span", "cap-n", cnt));
         r.append(top, el("p", "", c.what), el("p", "cap-how", c.how));
         ul.append(r);
       }
