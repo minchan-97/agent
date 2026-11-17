@@ -167,3 +167,87 @@ def overview(sb) -> dict:
     return {"capabilities": [{"key": k, "name": n, "what": what, "how": how, "used": used.get(k, 0)}
                              for k, n, what, how in CAPABILITIES],
             "cannot": CANNOT, "days": u["days"], "unmet": u.get("unmet") or []}
+
+
+# ── 개선 질문에 대한 '확실한' 답 ─────────────────────────────────────────────
+# 프롬프트 규칙만으로는 LLM 이 "소통을 원활하게, 맞춤형 강화" 같은 빈말로 답할 때가 있다.
+# 그래서 개선 질문이면 답을 검사하고, 빈말이면 실제 쓰임 기록으로 서버가 직접 답을 짠다.
+ASKS_IMPROVE = re.compile(r"(개선|더하면|추가하면|추가했으면|필요한 기능|부족한|아쉬운|업데이트|뭘 더|뭐를 더|뭐 더|"
+                          r"고치면|바꾸면 좋|발전)")
+VAGUE = re.compile(r"(원활|맞춤형|강화|향상|편리하게|더 쉽게|다양한|효율적|최적화|사용자 경험|발전할 수|"
+                   r"인터페이스|직관적|접근성)")
+_PREFER = ["template", "daily", "task", "doc", "why", "note", "draft", "search", "schedule", "reminder", "skill"]
+_CANNOT_HINT = [
+    (re.compile(r"(보내|전송|카톡|문자 해|메일 해|발송)"), 0),
+    (re.compile(r"(메일함|받은 메일|구글|아이폰 캘린더|캘린더 연동|나이스|업무포털|k-?에듀|에듀파인)", re.I), 1),
+    (re.compile(r"(전화|결제|로그인|앱 열어|다른 앱)"), 2),
+    (re.compile(r"(그림|이미지 만들|사진 만들|그려)"), 3),
+    (re.compile(r"(같이|공유해서|함께 쓰|다른 사람이)"), 4),
+]
+
+
+def asks_improvement(text: str) -> bool:
+    return bool(ASKS_IMPROVE.search(text or ""))
+
+
+def is_vague(reply: str) -> bool:
+    """기능 이름을 거의 안 대고 빈말만 하는 답인가."""
+    r = reply or ""
+    named = sum(1 for _, n, _, _ in CAPABILITIES if n in r)
+    return named < 2 or (bool(VAGUE.search(r)) and named < 3)
+
+
+def _cannot_for(ask: str):
+    for rx, i in _CANNOT_HINT:
+        if rx.search(ask):
+            return CANNOT[i]
+    return None
+
+
+def improve_answer(sb, u: dict | None = None) -> str:
+    """실제 쓰임으로만 짠 개선 답: ① 이미 있는데 안 쓴 기능 ② 자주 쓰는 기능 바로가기 ③ 못 해 드린 부탁."""
+    u = u or usage(sb)
+    used = u.get("by_cap") or {}
+    info = {k: (n, what, how) for k, n, what, how in CAPABILITIES}
+    lines = []
+    if u.get("talks", 0) < 5 and not used:
+        return ("아직 쓰신 기록이 거의 없어서, 무엇을 더하면 좋을지 판단하기 일러요.\n"
+                "우선 이런 걸 해 보세요:\n"
+                f"• 문서 올리기 — {info['doc'][2]}\n"
+                f"• 알림 — {info['reminder'][2]}\n"
+                "며칠 쓰신 뒤 다시 물어보시면, 실제로 쓰신 걸 보고 말씀드릴게요.")
+    # ① 이미 있는데 아직 안 쓴 기능 (문서는 쓰는데 양식은 안 쓰면 양식이 먼저)
+    order = list(_PREFER)
+    if used.get("doc") and not used.get("template"):
+        order.remove("template"); order.insert(0, "template")
+    unused = [k for k in order if not used.get(k)][:2]
+    if unused:
+        lines.append("1) 이미 있는데 아직 안 써 보신 것")
+        for k in unused:
+            n, what, how = info[k]
+            lines.append(f"• {n} — {what.split('. ')[0]}. 이렇게: {how}")
+    # ② 자주 쓰는 기능은 더 빨리
+    top = sorted(((k, v) for k, v in used.items() if v and k in info), key=lambda x: -x[1])[:2]
+    if top:
+        names = " · ".join(f"{info[k][0]} {v}번" for k, v in top)
+        lines.append(f"\n2) 자주 쓰시는 것 ({names})")
+        lines.append(f"• 자주 하는 부탁은 홈 버튼으로 만들 수 있어요. 예: \"{info[top[0][0]][0]} 버튼 만들어 줘\"")
+    # ③ 새 기능 후보: 못 해 드린 부탁에서만
+    wants = []
+    for ask in u.get("unmet") or []:
+        c = _cannot_for(ask)
+        if c and c not in [w[0] for w in wants]:
+            wants.append((c, ask))
+    lines.append("\n3) 새로 생기면 좋을 것")
+    if wants:
+        for c, ask in wants[:2]:
+            said = ask if ask.startswith("메시지를 직접") else f"\"{ask[:40]}\" 같은 부탁"
+            lines.append(f"• {c.split(' (')[0]} — 실제로 {said}을 못 해 드렸어요.")
+    else:
+        lines.append("• 최근에 제가 못 해 드린 부탁이 기록에 없어요. 새 기능은 아직 판단하기 일러요. "
+                     "쓰시다가 '이건 왜 안 돼?' 싶은 게 생기면 그대로 말씀해 주세요. 그게 다음 기능의 근거가 돼요.")
+    d = u.get("decided") or {}
+    if d.get("rejected", 0) >= 5 and d.get("rejected", 0) > d.get("accepted", 0):
+        lines.append(f"\n덧붙이면, 제가 하자고 한 일 중 넘기신 게 더 많아요(받아들임 {d.get('accepted', 0)} · "
+                     f"넘김 {d['rejected']}). 제안이 과하면 말씀해 주세요.")
+    return f"최근 {u.get('days', 30)}일 쓰신 기록을 보고 말씀드릴게요.\n\n" + "\n".join(lines)
