@@ -398,6 +398,27 @@ create table if not exists docs (
 create index if not exists docs_user on docs(user_id, id desc);
 create index if not exists docs_parent on docs(parent_id);
 
+-- 양식함: 문서를 양식으로 저장. path = {{칸}} 이 박힌 양식 원본, src_path = 처음 문서 사본
+create table if not exists templates (
+  id          bigserial primary key,
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  name        text not null,
+  kind        text not null check (kind in ('xlsx','docx','hwpx','pdf')),
+  ext         text not null,
+  src_path    text not null,
+  path        text not null,
+  fields      jsonb not null default '[]',
+  last_values jsonb not null default '{}',
+  uses        int not null default 0,
+  source_doc  bigint references docs(id) on delete set null,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  constraint templates_path_own check (path like (user_id::text || '/%') and src_path like (user_id::text || '/%')),
+  constraint templates_fields_ok check (jsonb_typeof(fields) = 'array' and jsonb_array_length(fields) <= 40)
+);
+create index if not exists templates_user on templates(user_id, id desc);
+alter table docs add column if not exists template_id bigint references templates(id) on delete set null;
+
 -- 저장소 버킷과 정책: 자기 폴더({auth.uid()}/...)의 파일만 읽고 쓰고 지운다.
 -- (Supabase 가 아닌 Postgres 에서 돌리면 storage 스키마가 없으므로 건너뛴다)
 do $$
@@ -463,7 +484,7 @@ begin
   foreach t in array array['agents','facts','quarantine','episodes','events','task_memory',
                            'skills','tasks','actions','action_trust','reminders','shortcuts',
                            'usage_patterns','outbox','push_subscriptions','agent_state','audit',
-                           'judgments','docs']
+                           'judgments','docs','templates']
   loop
     execute format('alter table %I enable row level security', t);
     execute format('drop policy if exists own_rows on %I', t);
