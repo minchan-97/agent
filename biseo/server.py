@@ -49,14 +49,23 @@ try:
     from biseo import layout as home_layout  # noqa: E402
     from biseo import memory as mem  # noqa: E402
     from biseo import judge  # noqa: E402
-    from biseo import docs as dx  # noqa: E402
-    from biseo import storage as st  # noqa: E402
 except Exception:  # noqa: BLE001
     _lines = traceback.format_exc().strip().splitlines()
     _BOOT_ERROR = {"detail": "서버 본체를 불러오지 못했어요",
                    "error": _lines[-1] if _lines else "알 수 없음",
                    "where": [l.strip() for l in _lines if l.strip().startswith("File ")][-3:],
                    "python": sys.version.split()[0]}
+
+
+# 문서함은 따로 불러온다: 문서 모듈이 빠지거나 깨져도 앱의 나머지는 살아 있게
+_DOCS_ERROR = None
+try:
+    from biseo import docs as dx  # noqa: E402
+    from biseo import storage as st  # noqa: E402
+except Exception:  # noqa: BLE001
+    dx = st = None
+    _DOCS_ERROR = traceback.format_exc().strip().splitlines()[-1]
+    print("DOCS_BOOT_ERROR", _DOCS_ERROR)
 
 
 class _FixPath:
@@ -247,7 +256,8 @@ def account_delete(authorization: str | None = Header(None)):
     try:
         svc.table("push_subscriptions").delete().eq("user_id", uid).execute()
         try:
-            st.purge_user(uid)          # 문서함 파일 (표는 cascade 로 지워지지만 저장소 파일은 따로)
+            if st:
+                st.purge_user(uid)          # 문서함 파일 (표는 cascade 로 지워지지만 저장소 파일은 따로)
         except Exception as e:
             print("ACCOUNT_DELETE_STORAGE", uid[:8], type(e).__name__)
         svc.auth.admin.delete_user(uid)
@@ -559,7 +569,13 @@ class DocAskIn(BaseModel):
     text: str = Field(max_length=1500)
 
 
+def _docs_ready():
+    if dx is None:
+        raise HTTPException(503, "문서함을 준비하지 못했어요." + (f" ({_DOCS_ERROR})" if DEBUG else ""))
+
+
 def _doc(fn, *a):
+    _docs_ready()
     try:
         return _run(fn, *a)
     except dx.RateLimited as e:
@@ -572,6 +588,7 @@ def _doc(fn, *a):
 
 @app.get("/api/docs")
 def docs_list(authorization: str | None = Header(None)):
+    _docs_ready()
     return dx.list_docs(_session(authorization))
 
 
