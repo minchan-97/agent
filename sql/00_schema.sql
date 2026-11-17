@@ -418,6 +418,12 @@ create table if not exists templates (
 );
 create index if not exists templates_user on templates(user_id, id desc);
 alter table docs add column if not exists template_id bigint references templates(id) on delete set null;
+-- 문서와 비서 잇기: 알림·일정·초안이 어느 문서에서 나왔는지 (문서를 지우면 연결만 풀린다)
+alter table reminders   add column if not exists doc_id bigint references docs(id) on delete set null;
+alter table events      add column if not exists doc_id bigint references docs(id) on delete set null;
+alter table task_memory add column if not exists doc_id bigint references docs(id) on delete set null;
+create index if not exists reminders_doc on reminders(doc_id) where doc_id is not null;
+create index if not exists events_doc on events(doc_id) where doc_id is not null;
 
 -- 저장소 버킷과 정책: 자기 폴더({auth.uid()}/...)의 파일만 읽고 쓰고 지운다.
 -- (Supabase 가 아닌 Postgres 에서 돌리면 storage 스키마가 없으므로 건너뛴다)
