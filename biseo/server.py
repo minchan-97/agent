@@ -968,6 +968,13 @@ async def push_unsubscribe(request: Request, authorization: str | None = Header(
     return {"ok": True}
 
 
+@app.get("/api/self")
+def self_overview(authorization: str | None = Header(None)):
+    """비서가 할 수 있는 일과 최근 30일 쓰임 (설정 → 할 수 있는 일)"""
+    from biseo import selfknow
+    return selfknow.overview(_session(authorization))
+
+
 @app.get("/api/push/status")
 def push_status(authorization: str | None = Header(None)):
     sb = _session(authorization)
