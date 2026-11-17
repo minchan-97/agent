@@ -62,8 +62,9 @@ _DOCS_ERROR = None
 try:
     from biseo import docs as dx  # noqa: E402
     from biseo import storage as st  # noqa: E402
+    from biseo import templates as tpl  # noqa: E402
 except Exception:  # noqa: BLE001
-    dx = st = None
+    dx = st = tpl = None
     _DOCS_ERROR = traceback.format_exc().strip().splitlines()[-1]
     print("DOCS_BOOT_ERROR", _DOCS_ERROR)
 
@@ -620,6 +621,74 @@ def docs_edit(doc_id: int, body: DocAskIn, authorization: str | None = Header(No
 @app.post("/api/docs/{doc_id}/delete")
 def docs_delete(doc_id: int, authorization: str | None = Header(None)):
     return _doc(dx.remove, _session(authorization), doc_id)
+
+
+# ---------- 양식함: 문서를 양식으로 저장하고, 내용만 넣어 문서 만들기 ----------
+class TplNewIn(BaseModel):
+    doc_id: int
+    name: str = Field("", max_length=60)
+    fields: list = Field(default_factory=list, max_length=80)
+
+
+class TplEditIn(BaseModel):
+    name: str = Field("", max_length=60)
+    fields: list = Field(default_factory=list, max_length=80)
+
+
+class TplMakeIn(BaseModel):
+    values: dict = Field(default_factory=dict)
+
+
+class TplProposeIn(BaseModel):
+    doc_id: int
+
+
+@app.get("/api/templates")
+def tpl_list(authorization: str | None = Header(None)):
+    _docs_ready()
+    return tpl.list_templates(_session(authorization))
+
+
+@app.post("/api/templates/propose")
+def tpl_propose(body: TplProposeIn, authorization: str | None = Header(None)):
+    return _doc(tpl.propose, _session(authorization), body.doc_id)
+
+
+@app.post("/api/templates")
+def tpl_create(body: TplNewIn, authorization: str | None = Header(None)):
+    return _doc(tpl.create, _session(authorization), body.doc_id, body.name, body.fields)
+
+
+@app.get("/api/templates/{tid}")
+def tpl_get(tid: int, authorization: str | None = Header(None)):
+    return _doc(tpl.get, _session(authorization), tid)
+
+
+@app.get("/api/templates/{tid}/url")
+def tpl_url(tid: int, authorization: str | None = Header(None)):
+    return _doc(tpl.url, _session(authorization), tid)
+
+
+@app.post("/api/templates/{tid}/update")
+def tpl_update(tid: int, body: TplEditIn, authorization: str | None = Header(None)):
+    return _doc(tpl.update, _session(authorization), tid, body.name, body.fields)
+
+
+@app.post("/api/templates/{tid}/fill")
+def tpl_fill(tid: int, body: DocAskIn, authorization: str | None = Header(None)):
+    return _doc(tpl.fill, _session(authorization), tid, body.text)
+
+
+@app.post("/api/templates/{tid}/make")
+def tpl_make(tid: int, body: TplMakeIn, authorization: str | None = Header(None)):
+    if len(body.values) > 80 or sum(len(str(v)) for v in body.values.values()) > 60_000:
+        raise HTTPException(400, "넣은 내용이 너무 길어요")
+    return _doc(tpl.make, _session(authorization), tid, body.values)
+
+
+@app.post("/api/templates/{tid}/delete")
+def tpl_delete(tid: int, authorization: str | None = Header(None)):
+    return _doc(tpl.remove, _session(authorization), tid)
 
 
 # ---------- 비서가 나에 대해 아는 것 (투명한 기억) ----------
