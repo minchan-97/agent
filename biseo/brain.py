@@ -301,6 +301,12 @@ def respond(sb, agent: dict, user_text: str) -> dict:
     out["actions"] = [a for a in out["actions"] if a.get("kind") not in ("search", "read_doc")]
 
     reply = docagent.humanize(out["reply"].strip(), doc_index) or "잠깐 생각이 엉켰어요. 한 번만 다시 말해 줄래요?"
+    # 개선 질문에 빈말("소통을 원활하게·맞춤형 강화")로 답했으면, 실제 쓰임 기록으로 다시 짠다
+    try:
+        if not saw_external and selfknow.asks_improvement(text) and selfknow.is_vague(reply):
+            reply = selfknow.improve_answer(sb)
+    except Exception as e:
+        print("SELFKNOW_IMPROVE_SKIP", type(e).__name__, str(e)[:120])
 
     # 검색 결과를 본 뒤의 행동은 사용자가 시킨 것과 웹페이지 글이 시킨 것을 구분할 수 없다.
     # 그래서 오염 표시를 붙여, 승격돼 있어도 반드시 묻게 한다.
