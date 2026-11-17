@@ -9,7 +9,7 @@ self.addEventListener("push", (event) => {
   event.waitUntil(self.registration.showNotification(title, {
     body: data.body || "",
     icon: "/icon-192.png",
-    badge: "/icon-192.png",
+    badge: "/badge-96.png",          // 상태 표시줄용 흰 엔소 실루엣
     data: { url: data.url || "/" },
     tag: data.tag || undefined,
   }));
