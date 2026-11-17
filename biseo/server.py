@@ -49,6 +49,8 @@ try:
     from biseo import layout as home_layout  # noqa: E402
     from biseo import memory as mem  # noqa: E402
     from biseo import judge  # noqa: E402
+    from biseo import docs as dx  # noqa: E402
+    from biseo import storage as st  # noqa: E402
 except Exception:  # noqa: BLE001
     _lines = traceback.format_exc().strip().splitlines()
     _BOOT_ERROR = {"detail": "서버 본체를 불러오지 못했어요",
@@ -146,7 +148,9 @@ def _session(authorization: str | None):
     if not uid:
         raise HTTPException(401, "로그인이 만료됐어요")
     # 사용자 토큰(RLS) + Scoped(user_id 자동) 이중으로 막는다
-    return db.Scoped(db.for_user(token), uid)
+    s = db.Scoped(db.for_user(token), uid)
+    s.token = token            # 파일 저장소 요청도 같은 토큰(RLS)으로
+    return s
 
 
 def _agent(sb) -> dict:
@@ -242,6 +246,10 @@ def account_delete(authorization: str | None = Header(None)):
     svc = db.for_cron()
     try:
         svc.table("push_subscriptions").delete().eq("user_id", uid).execute()
+        try:
+            st.purge_user(uid)          # 문서함 파일 (표는 cascade 로 지워지지만 저장소 파일은 따로)
+        except Exception as e:
+            print("ACCOUNT_DELETE_STORAGE", uid[:8], type(e).__name__)
         svc.auth.admin.delete_user(uid)
     except Exception as e:
         print("ACCOUNT_DELETE_ERROR", uid[:8], type(e).__name__, str(e)[:200])
@@ -537,6 +545,64 @@ def why(kind: str, ref_id: str, authorization: str | None = Header(None)):
         raise HTTPException(404, "없는 종류")
     sb = _session(authorization)
     return _run(judge.explain, sb, kind, ref_id)
+
+
+# ---------- 문서함: 올리기 · 읽기 · 묻기 · 고치기 ----------
+class DocIn(BaseModel):
+    path: str = Field(max_length=300)
+    name: str = Field(max_length=200)
+    mime: str = Field("", max_length=120)
+    size: int = 0
+
+
+class DocAskIn(BaseModel):
+    text: str = Field(max_length=1500)
+
+
+def _doc(fn, *a):
+    try:
+        return _run(fn, *a)
+    except dx.RateLimited as e:
+        raise HTTPException(429, str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e))
+    except st.StorageError as e:
+        raise HTTPException(502, "파일 저장소에 닿지 못했어요. 잠시 뒤 다시 해 주세요.") from e
+
+
+@app.get("/api/docs")
+def docs_list(authorization: str | None = Header(None)):
+    return dx.list_docs(_session(authorization))
+
+
+@app.post("/api/docs")
+def docs_register(body: DocIn, authorization: str | None = Header(None)):
+    return _doc(dx.register, _session(authorization), body.path, body.name, body.mime, body.size)
+
+
+@app.get("/api/docs/{doc_id}")
+def docs_get(doc_id: int, authorization: str | None = Header(None)):
+    return _doc(dx.get, _session(authorization), doc_id)
+
+
+@app.get("/api/docs/{doc_id}/url")
+def docs_url(doc_id: int, authorization: str | None = Header(None)):
+    return _doc(dx.url, _session(authorization), doc_id)
+
+
+@app.post("/api/docs/{doc_id}/ask")
+def docs_ask(doc_id: int, body: DocAskIn, authorization: str | None = Header(None)):
+    return _doc(dx.ask, _session(authorization), doc_id, body.text)
+
+
+@app.post("/api/docs/{doc_id}/edit")
+def docs_edit(doc_id: int, body: DocAskIn, authorization: str | None = Header(None)):
+    return _doc(dx.edit, _session(authorization), doc_id, body.text)
+
+
+@app.post("/api/docs/{doc_id}/delete")
+def docs_delete(doc_id: int, authorization: str | None = Header(None)):
+    return _doc(dx.remove, _session(authorization), doc_id)
 
 
 # ---------- 비서가 나에 대해 아는 것 (투명한 기억) ----------
