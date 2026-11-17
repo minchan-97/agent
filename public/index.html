@@ -58,8 +58,10 @@ button,input,textarea,select{font:inherit;color:inherit}
 .auth h1{font-size:1.5rem;font-weight:700;margin:0 0 6px}
 .auth p{color:var(--muted);margin:0 0 24px;white-space:pre-wrap}
 .brand{text-align:center;margin:8px 0 26px}
-.brand-mark{width:72px;height:72px;margin:0 auto 14px;border-radius:20px;overflow:hidden;box-shadow:0 2px 10px rgb(0 0 0 / .1)}
-.brand-mark img{width:100%;height:100%;display:block}
+.brand-mark{width:76px;height:76px;margin:0 auto 16px;border-radius:22.5%;overflow:hidden;display:grid;place-items:center;
+  background:radial-gradient(circle at 30% 22%,#13294B,#08111F 78%);box-shadow:0 2px 6px rgb(8 17 31 / .12),0 12px 28px rgb(8 17 31 / .16)}
+.brand-mark svg{width:62%;height:62%;display:block}
+@media (prefers-color-scheme: dark){ .brand-mark{box-shadow:inset 0 0 0 1px rgb(243 238 227 / .10),0 12px 28px rgb(0 0 0 / .4)} }
 .brand h1{font-size:1.6rem;font-weight:800;margin:0 0 6px;color:var(--accent)}
 .brand .tagline{color:var(--muted);margin:0}
 .tabs{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:18px}
@@ -671,7 +673,7 @@ form.homebar,form.compose{box-shadow:0 1px 2px rgb(22 35 58 / .05),0 8px 22px rg
 
   <section class="auth" id="auth" hidden>
     <div class="brand">
-      <div class="brand-mark"><img src="/icon-192.png" alt=""></div>
+      <div class="brand-mark" aria-hidden="true"><svg viewBox="0 0 1024 1024"><circle cx="452" cy="590" r="178" fill="none" stroke="#F3EEE3" stroke-width="74"/><line x1="630" y1="412" x2="630" y2="768" stroke="#F3EEE3" stroke-width="74" stroke-linecap="round"/><circle cx="630" cy="268" r="50" fill="#D8B46A"/></svg></div>
       <h1>나만의 비서</h1>
       <p class="tagline">일정·메모·할 일을 맡기면, 알아서 챙겨 주는 비서예요.</p>
     </div>
