@@ -140,7 +140,8 @@ def step_user(sb, agent: dict, ask_llm, allow_task=True, only_due=False) -> dict
     # 1. 시각이 된 알림 — 가져가기(claim)에 성공한 것만 보낸다. 틱이 겹쳐도 한 번만 간다
     from . import apps
     for r in apps.claim_due(sb, now.isoformat()):
-        url = f"/?open=events:{r['event_id']}" if r.get("event_id") else "/?open=reminders"
+        url = (f"/?open=docs:{r['doc_id']}" if r.get("doc_id")
+               else f"/?open=events:{r['event_id']}" if r.get("event_id") else "/?open=reminders")
         _say(sb, agent, "due", r["text"], f"{name} · 알림", url, force=True)
         apps.mark_sent(sb, r["id"])
         out["due"] += 1
@@ -204,6 +205,7 @@ def run(raw_sb, ask_llm, only_due=False) -> dict:
         key = a["user_id"][:8]
         try:
             sb = Scoped(raw_sb, a["user_id"])
+            sb.service = True          # 과제가 문서를 읽고 쓸 때 저장소도 service role 로 (경로는 그 사람 폴더만)
             # 시간이 모자라면 알림만 처리하고 과제 걸음은 다음 틱으로 미룬다
             allow = time.monotonic() - started < TIME_BUDGET
             report[key] = step_user(sb, a, ask_llm, allow_task=allow, only_due=only_due)
