@@ -26,6 +26,7 @@ from . import heir
 from . import tasks as tk
 from . import skills as sk
 from . import docagent
+from . import selfknow
 from .absorb import absorb
 from .identity import system_prompt
 from .privacy import mask
@@ -81,7 +82,7 @@ actions 에 쓸 수 있는 kind 와 args
 
 규칙
 - because: 그 행동의 근거가 된 줄의 번호. U = 사용자의 이번 말, F번호 = 아는 사실, N번호 = 업무 기록.
-  근거가 사용자의 이번 말뿐이면 ["U"]. 문서번호(문서1) = 문서. 근거를 댈 수 없는 행동은 하지 마.
+  근거가 사용자의 이번 말뿐이면 ["U"]. 문서번호(문서1) = 문서. K번호 = 이 사람의 실제 쓰임 기록. 근거를 댈 수 없는 행동은 하지 마.
 - 하자고 한 일이 "이미 끝났다"고 말하지 마. 실행할지는 시스템과 사용자가 정한다.
   "메모로 남겨 둘게요", "알림을 걸어 둘게요"처럼 말하면 충분하다.
 - 할 일이 없으면 actions 는 [].
@@ -211,6 +212,14 @@ def respond(sb, agent: dict, user_text: str) -> dict:
         doc_text, doc_index = "", {}
     extra += doc_text
     evidence_index.update(docagent.evidence_for(doc_index))
+    # 자기 이해: 내 기능·못 하는 일·이 사람의 실제 쓰임 (기능을 물을 때만 길게, K번호로 근거 인용)
+    try:
+        self_text, self_ev = selfknow.for_prompt(sb, text)
+    except Exception as e:
+        print("SELFKNOW_SKIP", type(e).__name__, str(e)[:120])
+        self_text, self_ev = "", {}
+    extra += self_text
+    evidence_index.update(self_ev)
     # 몰랑이 판단 노드: 대화 판단 트리를 걷고, 비슷했던 지난 판단을 회상한다
     from . import judge
     try:
