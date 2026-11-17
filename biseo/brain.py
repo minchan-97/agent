@@ -25,6 +25,7 @@ from . import growth
 from . import heir
 from . import tasks as tk
 from . import skills as sk
+from . import docagent
 from .absorb import absorb
 from .identity import system_prompt
 from .privacy import mask
@@ -64,10 +65,22 @@ actions 에 쓸 수 있는 kind 와 args
                 사용자가 "~하는 기능 만들어 줘"라고 하거나, 같은 종류의 부탁이 대화 기록에서
                 여러 번 반복된 게 보일 때만. 기본 도구로 할 수 없는 일은 기능으로 만들지 마.
   send_message  아직 못 하는 일. 보내 달라고 하면 draft 로 대신 만들고 그렇다고 말해.
+                문서를 보내 달라고 하면: 문서 화면의 '보내기'로 사용자가 직접 보낸다고 안내하고,
+                필요하면 그 문서를 붙인 reminder("~에게 보내기")나 보낼 말 draft 를 만들어.
+
+문서 (아래 [문서함]의 번호로 가리킨다. D=문서, T=양식, R=초안. 목록에 없는 문서는 가리키지 마)
+  read_doc      {"doc": "D1", "question": "무엇을 알아야 하는지"}
+                문서 내용을 알아야 답할 때 (요약, 질문, 날짜 확인 등). 시스템이 문서를 읽어 보여 준 뒤 다시 답한다.
+  doc_edit      {"doc": "D1", "instruction": "어떻게 고칠지 구체적으로"}   원본은 두고 고친 새 버전을 만든다
+  doc_make      {"template": "T1", "text": "칸에 넣을 내용 (사용자 말 그대로)"}   양식으로 새 문서
+  doc_new       {"title": "파일 이름", "text": "문서 본문 (# 제목, - 목록 가능)"} 또는 {"title": "...", "draft": "R1"}
+                글·초안을 워드 파일로 만들 때
+  reminder · event · draft 의 args 에 "doc": "D1" 을 넣으면 그 문서와 연결된다 (알림을 누르면 문서가 열린다).
+  "가정통신문 금요일까지 내야 해"처럼 문서와 관련된 마감이면 reminder 에 doc 을 붙여라.
 
 규칙
 - because: 그 행동의 근거가 된 줄의 번호. U = 사용자의 이번 말, F번호 = 아는 사실, N번호 = 업무 기록.
-  근거가 사용자의 이번 말뿐이면 ["U"]. 근거를 댈 수 없는 행동은 하지 마.
+  근거가 사용자의 이번 말뿐이면 ["U"]. D번호 = 문서. 근거를 댈 수 없는 행동은 하지 마.
 - 하자고 한 일이 "이미 끝났다"고 말하지 마. 실행할지는 시스템과 사용자가 정한다.
   "메모로 남겨 둘게요", "알림을 걸어 둘게요"처럼 말하면 충분하다.
 - 할 일이 없으면 actions 는 [].
@@ -189,6 +202,14 @@ def respond(sb, agent: dict, user_text: str) -> dict:
             f"#{o['id']} {o['goal']} ({o['status']})" for o in open_tasks)
 
     extra += sk.for_prompt(sb)
+    # 문서함: 번호(D1·T1·R1)로만 가리키게 한다. 진짜 id 는 서버만 안다
+    try:
+        doc_text, doc_index = docagent.catalog(sb)
+    except Exception as e:
+        print("DOC_CATALOG_SKIP", type(e).__name__, str(e)[:120])
+        doc_text, doc_index = "", {}
+    extra += doc_text
+    evidence_index.update(docagent.evidence_for(doc_index))
     # 몰랑이 판단 노드: 대화 판단 트리를 걷고, 비슷했던 지난 판단을 회상한다
     from . import judge
     try:
@@ -211,8 +232,21 @@ def respond(sb, agent: dict, user_text: str) -> dict:
 
     # 검색: 모델이 원하거나, 바뀌는 바깥 사실을 묻는 말이면 강제
     wanted = [a for a in out["actions"] if a.get("kind") == "search"]
-    own_work = any(a.get("kind") in ("note", "reminder", "draft", "event") for a in out["actions"])
-    forced = not wanted and not own_work and needs_live_facts(text)
+    own_work = any(a.get("kind") in ("note", "reminder", "draft", "event") + docagent.DOC_KINDS
+                   for a in out["actions"])
+    # 문서 읽기: 모델이 문서 내용을 보고 싶다고 하면 읽어서 보여 주고 다시 답하게 한다
+    doc_ctx, read_docs = [], []
+    for a in [a for a in out["actions"] if a.get("kind") == "read_doc"][:2]:
+        ra = docagent.resolve_args("read_doc", a.get("args") or {}, doc_index)
+        if not ra:
+            continue
+        try:
+            doc_ctx.append(docagent.read_context(sb, ra["doc_id"], str(ra.get("question") or text)))
+            read_docs.append(ra)
+        except Exception as e:
+            print("READ_DOC_SKIP", type(e).__name__, str(e)[:120])
+    saw_doc = bool(doc_ctx)      # 문서 글을 본 뒤의 행동도 바깥 자료처럼 오염 표시
+    forced = not wanted and not own_work and not read_docs and needs_live_facts(text)
     searched = False
     saw_external = False      # 두 번째 답이 검색 결과(바깥 글)를 보고 나왔는가
     trail = []
@@ -243,11 +277,18 @@ def respond(sb, agent: dict, user_text: str) -> dict:
                 ctx = "[검색 실패]\n" + NO_SEARCH
         else:
             ctx = NO_SEARCH
+        if doc_ctx:
+            ctx = "\n\n".join(doc_ctx) + "\n\n" + ctx
         # 첫 답은 버리고(지어낸 내용이 들어 있을 수 있다) 자료를 근거로 다시 답하게 한다
         messages.append({"role": "assistant", "content": json.dumps(out, ensure_ascii=False)})
         messages.append({"role": "user", "content": ctx})
         out = _ask(messages)
-    out["actions"] = [a for a in out["actions"] if a.get("kind") != "search"]
+    elif doc_ctx:
+        messages.append({"role": "assistant", "content": json.dumps(out, ensure_ascii=False)})
+        messages.append({"role": "user", "content": "\n\n".join(doc_ctx) + "\n\n위 문서를 근거로 다시 답해. "
+                         "이번에는 read_doc 을 다시 요청하지 마."})
+        out = _ask(messages)
+    out["actions"] = [a for a in out["actions"] if a.get("kind") not in ("search", "read_doc")]
 
     reply = out["reply"].strip() or "잠깐 생각이 엉켰어요. 한 번만 다시 말해 줄래요?"
 
@@ -255,8 +296,13 @@ def respond(sb, agent: dict, user_text: str) -> dict:
     # 그래서 오염 표시를 붙여, 승격돼 있어도 반드시 묻게 한다.
     done = []
     for a in out["actions"][:3]:
-        row = act.propose(sb, str(a.get("kind", "")), a.get("args") or {},
-                          str(a.get("reason", "")), origin="user", tainted=saw_external)
+        kind, args = str(a.get("kind", "")), a.get("args") or {}
+        if kind in docagent.DOC_KINDS or any(k in args for k in ("doc", "template", "draft")):
+            args = docagent.resolve_args(kind, args, doc_index)
+            if args is None:            # 목록에 없는 문서를 가리킴 → 하지 않는다
+                continue
+        row = act.propose(sb, kind, args, str(a.get("reason", "")), origin="user",
+                          tainted=saw_external or saw_doc)
         done.append(row)
         # 행동마다 판단 하나: 이 행동이 어느 근거(이번 말·사실·기록)에서 나왔는지
         if jw and row.get("id"):
@@ -264,11 +310,14 @@ def respond(sb, agent: dict, user_text: str) -> dict:
             ev = [evidence_index[t] for t in tags if t in evidence_index] or [evidence_index["U"]]
             if saw_external:
                 ev.append({"tag": "W", "kind": "web", "id": None, "text": "이번 답에 쓴 검색 자료"})
+            for rd in read_docs:
+                if not any(e.get("kind") == "doc" and e.get("id") == rd["doc_id"] for e in ev):
+                    ev.append({"tag": "D", "kind": "doc", "id": rd["doc_id"], "text": rd.get("doc_name", "문서")})
             try:
                 judge.record(sb, jw, summary=f"{act.KINDS.get(row['kind'], {}).get('label', row['kind'])}: "
                                              f"{a.get('reason') or ''}".strip(": "),
                              context=text, evidence=ev, recalled=recalled,
-                             ref_kind="action", ref_id=row["id"], tainted=saw_external)
+                             ref_kind="action", ref_id=row["id"], tainted=saw_external or saw_doc)
             except Exception as e:
                 print("JUDGE_RECORD_SKIP", type(e).__name__, str(e)[:120])
 
@@ -288,8 +337,10 @@ def respond(sb, agent: dict, user_text: str) -> dict:
     absorbed = absorb(sb, out["user_facts"], text, reply, agent["name"])
     sb.table("audit").insert({"kind": "turn", "detail": {
         "actions": [d.get("kind") for d in done], "absorbed": absorbed,
-        "searched": searched, "forced_search": forced, "tainted": saw_external,
+        "searched": searched, "forced_search": forced, "tainted": saw_external or saw_doc,
+        "read_docs": [r["doc_id"] for r in read_docs],
         "search_tries": len(trail)}}).execute()
 
     return {"reply": reply, "actions": done, "answered_tasks": answered,
-            "suggest": out.get("suggest", [])}
+            "suggest": out.get("suggest", []),
+            "docs_read": [{"id": r["doc_id"], "name": r.get("doc_name")} for r in read_docs]}
