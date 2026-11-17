@@ -13,6 +13,7 @@ selfknow.py — 비서가 '나는 무엇을 할 수 있고, 실제로 어떻게 
   for_prompt     자기에 대한 질문(기능·사용법·개선)일 때만 길게, 평소엔 한 줄
                  쓰임 줄마다 K번호를 달아, 제안의 근거로 인용하게 한다 ('왜' 화면에 그대로 보인다)
 """
+import os
 import re
 from collections import Counter
 from datetime import datetime, timedelta, timezone
@@ -48,7 +49,8 @@ ACTION_TO_CAP = {"event": "schedule", "reminder": "reminder", "note": "note", "d
                  "suggest_shortcut": "skill", "pin_shortcut": "skill"}
 
 ABOUT_ME = re.compile(r"(기능|할 수 있|할수있|뭘 할|무엇을 할|뭐 할 수|뭐가 돼|뭐 돼|사용법|어떻게 써|어떻게 쓰|개선|추가하면|"
-                      r"더하면|업데이트|필요한 기능|부족한|아쉬운|너는 뭐|넌 뭐|자기소개|소개해|도움말|할 줄)")
+                      r"더하면|업데이트|필요한 기능|부족한|아쉬운|너는 뭐|넌 뭐|자기소개|소개해|도움말|할 줄|"
+                     r"차별|다른 (?:llm|LLM|AI|ai|앱|비서)|gpt|GPT|챗GPT|챗지피티|지피티|클로드|제미나이|뭐가 달라|더 나은|장점|강점)")
 REFUSAL = re.compile(r"(할 수 없|할 수가 없|못 해요|못해요|못 해 드|못 합니다|지원하지 않|아직 못|아직 할 수 없|불가능|"
                      r"드릴 수 없|드릴 수는 없|볼 수 없|접근할 수 없|연결돼 있지 않|연결되어 있지 않|직접은 어려|직접 하기는 어려)")
 
@@ -169,6 +171,9 @@ def for_prompt(sb, text: str) -> tuple:
   새 기능은 [지금은 못 하는 일]에서만 고르고, 반드시 [K번호] 쓰임 근거를 하나 이상 대며 왜 이 사람에게 필요한지 말한다.
   근거가 없으면 '아직 쓰임 기록이 적어 판단하기 이르다'고 솔직히 말한다. 3개 이하로.
 - 보안·서버·성능처럼 만드는 사람의 일은 사용자 기능으로 제안하지 않는다.
+- 다른 AI(GPT·클로드 등)와 비교하면: 내 안쪽 두뇌도 {model_name()} 라는 걸 먼저 솔직히 말한다. 똑똑함 자체로 앞선다고 하지 않는다.
+  차이는 위 기능 목록의 구조(실제로 넣고 알리기·한글 문서·양식·'왜' 근거·위험한 일은 묻기)로만, K 쓰임 숫자를 곁들여 말한다.
+  '맞춤형·다정함·정직함·노력' 같은 성격 자랑은 하지 않는다. 큰 모델이 더 나은 일(긴 글·깊은 추론·코딩)도 한 줄로 인정한다.
 - 안 쓰는 기능이 있으면 그중 이 사람에게 도움이 될 하나를 골라 써 보는 법을 알려 줘도 좋다."""
     evidence = {k: {"tag": k, "kind": "usage", "id": None, "text": t[:160]} for k, t in ev}
     return block, evidence
@@ -189,7 +194,17 @@ def overview(sb) -> dict:
 ASKS_IMPROVE = re.compile(r"(개선|더하면|추가하면|추가했으면|필요한 기능|부족한|아쉬운|업데이트|뭘 더|뭐를 더|뭐 더|"
                           r"고치면|바꾸면 좋|발전)")
 VAGUE = re.compile(r"(원활|맞춤형|강화|향상|편리하게|더 쉽게|다양한|효율적|최적화|사용자 경험|발전할 수|"
-                   r"인터페이스|직관적|접근성)")
+                   r"인터페이스|직관적|접근성|다정|소중히|깊이 이해|차별화|최선을|노력하)")
+ASKS_COMPARE = re.compile(r"(차별|다른 (?:llm|ai|앱|비서|모델)|gpt|챗gpt|챗지피티|지피티|클로드|claude|제미나이|gemini|"
+                          r"뭐가 달라|뭐가 다르|더 나은|더 낫|장점|강점|왜 너를|왜 이걸 써)", re.I)
+
+
+def model_name() -> str:
+    return os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+
+
+def asks_compare(text: str) -> bool:
+    return bool(ASKS_COMPARE.search(text or ""))
 _PREFER = ["template", "daily", "task", "doc", "note", "draft", "reminder", "schedule", "skill"]
 # '왜'·기억·음성은 쓰임이 기록되지 않는 기능이라 '안 써 본 기능'으로 권하지 않는다
 _TIP = {
@@ -280,3 +295,26 @@ def improve_answer(sb, u: dict | None = None) -> str:
             "\n\n새 기능은 아직 근거가 없어요. 제가 못 해 드린 부탁이 기록에 없거든요. "
             "쓰시다 '이건 왜 안 돼?' 싶으면 그대로 말씀해 주세요. 그게 다음 기능의 근거가 돼요.")
     return head + "\n" + "\n".join(parts) + tail
+
+
+def compare_answer(sb, u: dict | None = None) -> str:
+    """'다른 AI 보다 뭐가 나아?' — 성격 자랑 대신, 실제 구조와 쓰인 숫자로."""
+    u = u or usage(sb)
+    used = u.get("by_cap") or {}
+
+    def n(k):
+        return f" (최근 {u.get('days', 30)}일 {used[k]}번)" if used.get(k) else ""
+    pts = [
+        ("reminder", f"• 말로 끝나지 않고 해 둬요 — 일정·알림을 실제로 넣고, 정한 시각에 휴대폰으로 알려요{n('reminder') or n('schedule')}."),
+        ("doc", f"• 한글·엑셀·PDF를 읽고, 고친 새 파일을 만들어요. 자주 쓰는 문서는 양식으로 두고 내용만 바꿔 다시 만들어요{n('doc')}."),
+        ("why", "• 이유를 보여 줘요 — 제안마다 '왜' 줄에 근거(일정·메모·문서)와 판단 경로가 붙어요."),
+        ("safe", "• 위험한 일은 묻고 해요 — 검색·문서에서 읽은 글이 시킨 듯한 일은 꼭 확인받고, 메시지를 대신 보내지는 않아요."),
+        ("daily", f"• 먼저 말을 걸어요 — 매일 정한 시각에 오늘 할 만한 일을 건네요{n('daily')}."),
+        ("memory", "• 기억을 보여 줘요 — 제가 기억한 걸 직접 보고 고치고 지울 수 있어요."),
+    ]
+    # 실제로 쓰인 기능을 앞에
+    pts.sort(key=lambda p: 0 if used.get(p[0]) else 1)
+    body = "\n".join(t for _, t in pts[:4])
+    return (f"솔직히, 제 안쪽에서 생각하는 건 {model_name()} 모델이에요. 그래서 똑똑함 자체로는 ChatGPT나 Claude를 앞서지 않아요.\n"
+            f"차이는 그 모델을 감싼 구조에 있어요.\n{body}\n"
+            "반대로 긴 글쓰기·깊은 추론·코딩은 큰 모델이 더 나아요. 그런 일은 그쪽을 쓰시는 게 맞아요.")
