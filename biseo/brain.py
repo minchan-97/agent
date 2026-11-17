@@ -26,7 +26,7 @@ from . import heir
 from . import tasks as tk
 from . import skills as sk
 from . import docagent
-from . import selfknow
+from . import contra, selfknow
 from .absorb import absorb
 from .identity import system_prompt
 from .privacy import mask
@@ -171,6 +171,37 @@ def _ask(messages: list) -> dict:
     return out
 
 
+def _verify(sb, messages, out, reply, done, text, doc_index, jw):
+    """모순 검사 → 짚어서 다시 쓰기 → 다시 검사 → 남은 것은 바로잡기. 모순이 난 판단 경로는 약하게 배운다."""
+    try:
+        found = contra.check(reply, done, text)
+    except Exception as e:
+        print("CONTRA_SKIP", type(e).__name__, str(e)[:120])
+        return reply, []
+    if not found:
+        return reply, []
+    if jw:
+        from . import judge
+        judge.learn_walk(sb, jw, -0.5)
+    first = found
+    try:
+        acted = "\n".join(f"- {d.get('kind')}: {d.get('status')}" for d in done) or "- 없음"
+        retry = messages + [{"role": "assistant", "content": json.dumps(out, ensure_ascii=False)},
+                            {"role": "user", "content": contra.prompt_text(found)
+                             + "\n\n[이번에 실제로 일어난 일]\n" + acted}]
+        again = docagent.humanize((_ask(retry).get("reply") or "").strip(), doc_index)
+        if again:
+            reply, found = again, contra.check(again, done, text)
+    except Exception as e:
+        print("CONTRA_RETRY_SKIP", type(e).__name__, str(e)[:120])
+    if any(f["type"] == "vague" for f in found):
+        reply = selfknow.compare_answer(sb) if selfknow.asks_compare(text) else selfknow.improve_answer(sb)
+        found = [f for f in found if f["type"] != "vague"]
+    if found:
+        reply = contra.repair(reply, found) or reply
+    return reply, first
+
+
 def respond(sb, agent: dict, user_text: str) -> dict:
     text = mask(user_text.strip())[:4000]
     now = datetime.now(KST).strftime("%Y-%m-%d (%a) %H:%M")
@@ -301,15 +332,6 @@ def respond(sb, agent: dict, user_text: str) -> dict:
     out["actions"] = [a for a in out["actions"] if a.get("kind") not in ("search", "read_doc")]
 
     reply = docagent.humanize(out["reply"].strip(), doc_index) or "잠깐 생각이 엉켰어요. 한 번만 다시 말해 줄래요?"
-    # 개선 질문에 빈말("소통을 원활하게·맞춤형 강화")로 답했으면, 실제 쓰임 기록으로 다시 짠다
-    try:
-        if not saw_external and selfknow.is_vague(reply):
-            if selfknow.asks_compare(text):
-                reply = selfknow.compare_answer(sb)
-            elif selfknow.asks_improvement(text):
-                reply = selfknow.improve_answer(sb)
-    except Exception as e:
-        print("SELFKNOW_IMPROVE_SKIP", type(e).__name__, str(e)[:120])
 
     # 검색 결과를 본 뒤의 행동은 사용자가 시킨 것과 웹페이지 글이 시킨 것을 구분할 수 없다.
     # 그래서 오염 표시를 붙여, 승격돼 있어도 반드시 묻게 한다.
@@ -340,6 +362,9 @@ def respond(sb, agent: dict, user_text: str) -> dict:
             except Exception as e:
                 print("JUDGE_RECORD_SKIP", type(e).__name__, str(e)[:120])
 
+    # 순환검증: 답의 판단이 확정된 판단(자기 모형·이번에 실제로 한 일)과 어긋나는지 본다
+    reply, contradictions = _verify(sb, messages, out, reply, done, text, doc_index, jw)
+
     answered = []
     waiting_ids = {w["id"] for w in waiting}
     for ta in (out.get("task_answers") or [])[:3]:
@@ -358,7 +383,8 @@ def respond(sb, agent: dict, user_text: str) -> dict:
         "actions": [d.get("kind") for d in done], "absorbed": absorbed,
         "searched": searched, "forced_search": forced, "tainted": saw_external or saw_doc,
         "read_docs": [r["doc_id"] for r in read_docs],
-        "search_tries": len(trail)}}).execute()
+        "search_tries": len(trail),
+        "contradictions": [{"type": c["type"], "s": c["sentence"][:80]} for c in contradictions]}}).execute()
 
     return {"reply": reply, "actions": done, "answered_tasks": answered,
             "suggest": out.get("suggest", []),
