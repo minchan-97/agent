@@ -1,8 +1,10 @@
 """
 docagent.py — 문서함을 비서(대화·과제·초안·알림)와 잇는다.
 
-  catalog(sb)              대화·과제 프롬프트에 넣을 문서 목록. 문서는 [D1], 양식은 [T1], 초안은 [R1] 로 부른다
+  catalog(sb, query)       대화·과제 프롬프트에 넣을 문서 목록. 문서는 '문서1', 양식은 '양식1', 초안은 '초안1' 로 부른다
                            (LLM 은 진짜 id 를 모른다. 번호를 서버가 id 로 바꾼다 → 남의 문서를 가리킬 수 없다)
+                           최근 문서에 더해, 지금 말·과제 목표와 이름이 닮은 문서를 함께 넣는다
+  humanize(text, index)    사용자에게 가는 말에 번호(문서1)가 새어 나오면 문서 이름으로 바꾼다
   resolve_args(kind, args, index)   행동 args 의 "doc":"D1" 같은 번호를 id 로 바꾼다
   read_context(sb, doc_id, q)       '문서 읽기': 질문과 가까운 부분을 [문서 자료] 로 감싸 돌려준다
   new_doc(sb, title, text)          글 → 새 워드(.docx) 파일 (# 제목, - 목록 줄을 살린다)
@@ -28,37 +30,83 @@ DOC_KINDS = ("doc_edit", "doc_make", "doc_new")
 
 
 # ---------------------------------------------------------------- 목록과 번호
-def catalog(sb, n_docs: int = 8, n_tpl: int = 6, n_drafts: int = 3) -> tuple:
+PREFIX = {"doc": "문서", "template": "양식", "draft": "초안"}
+_LEGACY = {"D": "문서", "T": "양식", "R": "초안", "DOC": "문서", "TPL": "양식", "DRAFT": "초안"}
+_KEY_RE = re.compile(r"^\[?\s*(문서|양식|초안|DOC|TPL|DRAFT|D|T|R)\s*#?\s*(\d{1,3})\s*\]?$", re.I)
+
+
+def norm_key(v) -> str:
+    """'[문서1]', '문서 1', 'D1', 'doc1' → '문서1'"""
+    m = _KEY_RE.match(str(v or "").strip())
+    if not m:
+        return ""
+    head = m.group(1)
+    return f"{_LEGACY.get(head.upper(), head)}{int(m.group(2))}"
+
+
+def _grams(s: str) -> set:
+    s = re.sub(r"\.[a-z0-9]{2,5}$", "", (s or "").lower())
+    s = re.sub(r"[\s_\-().\[\]]+", "", s)
+    return {s[i:i + 2] for i in range(len(s) - 1)}
+
+
+def catalog(sb, query: str = "", n_docs: int = 8, n_tpl: int = 6, n_drafts: int = 3) -> tuple:
     """(프롬프트 글, 번호 → {kind, id, name})"""
     index, lines = {}, []
     try:
         ds = sb.table("docs").select("id,name,kind,created_at,parent_id").order("id", desc=True).limit(n_docs).execute().data or []
         ts = sb.table("templates").select("id,name,fields").order("id", desc=True).limit(n_tpl).execute().data or []
+        if query:                         # 오래된 문서라도 이름이 지금 말과 닮았으면 넣는다
+            q = _grams(query)
+            have = {d["id"] for d in ds}
+            more = sb.table("docs").select("id,name,kind,created_at,parent_id").order("id", desc=True).limit(300).execute().data or []
+            scored = sorted(((len(q & _grams(d["name"])), d) for d in more if d["id"] not in have),
+                            key=lambda x: -x[0])
+            ds += [d for sc, d in scored[:4] if sc >= 2]
     except Exception:                     # 문서 표가 아직 없는 DB
         ds, ts = [], []
     rs = sb.table("task_memory").select("id,content,doc_id").eq("kind", "draft") \
            .order("id", desc=True).limit(n_drafts).execute().data or []
     for i, d in enumerate(ds, 1):
-        index[f"D{i}"] = {"kind": "doc", "id": d["id"], "name": d["name"]}
+        index[f"문서{i}"] = {"kind": "doc", "id": d["id"], "name": d["name"]}
         when = str(d.get("created_at") or "")[:10]
-        lines.append(f"[D{i}] {d['name']} ({KIND_LABEL.get(d['kind'], d['kind'])}{', 고친 버전' if d.get('parent_id') else ''}, {when})")
+        lines.append(f"문서{i}: {d['name']} ({KIND_LABEL.get(d['kind'], d['kind'])}{', 고친 버전' if d.get('parent_id') else ''}, {when})")
     for i, t in enumerate(ts, 1):
-        index[f"T{i}"] = {"kind": "template", "id": t["id"], "name": t["name"]}
+        index[f"양식{i}"] = {"kind": "template", "id": t["id"], "name": t["name"]}
         labels = ", ".join(f["label"] for f in (t.get("fields") or [])[:8])
-        lines.append(f"[T{i}] 양식 '{t['name']}' — 칸: {labels}")
+        lines.append(f"양식{i}: '{t['name']}' — 칸: {labels}")
     for i, r in enumerate(rs, 1):
-        index[f"R{i}"] = {"kind": "draft", "id": r["id"], "name": str(r["content"]).split("\n")[0][:40],
-                          "text": r["content"]}
-        lines.append(f"[R{i}] 초안: {str(r['content']).split(chr(10))[0][:60]}")
+        index[f"초안{i}"] = {"kind": "draft", "id": r["id"], "name": str(r["content"]).split("\n")[0][:40],
+                           "text": r["content"]}
+        lines.append(f"초안{i}: {str(r['content']).split(chr(10))[0][:60]}")
     if not lines:
         return "", index
-    return "\n\n[문서함 — 번호로 가리켜라]\n" + "\n".join(lines), index
+    return ("\n\n[문서함] args 에는 왼쪽 번호(문서1·양식1·초안1)를 쓴다. 이 번호는 시스템 안에서만 쓰는 것이니 "
+            "사용자에게 하는 말(reply·question·result)에는 절대 쓰지 말고 문서 이름으로 말해라. "
+            "사용자가 말한 문서가 목록에 없으면 이름을 다시 물어라.\n" + "\n".join(lines)), index
 
 
 def _ref(index: dict, v, want: str):
-    key = str(v or "").strip().strip("[]").upper()
-    hit = index.get(key)
+    hit = index.get(norm_key(v))
     return hit if hit and hit["kind"] == want else None
+
+
+# '문서1' 처럼 붙여 쓴 번호만 (띄어 쓴 '문서 2개', '양식 3장' 같은 보통 말은 건드리지 않는다)
+_LEAK_RE = re.compile(r"(?:\[\s*)?(문서|양식|초안)#?(\d{1,3})(?![\d개장쪽건부])(?:\s*\])?|\[(D|T|R)(\d{1,3})\]")
+
+
+def humanize(text: str, index: dict) -> str:
+    """사용자에게 가는 말에서 내부 번호를 이름으로. 목록에 없는 번호는 '그 문서' 로."""
+    if not text:
+        return text
+
+    def sub(m):
+        key = norm_key(m.group(0))
+        hit = index.get(key)
+        if hit:
+            return f"'{hit['name']}'" if hit["kind"] != "draft" else f"초안 '{hit['name']}'"
+        return {"문서": "그 문서", "양식": "그 양식", "초안": "그 초안"}.get(key.rstrip("0123456789"), "그 문서")
+    return _LEAK_RE.sub(sub, text)
 
 
 def resolve_args(kind: str, args: dict, index: dict):
@@ -88,6 +136,11 @@ def resolve_args(kind: str, args: dict, index: dict):
 def evidence_for(index: dict) -> dict:
     return {k: {"tag": k, "kind": "doc", "id": v["id"], "text": v["name"]}
             for k, v in index.items() if v["kind"] == "doc"}
+
+
+def because_key(tag) -> str:
+    """근거 번호: U·F1·N2 는 그대로, 문서 번호는 '문서1' 꼴로."""
+    return norm_key(tag) or str(tag).strip("[] ")
 
 
 # ---------------------------------------------------------------- 읽기
