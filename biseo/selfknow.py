@@ -39,6 +39,8 @@ CANNOT = [
     "사진·그림 새로 만들기",
     "다른 사람과 일정·문서 함께 쓰기",
 ]
+_STOP = {"오늘", "내일", "어제", "이번", "지금", "현재", "최근", "알려", "알려줘", "어때", "뭐야", "있어", "정보",
+         "관련", "검색", "찾아", "찾아줘", "요즘", "최신", "기준", "년", "월", "일"}
 LABEL = {k: n for k, n, _, _ in CAPABILITIES}
 ACTION_TO_CAP = {"event": "schedule", "reminder": "reminder", "note": "note", "draft": "draft",
                  "start_task": "task", "self_task": "task", "search": "search", "doc_edit": "doc",
@@ -47,7 +49,8 @@ ACTION_TO_CAP = {"event": "schedule", "reminder": "reminder", "note": "note", "d
 
 ABOUT_ME = re.compile(r"(기능|할 수 있|할수있|뭘 할|무엇을 할|뭐 할 수|뭐가 돼|뭐 돼|사용법|어떻게 써|어떻게 쓰|개선|추가하면|"
                       r"더하면|업데이트|필요한 기능|부족한|아쉬운|너는 뭐|넌 뭐|자기소개|소개해|도움말|할 줄)")
-REFUSAL = re.compile(r"(할 수 없|못 해요|못해요|못 해 드|못 합니다|지원하지 않|아직 못|아직 할 수 없|불가능)")
+REFUSAL = re.compile(r"(할 수 없|할 수가 없|못 해요|못해요|못 해 드|못 합니다|지원하지 않|아직 못|아직 할 수 없|불가능|"
+                     r"드릴 수 없|드릴 수는 없|볼 수 없|접근할 수 없|연결돼 있지 않|연결되어 있지 않|직접은 어려|직접 하기는 어려)")
 
 
 def asks_about_me(text: str) -> bool:
@@ -63,7 +66,7 @@ def usage(sb, days: int = 30) -> dict:
     since = _since(days)
     out = {"days": days, "by_cap": {}, "decided": {}, "unmet": [], "talks": 0}
     try:
-        acts = sb.table("actions").select("kind,status").gte("created_at", since).limit(2000).execute().data or []
+        acts = sb.table("actions").select("kind,status,args").gte("created_at", since).limit(2000).execute().data or []
     except Exception:
         acts = []
     used = Counter()
@@ -91,9 +94,18 @@ def usage(sb, days: int = 30) -> dict:
     except Exception:
         pass
     out["by_cap"] = dict(used)
+    words = Counter()
+    for a in acts:
+        if a.get("kind") == "search":
+            q = str((a.get("args") or {}).get("query") or "")
+            for w in set(re.findall(r"[가-힣A-Za-z]{2,}", q)):
+                if w not in _STOP:
+                    words[w] += 1
+    out["top_search"] = [(w, c) for w, c in words.most_common(3) if c >= 3]
     # 못 해 드린 부탁: 비서가 '할 수 없다'고 답한 직전의 사용자 말 + 막힌 행동
     try:
-        eps = sb.table("episodes").select("role,text").gte("created_at", since).order("id").limit(600).execute().data or []
+        eps = (sb.table("episodes").select("role,text").gte("created_at", since)
+               .order("id", desc=True).limit(800).execute().data or [])[::-1]
     except Exception:
         eps = []
     out["talks"] = sum(1 for e in eps if e.get("role") == "user")
@@ -176,7 +188,19 @@ ASKS_IMPROVE = re.compile(r"(개선|더하면|추가하면|추가했으면|필�
                           r"고치면|바꾸면 좋|발전)")
 VAGUE = re.compile(r"(원활|맞춤형|강화|향상|편리하게|더 쉽게|다양한|효율적|최적화|사용자 경험|발전할 수|"
                    r"인터페이스|직관적|접근성)")
-_PREFER = ["template", "daily", "task", "doc", "why", "note", "draft", "search", "schedule", "reminder", "skill"]
+_PREFER = ["template", "daily", "task", "doc", "note", "draft", "reminder", "schedule", "skill"]
+# '왜'·기억·음성은 쓰임이 기록되지 않는 기능이라 '안 써 본 기능'으로 권하지 않는다
+_TIP = {
+    "template": "자주 쓰는 문서를 양식으로 저장해 두면, 내용만 말해도 같은 모양 문서가 나와요. 예: \"체험학습 양식으로 6월 3일 박물관 써 줘\"",
+    "daily": "매일 정한 시각에 오늘 할 만한 일을 먼저 건네 드려요. 설정 → 오늘의 생각 시각에서 켜요",
+    "task": "여러 단계 일을 맡기면 혼자 찾고 정리해서 결과를 드려요. 예: \"체험학습 장소 후보 조사해서 정리해 줘\"",
+    "doc": "엑셀·한글·PDF를 올리면 읽고 답하고, 고친 새 버전도 만들어요. 문서 → 올리기",
+    "note": "\"이거 메모해 줘\" 한마디로 기록하고, 일정에 붙여 둘 수 있어요",
+    "draft": "문자·메일·공지 초안을 써 드려요. 예: \"학부모님께 보낼 안내 문자 써 줘\"",
+    "reminder": "정한 시각에 휴대폰 알림을 보내요. 예: \"금요일 9시에 동의서 걷기 알려 줘\"",
+    "schedule": "말로 일정을 넣고 반복도 걸 수 있어요. 예: \"매주 월요일 9시 회의 넣어 줘\"",
+    "skill": "반복되는 부탁을 홈 버튼으로 만들어요. 예: \"회의 준비 버튼 만들어 줘\"",
+}
 _CANNOT_HINT = [
     (re.compile(r"(보내|전송|카톡|문자 해|메일 해|발송)"), 0),
     (re.compile(r"(메일함|받은 메일|구글|아이폰 캘린더|캘린더 연동|나이스|업무포털|k-?에듀|에듀파인)", re.I), 1),
@@ -205,49 +229,44 @@ def _cannot_for(ask: str):
 
 
 def improve_answer(sb, u: dict | None = None) -> str:
-    """실제 쓰임으로만 짠 개선 답: ① 이미 있는데 안 쓴 기능 ② 자주 쓰는 기능 바로가기 ③ 못 해 드린 부탁."""
+    """실제 쓰임으로만 짠 개선 답: ① 자주 하는 일을 더 빠르게 ② 안 써 본 기능 ③ 못 해 드린 부탁."""
     u = u or usage(sb)
     used = u.get("by_cap") or {}
-    info = {k: (n, what, how) for k, n, what, how in CAPABILITIES}
-    lines = []
-    if u.get("talks", 0) < 5 and not used:
+    if u.get("talks", 0) < 5 and not any(used.values()):
         return ("아직 쓰신 기록이 거의 없어서, 무엇을 더하면 좋을지 판단하기 일러요.\n"
-                "우선 이런 걸 해 보세요:\n"
-                f"• 문서 올리기 — {info['doc'][2]}\n"
-                f"• 알림 — {info['reminder'][2]}\n"
-                "며칠 쓰신 뒤 다시 물어보시면, 실제로 쓰신 걸 보고 말씀드릴게요.")
-    # ① 이미 있는데 아직 안 쓴 기능 (문서는 쓰는데 양식은 안 쓰면 양식이 먼저)
+                f"우선 이렇게 써 보세요.\n• {_TIP['doc']}\n• {_TIP['reminder']}\n"
+                "며칠 쓰신 뒤 다시 물어보시면, 쓰신 기록을 보고 말씀드릴게요.")
+    parts = []
+    # ① 자주 하는 일 → 더 빠르게 (기능 이름이 아니라 실제로 자주 한 부탁을 버튼으로)
+    top_search = u.get("top_search") or []
+    if top_search:
+        w, c = top_search[0]
+        parts.append(f"• '{w}'를 {c}번 찾으셨어요. 홈에 '{w}' 버튼을 두면 누르기만 해도 바로 찾아 드려요. "
+                     f"\"{w} 버튼 만들어 줘\"라고 하시면 돼요.")
+    elif used.get("note", 0) >= 20:
+        parts.append(f"• 메모가 {used['note']}개 쌓였어요. \"이번 주 메모 정리해 줘\"라고 맡기시면 묶어서 정리해 드려요.")
+    # ② 안 써 본 기능 중 하나 (문서는 쓰는데 양식은 안 쓰면 양식)
     order = list(_PREFER)
     if used.get("doc") and not used.get("template"):
         order.remove("template"); order.insert(0, "template")
-    unused = [k for k in order if not used.get(k)][:2]
+    unused = [k for k in order if not used.get(k)]
     if unused:
-        lines.append("1) 이미 있는데 아직 안 써 보신 것")
-        for k in unused:
-            n, what, how = info[k]
-            lines.append(f"• {n} — {what.split('. ')[0]}. 이렇게: {how}")
-    # ② 자주 쓰는 기능은 더 빨리
-    top = sorted(((k, v) for k, v in used.items() if v and k in info), key=lambda x: -x[1])[:2]
-    if top:
-        names = " · ".join(f"{info[k][0]} {v}번" for k, v in top)
-        lines.append(f"\n2) 자주 쓰시는 것 ({names})")
-        lines.append(f"• 자주 하는 부탁은 홈 버튼으로 만들 수 있어요. 예: \"{info[top[0][0]][0]} 버튼 만들어 줘\"")
-    # ③ 새 기능 후보: 못 해 드린 부탁에서만
+        parts.append(f"• 아직 안 써 보신 {LABEL[unused[0]]} — {_TIP[unused[0]]}")
+    # ③ 새 기능 후보: 실제로 못 해 드린 부탁에서만
     wants = []
     for ask in u.get("unmet") or []:
         c = _cannot_for(ask)
         if c and c not in [w[0] for w in wants]:
             wants.append((c, ask))
-    lines.append("\n3) 새로 생기면 좋을 것")
-    if wants:
-        for c, ask in wants[:2]:
-            said = ask if ask.startswith("메시지를 직접") else f"\"{ask[:40]}\" 같은 부탁"
-            lines.append(f"• {c.split(' (')[0]} — 실제로 {said}을 못 해 드렸어요.")
-    else:
-        lines.append("• 최근에 제가 못 해 드린 부탁이 기록에 없어요. 새 기능은 아직 판단하기 일러요. "
-                     "쓰시다가 '이건 왜 안 돼?' 싶은 게 생기면 그대로 말씀해 주세요. 그게 다음 기능의 근거가 돼요.")
+    for c, ask in wants[:2]:
+        said = ask if ask.startswith("메시지를 직접") else f"\"{ask[:40]}\" 같은 부탁"
+        parts.append(f"• 새로 생기면 좋을 것: {c.split(' (')[0]} — 실제로 {said}을 못 해 드렸어요.")
     d = u.get("decided") or {}
     if d.get("rejected", 0) >= 5 and d.get("rejected", 0) > d.get("accepted", 0):
-        lines.append(f"\n덧붙이면, 제가 하자고 한 일 중 넘기신 게 더 많아요(받아들임 {d.get('accepted', 0)} · "
-                     f"넘김 {d['rejected']}). 제안이 과하면 말씀해 주세요.")
-    return f"최근 {u.get('days', 30)}일 쓰신 기록을 보고 말씀드릴게요.\n\n" + "\n".join(lines)
+        parts.append(f"• 제가 하자고 한 일 중 넘기신 게 더 많아요(받아들임 {d.get('accepted', 0)} · 넘김 {d['rejected']}). "
+                     "제안이 과하면 말씀해 주세요.")
+    head = f"최근 {u.get('days', 30)}일 쓰신 걸 보면,"
+    tail = ("" if wants else
+            "\n\n새 기능은 아직 근거가 없어요. 제가 못 해 드린 부탁이 기록에 없거든요. "
+            "쓰시다 '이건 왜 안 돼?' 싶으면 그대로 말씀해 주세요. 그게 다음 기능의 근거가 돼요.")
+    return head + "\n" + "\n".join(parts) + tail
