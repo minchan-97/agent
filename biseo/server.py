@@ -583,6 +583,10 @@ def _doc(fn, *a):
         raise HTTPException(429, str(e))
     except FileNotFoundError as e:
         raise HTTPException(404, str(e))
+    except ImportError as e:      # 배포에 문서 패키지가 빠졌을 때: 500 대신 무엇이 없는지 알려 준다
+        name = getattr(e, "name", None) or str(e)
+        print("DOCS_MISSING_PACKAGE", name)
+        raise HTTPException(503, f"서버에 문서 처리 도구({name})가 설치되지 않았어요. pyproject.toml 의존성을 확인해 주세요.")
     except st.StorageError as e:
         raise HTTPException(502, "파일 저장소에 닿지 못했어요. 잠시 뒤 다시 해 주세요.") from e
 
