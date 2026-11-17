@@ -680,6 +680,61 @@ form.homebar,form.compose{box-shadow:0 1px 2px rgb(22 35 58 / .05),0 8px 22px rg
 .cap-n{font-size:.75rem;color:var(--muted);flex:none}
 .cap p{margin:3px 0 0;font-size:.8125rem;line-height:1.5}.cap .cap-how{color:var(--muted)}
 .cap.no{background:var(--soft);box-shadow:none}.cap.no p{color:var(--muted)}
+
+/* ---------- 둘러보기: 이 비서가 다른 점 (처음 한 번 · 설정에서 다시) ---------- */
+#tour{position:fixed;inset:0;z-index:9000;background:var(--bg);display:flex;flex-direction:column;
+  padding:max(18px,env(safe-area-inset-top)) 0 max(18px,env(safe-area-inset-bottom));opacity:0;transition:opacity .3s ease}
+#tour.on{opacity:1}
+.tr-top{display:flex;align-items:center;justify-content:space-between;padding:0 22px 10px;color:var(--muted);font-size:.8125rem;letter-spacing:.02em}
+.tr-top .tr-brand{display:flex;align-items:center;gap:7px;color:var(--ink);font-weight:600}
+.tr-top .tr-brand .enso{width:18px;height:18px;color:var(--brand-navy)}
+@media (prefers-color-scheme: dark){.tr-top .tr-brand .enso{color:var(--brand-ivory)}}
+.tr-skip{background:none;border:0;color:var(--muted);font-size:.8125rem;padding:6px 2px;cursor:pointer}
+.tr-view{flex:1;overflow:hidden;position:relative;touch-action:pan-y}
+.tr-track{display:flex;height:100%;transition:transform .42s cubic-bezier(.3,.8,.3,1)}
+.tr-slide{flex:0 0 100%;display:flex;flex-direction:column;justify-content:center;padding:0 22px 6vh;overflow-y:auto}
+.tr-slide>*{flex:none}
+.tr-stage{position:relative;border-radius:22px;padding:18px 16px;min-height:236px;display:flex;flex-direction:column;justify-content:center;gap:9px;
+  background:radial-gradient(circle at 26% 18%,#1B3866,#13294B 45%,#08111F);overflow:hidden;color:#0E1A2B}
+.tr-stage::after{content:"";position:absolute;right:-46px;bottom:-54px;width:190px;height:190px;opacity:.07;pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='52' r='34' fill='none' stroke='%23F3EEE3' stroke-width='9' stroke-dasharray='190 24' transform='rotate(-62 50 52)'/%3E%3C/svg%3E") center/contain no-repeat}
+.tr-k{margin:22px 0 6px;font-size:.75rem;letter-spacing:.14em;color:var(--gold);font-weight:700}
+.tr-h{margin:0 0 10px;font-size:1.375rem;line-height:1.35;letter-spacing:-.01em;color:var(--ink);word-break:keep-all}
+.tr-p{margin:0;font-size:.9375rem;line-height:1.65;color:var(--muted);word-break:keep-all}
+.tr-p b{color:var(--ink);font-weight:600}
+.tr-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 22px 0}
+.tr-dots{display:flex;gap:7px}
+.tr-dots i{width:7px;height:7px;border-radius:50%;background:var(--line);transition:all .3s}
+.tr-dots i.on{background:var(--gold);width:20px;border-radius:4px}
+.tr-btns{display:flex;gap:8px}.tr-btns .btn{white-space:nowrap}
+/* 무대 위 작은 화면 조각 (실제 앱 모양을 따라 한 것) */
+.m-card{position:relative;z-index:1;background:#FBF9F4;border-radius:14px;padding:10px 12px;box-shadow:0 6px 18px rgb(0 0 0 / .22);font-size:.8125rem;line-height:1.45}
+.m-card .m-l{display:flex;align-items:center;gap:7px;font-size:.6875rem;color:#56616F;letter-spacing:.02em;margin-bottom:3px}
+.m-card b{font-weight:650;color:#0E1A2B}
+.m-ic{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.m-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;position:relative;z-index:1}
+.m-grid .m-card{padding:9px 10px}
+.m-bar{height:5px;border-radius:3px;background:#E3E8EE;margin-top:6px;overflow:hidden}
+.m-bar i{display:block;height:100%;width:62%;background:#13294B;border-radius:3px}
+.m-chat{position:relative;z-index:1;display:flex;align-items:center;gap:8px;background:rgb(243 238 227 / .12);border:1px solid rgb(243 238 227 / .22);
+  color:#F3EEE3;border-radius:12px;padding:9px 12px;font-size:.8125rem}
+.m-chat span{opacity:.9}.m-chat .m-ic{opacity:.8}
+.m-why{display:flex;align-items:flex-start;gap:4px;margin-top:7px;padding-top:7px;border-top:1px solid #E3E8EE;font-size:.75rem;color:#56616F}
+.m-why .gdot{margin-top:.38em;background:#B8862E}
+.m-path{position:relative;z-index:1;display:flex;flex-direction:column;gap:0;margin:2px 0 0 12px;padding-left:14px;border-left:1.5px solid rgb(243 238 227 / .3);color:#F3EEE3;font-size:.75rem}
+.m-path span{position:relative;padding:3px 0;opacity:.88}
+.m-path span::before{content:"";position:absolute;left:-18.5px;top:9px;width:7px;height:7px;border-radius:50%;background:#F3EEE3}
+.m-path span.g::before{background:#D8B46A;box-shadow:0 0 0 3px rgb(216 180 106 / .25)}
+.m-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.m-chips em{font-style:normal;font-size:.6875rem;padding:3px 8px;border-radius:999px;background:#ECF0F5;color:#13294B}
+.m-chips em.on{background:#13294B;color:#F3EEE3}
+.m-arrow{position:relative;z-index:1;text-align:center;color:#D8B46A;font-size:.875rem;line-height:1}
+.m-acts{display:flex;gap:6px;margin-top:8px}
+.m-acts span{flex:1;text-align:center;font-size:.75rem;padding:6px 0;border-radius:9px;background:#13294B;color:#F3EEE3;font-weight:600}
+.m-acts span.g{background:#ECF0F5;color:#56616F}
+.m-bub{position:relative;z-index:1;align-self:flex-start;max-width:86%;background:rgb(243 238 227 / .14);color:#F3EEE3;border-radius:14px 14px 14px 4px;padding:8px 11px;font-size:.78rem;line-height:1.45}
+.m-ok{position:relative;z-index:1;align-self:flex-start;display:flex;align-items:center;gap:5px;font-size:.6875rem;color:#D8B46A;letter-spacing:.02em;margin-left:4px}
+@media (prefers-reduced-motion: reduce){.tr-track{transition:none}#tour{transition:none}}
 </style>
 </head>
 <body>
@@ -3075,6 +3130,9 @@ SCREENS.settings = {
       el("span", "ver", "이 비서는 arcogit 구조로 만들었어요"));
     about.append(mono, ab);
     box.append(about);
+    const again = el("div", "row");
+    again.append(button("둘러보기 다시 보기", "ghost small", () => showTour(true)));
+    box.append(again);
     body.replaceChildren(box);
   },
 };
@@ -3377,6 +3435,7 @@ async function enter() {
   cache.warm();                            // 모든 앱 데이터를 한 번에 데운다 (기다리지 않는다)
   await goHome();
   if (target) { history.replaceState(null, "", location.pathname); await openTarget(target); }
+  else showTour();                         // 처음 한 번: 이 비서가 다른 점
   // 알림 서비스 워커가 있으면 연결해 두고, 알림을 누르면 화면을 바꾼다
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
@@ -3395,28 +3454,105 @@ $("saveName").addEventListener("click", async () => {
 });
 
 /* ===================== 첫 사용 안내 ===================== */
-function welcome() {
-  if (ls("biseo.welcomed")) return;
-  openSheet(`${agentName}와(과) 시작하기`, (s) => {
-    s.classList.add("welcome");
-    const ol = el("ol");
-    for (const [b, t] of [
-      ["말로 맡기세요", "\u201c내일 3시 회의, 30분 전에 알려 줘\u201d처럼 채팅으로 말하면 일정·알림·메모로 정리돼요."],
-      ["처음 하는 일은 먼저 물어봐요", "확인함에서 \u2018하기\u2019를 누르면 해요. 같은 종류를 다섯 번 그대로 승인하면 그다음부턴 묻지 않고 해 두고, 되돌리면 다시 묻기 시작해요."],
-      ["남에게 닿는 일은 언제나 물어봐요", "메시지 보내기처럼 되돌릴 수 없는 일은 아무리 써도 혼자 하지 않아요."],
-      ["긴 일은 \u2018맡은 일\u2019로", "조사·정리처럼 여러 단계가 필요한 일은 틈틈이 진행하고, 묻거나 끝나면 알려 줘요."],
-    ]) { const li = el("li"); li.append(el("b", "", b), el("span", "muted", t)); ol.append(li); }
-    s.append(ol);
-    const foot = el("div", "actions");
-    foot.append(button("나중에", "ghost", async () => { ls("biseo.welcomed", "1"); closeSheet(); }),
-      button("알림 켜고 시작", "", async () => {
-        ls("biseo.welcomed", "1");
-        try { await enablePush(); toast("알림을 켰어요."); } catch (e) { toast(e.message, "err"); }
-        closeSheet();
-      }));
-    s.append(foot);
-  });
+/* ===================== 둘러보기: 이 비서가 다른 점 ===================== */
+// 처음 한 번 보여 주고, 설정 → '둘러보기 다시 보기'로 언제든 다시 본다.
+// 무대 위 조각은 실제 앱 모양을 따라 그린 것 (진짜 데이터가 아니라 예시)
+const TOUR_KEY = "biseo.tour.v1";
+function mIc(name) { return `<svg class="m-ic" viewBox="0 0 24 24" aria-hidden="true">${ICON[name] || ICON.dot}</svg>`; }
+const TOUR = [
+  { k: "하나", h: "한 화면에서 시키고,<br>보면서 이어 맡겨요",
+    p: "채팅에 묻혀 사라지지 않아요. <b>일정·알림·확인 대기·맡은 일</b>이 홈에 그대로 남아서, 지금 상황을 한눈에 보며 다음 일을 맡기면 돼요.",
+    stage: `<div class="m-grid">
+      <div class="m-card"><div class="m-l">${mIc("events")}일정</div><b>오늘 3시 협의회</b></div>
+      <div class="m-card"><div class="m-l">${mIc("inbox")}확인함</div><b>1건 기다려요</b> <span class="gdot"></span></div>
+      <div class="m-card"><div class="m-l">${mIc("tasks")}맡은 일</div><b>체험학습 장소 조사</b><div class="m-bar"><i></i></div></div>
+      <div class="m-card"><div class="m-l">${mIc("reminders")}알림</div><b>금 9:00 동의서 걷기</b></div></div>
+      <div class="m-chat">${mIc("chat")}<span>“다음 주 월요일 학부모 상담도 넣어 줘”</span></div>` },
+  { k: "둘", h: "제안마다<br>‘왜’가 붙어요",
+    p: "무엇을 근거로 그렇게 판단했는지 한 줄로 보여 줘요. 누르면 <b>근거(일정·메모·문서)</b>와 생각이 지나간 <b>판단 경로</b>까지 볼 수 있어요.",
+    stage: `<div class="m-card"><div class="m-l">${mIc("bolt")}오늘의 제안</div><b>내일 협의회 자료를 미리 정리해 둘까요?</b>
+        <div class="m-why"><span class="gdot"></span><span>내일 3시 협의회 일정 · 지난주 메모 ‘안건 3개’</span></div></div>
+      <div class="m-path"><span>상황 파악 — 내일과 이어지는 일만</span><span class="g">근거끼리 맞춰 보기</span><span>근거 대고 추천</span></div>` },
+  { k: "셋", h: "한글·엑셀 문서도<br>읽고 고쳐요",
+    p: "가정통신문을 올리면 내용을 묻고, 날짜를 고친 <b>새 파일</b>을 받을 수 있어요. 자주 쓰는 문서는 <b>양식</b>으로 두면 내용만 말해도 같은 모양으로 만들어요.",
+    stage: `<div class="m-card"><div class="m-l">${mIc("docs")}문서</div><b>체험학습 가정통신문.hwpx</b>
+        <div class="m-chips"><em>읽고 묻기</em><em>고친 새 버전</em><em class="on">양식으로 저장</em></div></div>
+      <div class="m-chat">${mIc("chat")}<span>“이 양식으로 6월 3일 박물관, 준비물 도시락”</span></div>
+      <div class="m-arrow">↓</div>
+      <div class="m-card"><div class="m-l">${mIc("check")}새로 만들었어요</div><b>체험학습 안내(6월 3일).hwpx</b></div>` },
+  { k: "넷", h: "먼저 묻고,<br>말과 실제가 맞아요",
+    p: "처음 하는 일은 <b>확인함</b>에서 기다려요. 같은 종류를 다섯 번 그대로 승인하면 그다음부턴 알아서 하고, 메시지 보내기처럼 남에게 닿는 일은 언제나 물어요. 확인 전에는 ‘했다’고 말하지 않도록 <b>스스로 검사</b>해요.",
+    stage: `<div class="m-card"><div class="m-l">${mIc("inbox")}확인함</div><b>알림 · 금요일 9시 동의서 걷기</b>
+        <div class="m-acts"><span>하기</span><span class="g">넘기기</span></div></div>
+      <div class="m-bub">확인함에 올려 뒀어요. 누르시면 그때 들어가요.</div>
+      <div class="m-ok">${mIc("check")}말과 실제를 맞춰 봤어요</div>` },
+];
+
+function josaGa(w) {                  // 받침이 있으면 '이', 없으면 '가'
+  const c = w.charCodeAt(w.length - 1);
+  return w + (c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 ? "이" : "가");
 }
+function showTour(force = false) {
+  if (!force && ls(TOUR_KEY)) return;
+  if ($("tour")) return;
+  const root = el("div"); root.id = "tour"; root.setAttribute("role", "dialog"); root.setAttribute("aria-label", "둘러보기");
+  const top = el("div", "tr-top");
+  const brand = el("span", "tr-brand"); brand.innerHTML = ensoSVG() + `<span>${josaGa(agentName || "비서")} 다른 점</span>`;
+  const skip = el("button", "tr-skip", "건너뛰기");
+  top.append(brand, skip);
+  const view = el("div", "tr-view"), track = el("div", "tr-track");
+  for (const s of TOUR) {
+    const sl = el("section", "tr-slide");
+    const st = el("div", "tr-stage"); st.innerHTML = s.stage;
+    const k = el("p", "tr-k", s.k), hh = el("h2", "tr-h"), pp = el("p", "tr-p");
+    hh.innerHTML = s.h; pp.innerHTML = s.p;
+    sl.append(st, k, hh, pp); track.append(sl);
+  }
+  view.append(track);
+  const foot = el("div", "tr-foot"), dots = el("div", "tr-dots"), btns = el("div", "tr-btns");
+  TOUR.forEach(() => dots.append(el("i")));
+  foot.append(dots, btns);
+  root.append(top, view, foot);
+  document.body.append(root);
+  requestAnimationFrame(() => root.classList.add("on"));
+
+  let i = 0;
+  const close = () => { ls(TOUR_KEY, "1"); ls("biseo.welcomed", "1"); root.classList.remove("on"); setTimeout(() => root.remove(), 320); };
+  const pushOn = () => { try { return Notification.permission === "granted"; } catch { return true; } };
+  const paint = () => {
+    track.style.transform = `translateX(${-100 * i}%)`;
+    [...dots.children].forEach((d, n) => d.classList.toggle("on", n === i));
+    skip.style.visibility = i === TOUR.length - 1 ? "hidden" : "visible";
+    const last = i === TOUR.length - 1;
+    const b = [];
+    if (i > 0 && !(last && !pushOn())) b.push(button("이전", "ghost", () => { i--; paint(); }));
+    if (!last) b.push(button("다음", "", () => { i++; paint(); }));
+    else if (pushOn()) b.push(button("시작하기", "", close));
+    else b.push(button("나중에", "ghost", close), button("알림 켜고 시작", "", async () => {
+      try { await enablePush(); toast("알림을 켰어요."); } catch (e) { toast(e.message, "err"); }
+      close();
+    }));
+    btns.replaceChildren(...b);
+  };
+  skip.onclick = close;
+  // 밀어서 넘기기
+  let x0 = null;
+  view.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+  view.addEventListener("touchend", (e) => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0; x0 = null;
+    if (Math.abs(dx) < 45) return;
+    i = Math.max(0, Math.min(TOUR.length - 1, i + (dx < 0 ? 1 : -1))); paint();
+  });
+  root.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight" && i < TOUR.length - 1) { i++; paint(); }
+    if (e.key === "ArrowLeft" && i > 0) { i--; paint(); }
+    if (e.key === "Escape") close();
+  });
+  root.tabIndex = -1; root.focus();
+  paint();
+}
+function welcome() { showTour(); }
 
 /* ===================== 시작 ===================== */
 (async () => {
