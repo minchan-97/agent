@@ -303,8 +303,11 @@ def respond(sb, agent: dict, user_text: str) -> dict:
     reply = docagent.humanize(out["reply"].strip(), doc_index) or "잠깐 생각이 엉켰어요. 한 번만 다시 말해 줄래요?"
     # 개선 질문에 빈말("소통을 원활하게·맞춤형 강화")로 답했으면, 실제 쓰임 기록으로 다시 짠다
     try:
-        if not saw_external and selfknow.asks_improvement(text) and selfknow.is_vague(reply):
-            reply = selfknow.improve_answer(sb)
+        if not saw_external and selfknow.is_vague(reply):
+            if selfknow.asks_compare(text):
+                reply = selfknow.compare_answer(sb)
+            elif selfknow.asks_improvement(text):
+                reply = selfknow.improve_answer(sb)
     except Exception as e:
         print("SELFKNOW_IMPROVE_SKIP", type(e).__name__, str(e)[:120])
 
