@@ -288,12 +288,32 @@ def edit_hwpx(data: bytes, ops: list) -> dict:
     def paragraphs():
         return [p for r in roots.values() for p in r.iter(P)]
 
+    BR = f"{{{HP}}}lineBreak"
+
+    def set_text(t, v):          # 여러 줄 값은 한글의 줄바꿈 요소로
+        parts = (v or "").split("\n")
+        t.text = parts[0]
+        for part in reversed(parts[1:]):
+            br = etree.Element(BR)
+            br.tail = part
+            t.insert(0, br)
+
+    def set_tail(t, ch, v):
+        parts = (v or "").split("\n")
+        ch.tail = parts[0]
+        at = list(t).index(ch) + 1
+        for part in reversed(parts[1:]):
+            br = etree.Element(BR)
+            br.tail = part
+            t.insert(at, br)
+
     def slots_of(p):
         out = []
         for t in p.findall(f"{RUN}/{T}"):
-            out.append(Slot(lambda t=t: t.text, lambda v, t=t: setattr(t, "text", v), p))
-            for ch in t:
-                out.append(Slot(lambda c=ch: c.tail, lambda v, c=ch: setattr(c, "tail", v), p))
+            kids = list(t)
+            out.append(Slot(lambda t=t: t.text, lambda v, t=t: set_text(t, v), p))
+            for ch in kids:
+                out.append(Slot(lambda c=ch: c.tail, lambda v, t=t, c=ch: set_tail(t, c, v), p))
         return out
 
     def mark(p):
