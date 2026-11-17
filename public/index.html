@@ -672,6 +672,14 @@ form.homebar,form.compose{box-shadow:0 1px 2px rgb(22 35 58 / .05),0 8px 22px rg
 .btn{letter-spacing:-.005em}
 .clock{display:flex;align-items:center;gap:8px;margin:12px 0 4px;font-size:.8125rem}
 .ck-dot{width:8px;height:8px;border-radius:50%;flex:none}.ck-dot.on{background:var(--live)}.ck-dot.off{background:var(--danger)}
+.caps{margin:22px 0 0}.caps summary{cursor:pointer;font-weight:700;font-size:.9375rem;padding:6px 0}
+.caplist{display:flex;flex-direction:column;gap:8px;margin:8px 0}
+.cap{background:var(--surface);border-radius:14px;padding:11px 14px;box-shadow:var(--shadow)}
+.cap.unused{box-shadow:none;border:1px dashed var(--line);background:none}
+.cap-t{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.cap-t b{font-size:.9375rem}
+.cap-n{font-size:.75rem;color:var(--muted);flex:none}
+.cap p{margin:3px 0 0;font-size:.8125rem;line-height:1.5}.cap .cap-how{color:var(--muted)}
+.cap.no{background:var(--soft);box-shadow:none}.cap.no p{color:var(--muted)}
 </style>
 </head>
 <body>
@@ -2532,7 +2540,7 @@ async function openTemplate(tid) {
 // 비서가 무언가를 권하거나 해 둘 때 남긴 판단 기록(어떤 판단 노드를 거쳤는지, 무엇을 근거로 삼았는지,
 // 비슷했던 지난 판단 중 무엇을 떠올렸는지)을 사람이 읽을 수 있게 보여 준다.
 // 제안 옆에 늘 보이는 '왜' 한 줄: 이유 + 근거 표시(일정·메모·문서… 선 아이콘) + 몰랑이에게서 자란 판단이면 금빛 점
-const WHY_ICON = { event: "events", calendar: "events", reminder: "reminders", task: "tasks", note: "notes", fact: "memory", web: "globe", doc: "docs", answer: "chat" };
+const WHY_ICON = { event: "events", calendar: "events", reminder: "reminders", task: "tasks", note: "notes", fact: "memory", web: "globe", doc: "docs", answer: "chat", usage: "chart" };
 function whyLine(kind, refId, reason, j, label) {
   const b = el("button", "whyline");
   b.type = "button";
@@ -2566,6 +2574,7 @@ const EVIDENCE_KIND = {
   talk: ["대화", () => openApp("chat")],
   answer: ["내 답", null],
   doc: ["문서", (ev) => openDoc(ev.id)],
+  usage: ["쓰임", null],
   web: ["검색 자료", (ev) => { if (/^https?:\/\//.test(ev.id || "")) window.open(ev.id, "_blank", "noopener"); }],
   calendar: ["오늘", null],
 };
@@ -3035,6 +3044,24 @@ SCREENS.settings = {
       const a = el("a", "", label); a.href = href; a.target = "_blank"; a.rel = "noopener"; legal.append(a);
     }
     box.append(legal);
+
+    // 할 수 있는 일: 비서가 아는 자기 기능 목록 + 최근 30일 쓰임 (비서도 같은 목록으로 답한다)
+    try {
+      const me2 = await api("/api/self");
+      const cap = el("details", "caps"); cap.append(el("summary", "", "이 비서가 할 수 있는 일"));
+      const ul = el("div", "caplist");
+      for (const c of me2.capabilities) {
+        const r = el("div", "cap" + (c.used ? "" : " unused"));
+        const top = el("div", "cap-t"); top.append(el("b", "", c.name), el("span", "cap-n", c.used ? `최근 ${me2.days}일 ${c.used}번` : "아직 안 써 봤어요"));
+        r.append(top, el("p", "", c.what), el("p", "cap-how", c.how));
+        ul.append(r);
+      }
+      const no = el("div", "cap no"); no.append(el("b", "", "아직 못 하는 일"));
+      for (const t of me2.cannot) no.append(el("p", "", t));
+      cap.append(ul, no,
+        el("p", "muted small", "채팅에서 \u201c무슨 기능을 더하면 좋을까?\u201d라고 물으면, 이 목록과 실제 쓰임을 근거로 답해요."));
+      box.append(cap);
+    } catch {}
 
     // 앱 정보: arcogit 모노그램과 철학 한 줄
     const about = el("div", "about");
