@@ -367,7 +367,19 @@ def list_actions(authorization: str | None = Header(None)):
               .gte("created_at", since).order("id", desc=True).limit(10).execute().data) or []
     for r in pending + recent:
         r["label"] = act.KINDS.get(r["kind"], {}).get("label", r["kind"])
+    whys = judge.brief(sb, "action", [r["id"] for r in pending])        # 제안마다 '왜' 한 줄
+    for r in pending:
+        r["why"] = whys.get(str(r["id"]))
     return {"pending": pending, "recent": recent}
+
+
+def _plan_why(sb, plan):
+    """오늘의 제안 항목마다 판단 근거 요약을 붙인다 (홈에 '왜' 한 줄로 보인다)."""
+    if plan and plan.get("items"):
+        whys = judge.brief(sb, "daily", [it.get("id") for it in plan["items"]])
+        for it in plan["items"]:
+            it["judge"] = whys.get(str(it.get("id")))
+    return plan
 
 
 @app.post("/api/actions/{action_id}/{verb}")
@@ -527,7 +539,7 @@ def home(authorization: str | None = Header(None)):
                      "origin": sk0.get("origin") or "user", "uses": sk0.get("uses") or 0,
                      "created_at": sk0.get("created_at")})
     data["pins"] = pins
-    data["daily"] = daily.today_plan(sb)          # 오늘의 제안 (없으면 null)
+    data["daily"] = _plan_why(sb, daily.today_plan(sb))          # 오늘의 제안 (없으면 null)
     # 홈의 '진행 중' 카드: 지금 돌고 있는 과제 하나 (없으면 답을 기다리는 것)
     live = (sb.table("tasks").select("id,goal,status,steps,max_steps")
             .in_("status", ["open", "waiting_user"]).order("updated_at", desc=True).limit(5).execute().data) or []
@@ -815,7 +827,7 @@ async def layout_set(request: Request, authorization: str | None = Header(None))
 def daily_get(authorization: str | None = Header(None)):
     sb = _session(authorization)
     a = _agent(sb)
-    return {"plan": daily.today_plan(sb), "think_at": daily.think_at(a)}
+    return {"plan": _plan_why(sb, daily.today_plan(sb)), "think_at": daily.think_at(a)}
 
 
 class ThinkIn(BaseModel):
