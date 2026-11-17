@@ -118,6 +118,8 @@ def _row(sb, doc_id: int, cols: str = "*") -> dict:
 
 def _token(sb) -> str:
     t = getattr(sb, "token", None)
+    if not t and getattr(sb, "service", False):     # 크론(과제 진행): service role. 경로·행은 Scoped 가 그 사람 것만
+        t = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
     if not t:
         raise RuntimeError("저장소 토큰이 없어요")
     return t
