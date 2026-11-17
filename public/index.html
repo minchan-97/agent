@@ -568,6 +568,13 @@ body.editing .wslot > .bt{opacity:.92}
 .dtools .btn.ready{background:var(--accent);color:var(--accent-ink)}
 .docchip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--surface);color:var(--accent);border-radius:999px;padding:4px 10px;font:inherit;font-size:.78rem;font-weight:600;margin:4px 6px 4px 0;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .item.pend{border-color:color-mix(in srgb,var(--wait) 45%,var(--line))}.item.pend .t{color:var(--wait)}
+.whyline{display:flex;align-items:center;gap:6px;width:100%;min-width:0;border:0;background:none;padding:3px 0 0;margin:0;font:inherit;text-align:left;cursor:pointer;color:var(--muted)}
+.whyline .wl-k{flex:none;font-size:.66rem;font-weight:800;color:var(--accent);background:color-mix(in srgb,var(--accent) 11%,transparent);border-radius:5px;padding:1px 5px}
+.whyline .wl-t{flex:1;min-width:0;font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.whyline .wl-e{flex:none;display:flex;gap:1px;font-size:.72rem;line-height:1}
+.whyline .wl-g{color:var(--accent);font-weight:700;margin-left:2px}
+.whyline:active .wl-t{text-decoration:underline}
+.card.wait .whyline{margin:2px 0 8px}
 </style>
 </head>
 <body>
@@ -951,8 +958,7 @@ function planCard(h) {
     const row = el("div", "pr" + (it.state === "accepted" ? " done" : ""));
     const txt = el("span", "px");
     txt.append(el("span", "pxt", (it.state === "accepted" ? "✓ " : "") + it.title));
-    if (it.why) txt.append(el("span", "pxw", it.why));
-    txt.append(whyBtn("daily", it.id, it.title));
+    txt.append(whyLine("daily", it.id, it.why, it.judge, it.title));
     row.append(txt);
     if (it.state === "new") {
       const yes = it.kind === "none" ? "할게요" : "맡기기";
@@ -2363,6 +2369,22 @@ async function openTemplate(tid) {
 /* ===================== 왜? — 판단 회상 ===================== */
 // 비서가 무언가를 권하거나 해 둘 때 남긴 판단 기록(어떤 판단 노드를 거쳤는지, 무엇을 근거로 삼았는지,
 // 비슷했던 지난 판단 중 무엇을 떠올렸는지)을 사람이 읽을 수 있게 보여 준다.
+// 제안 옆에 늘 보이는 '왜' 한 줄: 이유 + 근거 표시(📅📝📎…) + 몰랑이에게서 자란 판단이면 ✦
+const WHY_ICON = { event: "📅", calendar: "📅", reminder: "⏰", task: "✅", note: "📝", fact: "🧠", web: "🌐", doc: "📎", answer: "💬" };
+function whyLine(kind, refId, reason, j, label) {
+  const b = el("button", "whyline");
+  b.type = "button";
+  b.setAttribute("aria-label", `왜 이렇게 제안했는지 보기${label ? `: ${String(label).slice(0, 40)}` : ""}`);
+  const because = (j?.because || []).filter((e) => WHY_ICON[e.kind]);
+  const text = (reason || "").trim() || because.map((e) => e.text).join(" · ") || "판단 근거 보기";
+  b.append(el("span", "wl-k", "왜"), el("span", "wl-t", text));
+  const tail = el("span", "wl-e");
+  for (const e of because.slice(0, 3)) { const i = el("span", "", WHY_ICON[e.kind]); i.title = e.text; tail.append(i); }
+  if (j?.grown) { const g = el("span", "wl-g", "✦"); g.title = "몰랑이에게서 자란 판단"; tail.append(g); }
+  if (tail.children.length) b.append(tail);
+  b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); openWhy(kind, refId); };
+  return b;
+}
 function whyBtn(kind, refId, label, text = "왜?") {
   const b = el("button", "whybtn", text);
   b.type = "button";
@@ -2642,7 +2664,7 @@ SCREENS.inbox = {
       // 검색 결과를 보고 나온 일: 웹페이지 글이 시킨 것일 수 있으니 내용을 한 번 더 보게 한다
       if (a.tainted) d.append(el("div", "taint", a.args?.doc_id ? "문서 내용을 보고 나온 일이에요. 문서에 적힌 대로인지 확인해 주세요." : "검색 자료를 보고 나온 일이에요. 내용이 맞는지 확인해 주세요."));
       if (a.args?.doc_id) { const c = el("button", "docchip", `📎 ${a.args.doc_name || "문서"}`); c.type = "button"; c.onclick = () => openDoc(a.args.doc_id); d.append(c); }
-      d.append(whyBtn("action", a.id, describe(a)));
+      d.append(whyLine("action", a.id, a.reason, a.why, describe(a)));
       const row = el("div", "row");
       const decide = (verb) => async () => {
         d.style.opacity = "0.4";                      // 먼저 흐리게 (즉시 반응)
