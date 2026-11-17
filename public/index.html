@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>비서</title>
 <link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="/brand/enso.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -224,8 +225,8 @@ code.topic{display:block;background:var(--surface);border:1px solid var(--line);
 .ainote b{color:var(--accent)}
 /* 비서가 만든 타일: 반짝 표시 */
 .app-icon.ai .tile{position:relative}
-.app-icon.ai .tile::after{content:"✦";position:absolute;top:-6px;left:-6px;width:20px;height:20px;border-radius:50%;
-  background:var(--surface);color:var(--accent);font-size:11px;display:grid;place-items:center;border:1px solid var(--line)}
+.app-icon.ai .tile::after{content:"";position:absolute;top:-4px;left:-4px;width:12px;height:12px;border-radius:50%;
+  background:var(--gold);border:2px solid var(--surface)}
 /* 홈 아래 입력줄 */
 form.homebar{position:sticky;bottom:0;margin-top:auto;display:flex;gap:8px;padding:10px 0 calc(12px + env(safe-area-inset-bottom,0px));
   background:linear-gradient(transparent,var(--bg) 22%)}
@@ -504,7 +505,7 @@ body.editing .wslot > .bt{opacity:.92}
 .why-path{margin:0;padding:0;list-style:none;counter-reset:wp}
 .why-path li{counter-increment:wp;position:relative;padding:8px 0 8px 30px;border-left:2px solid var(--line);margin-left:10px}
 .why-path li::before{content:counter(wp);position:absolute;left:-11px;top:8px;width:20px;height:20px;border-radius:50%;background:var(--surface);border:1px solid var(--line);font-size:.7rem;display:grid;place-items:center;color:var(--muted)}
-.why-path li.grown::before{content:"✦";background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.why-path li.grown::before{content:"";background:var(--gold);border:4px solid var(--surface);box-shadow:0 0 0 1px var(--gold);width:12px;height:12px;left:-9px;top:12px}
 .why-path .wp{display:block;font-size:.9rem}
 .why-path .wm,.why-rc .wm{display:block;font-size:.74rem;color:var(--muted);margin-top:2px}
 .why-path li.grown .wm{color:var(--accent)}
@@ -575,9 +576,54 @@ body.editing .wslot > .bt{opacity:.92}
 .whyline .wl-g{color:var(--accent);font-weight:700;margin-left:2px}
 .whyline:active .wl-t{text-decoration:underline}
 .card.wait .whyline{margin:2px 0 8px}
+
+/* ---------- arcogit: 금빛 점 · 엔소 · 스플래시 ---------- */
+:root{--gold:#B8862E;--brand-navy:#13294B;--brand-ivory:#F3EEE3}
+@media (prefers-color-scheme: dark){:root{--gold:#D8B46A}}
+.gdot{display:inline-block;width:.46em;height:.46em;border-radius:50%;background:var(--gold);vertical-align:.12em;margin:0 .32em 0 .1em;flex:none}
+.enso{display:inline-block;width:1em;height:1em;color:currentColor}.enso .enso-dot,.mono .enso-dot{fill:var(--gold)}
+.thinkmark{display:inline-flex;width:22px;height:22px;color:var(--muted);vertical-align:middle}
+.thinkmark .enso{width:100%;height:100%;animation:ensoSpin 1.6s cubic-bezier(.5,.1,.5,.9) infinite}
+@keyframes ensoSpin{to{transform:rotate(360deg)}}
+.bubble.thinking .thinkmark{width:24px;height:24px}
+.pill .thinkmark{width:16px;height:16px;color:currentColor;margin-right:6px}
+.thinkline{display:flex;align-items:center;gap:8px}
+.h2-enso{width:.95em;height:.95em;margin-right:8px;vertical-align:-.12em;color:var(--accent)}
+.about{display:flex;gap:14px;align-items:flex-start;margin:22px 0 6px;padding:16px;border-radius:16px;background:var(--surface);border:1px solid var(--line)}
+.about-mono{flex:none;width:52px;height:52px;border-radius:13px;background:radial-gradient(circle at 30% 22%,#13294B,#08111F);color:var(--brand-ivory);display:grid;place-items:center}
+.about-mono svg{width:40px;height:40px}.about-mono .enso-dot{fill:#D8B46A}
+.about-t{display:flex;flex-direction:column;gap:3px;min-width:0}.about-t b{font-size:1rem;letter-spacing:.01em}
+.about-t span{font-size:.76rem;color:var(--muted)}.about-t p{margin:6px 0 4px;font-size:.86rem;line-height:1.5}
+.about-t .ver{font-size:.72rem}
+#splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;
+  background:radial-gradient(circle at 30% 22%,#13294B,#08111F 75%);transition:opacity .5s ease}
+#splash.gone{opacity:0;pointer-events:none}
+.sp-enso{width:min(36vw,150px);height:auto}
+.sp-draw{animation:spDraw .95s cubic-bezier(.65,.02,.3,1) .1s forwards}
+@keyframes spDraw{to{stroke-dashoffset:0}}
+.sp-dot{opacity:0;transform-box:fill-box;transform-origin:center;animation:spDot .42s cubic-bezier(.3,1.6,.5,1) 1s forwards}
+@keyframes spDot{from{opacity:0;transform:scale(.2)}to{opacity:1;transform:scale(1)}}
+.sp-word{display:flex;align-items:center;gap:8px;color:#F3EEE3;opacity:0;font-size:.95rem;letter-spacing:.18em;animation:spWord .5s ease 1.05s forwards}
+.sp-mono svg{width:20px;height:20px;display:block}
+@keyframes spWord{to{opacity:.75}}
+@media (prefers-reduced-motion: reduce){
+  .sp-draw{animation:none;stroke-dashoffset:0}.sp-dot,.sp-word{animation:none;opacity:1}
+  .thinkmark .enso{animation:ensoPulse 1.6s ease-in-out infinite}
+  @keyframes ensoPulse{50%{opacity:.4}}
+}
 </style>
 </head>
 <body>
+<div id="splash" aria-hidden="true">
+  <svg class="sp-enso" viewBox="0 0 1024 1024">
+    <defs><mask id="spMask" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <circle class="sp-draw" cx="512" cy="520" r="300" fill="none" stroke="#fff" stroke-width="190" pathLength="1"
+              stroke-dasharray="1 1" stroke-dashoffset="1" transform="rotate(-62 512 520)"/></mask></defs>
+    <path d="M678,253 L685,255 L692,258 L699,262 L705,265 L712,269 L718,273 L724,277 L730,282 L736,287 L742,291 L747,296 L753,301 L758,307 L764,312 L769,318 L774,323 L779,329 L783,335 L788,341 L792,347 L797,354 L801,360 L805,367 L809,373 L812,380 L816,387 L819,394 L822,401 L825,408 L828,415 L831,422 L833,430 L836,437 L838,445 L840,452 L841,460 L843,467 L845,475 L846,483 L847,490 L848,498 L848,506 L849,514 L849,521 L849,529 L849,537 L849,545 L849,553 L848,560 L847,568 L846,576 L845,584 L844,592 L842,599 L840,607 L838,615 L836,622 L834,630 L832,637 L829,645 L826,652 L823,659 L820,666 L817,674 L813,681 L809,688 L806,695 L802,701 L797,708 L793,715 L788,721 L784,728 L779,734 L774,740 L769,746 L764,752 L758,758 L753,764 L747,769 L741,775 L735,780 L729,785 L723,790 L717,795 L710,800 L704,804 L697,809 L691,813 L684,817 L677,821 L670,825 L663,828 L656,831 L648,835 L641,838 L634,841 L626,843 L619,846 L611,848 L603,850 L596,852 L588,854 L580,856 L572,857 L564,858 L557,859 L549,860 L541,861 L533,861 L525,862 L517,862 L509,862 L501,861 L493,861 L485,860 L478,859 L470,858 L462,857 L454,856 L447,854 L439,852 L431,850 L424,848 L416,846 L409,843 L401,841 L394,838 L387,835 L380,832 L372,828 L365,825 L359,821 L352,817 L345,813 L338,809 L332,805 L325,800 L319,796 L313,791 L307,786 L301,781 L295,776 L289,771 L284,765 L279,760 L273,754 L268,748 L263,742 L258,736 L254,730 L249,724 L245,718 L240,711 L236,705 L232,698 L229,692 L225,685 L222,678 L218,671 L215,664 L212,657 L210,650 L207,643 L205,636 L202,628 L200,621 L198,614 L197,606 L195,599 L194,591 L193,584 L192,577 L191,569 L190,562 L190,554 L189,547 L189,539 L189,532 L190,524 L190,517 L191,509 L191,502 L192,495 L193,487 L195,480 L196,473 L198,465 L200,458 L201,451 L204,444 L206,437 L208,430 L211,423 L214,417 L217,410 L220,403 L223,397 L226,390 L230,384 L233,378 L237,372 L241,366 L245,360 L249,354 L254,348 L258,343 L263,337 L268,332 L273,327 L278,322 L283,316 L287,311 L292,306 L297,301 L303,296 L308,292 L313,287 L319,283 L324,278 L330,274 L336,270 L342,266 L348,263 L354,259 L360,256 L366,252 L372,249 L379,246 L385,243 L392,240 L398,238 L405,235 L411,233 L418,231 L425,229 L432,227 L438,226 L445,224 L452,223 L459,222 L460,227 L453,228 L446,230 L440,231 L433,233 L427,235 L420,237 L414,240 L407,242 L401,245 L395,247 L388,250 L382,253 L376,257 L370,260 L364,263 L359,267 L353,271 L347,274 L342,278 L336,282 L331,287 L326,291 L320,295 L315,300 L310,305 L306,310 L301,314 L296,319 L292,325 L287,330 L283,335 L280,341 L276,347 L273,353 L270,359 L267,365 L263,371 L261,377 L258,383 L255,389 L253,395 L250,401 L248,408 L246,414 L244,420 L242,427 L241,433 L239,439 L238,446 L237,452 L236,459 L235,465 L234,472 L233,478 L233,485 L233,491 L233,498 L233,504 L233,511 L233,517 L234,524 L234,530 L235,536 L236,543 L237,549 L238,555 L239,562 L241,568 L242,574 L244,580 L246,586 L248,592 L250,598 L252,604 L255,610 L257,616 L260,621 L263,627 L266,633 L269,638 L272,644 L275,649 L278,654 L282,659 L285,664 L289,669 L293,674 L297,679 L301,684 L305,688 L309,693 L313,697 L318,702 L322,706 L327,710 L331,714 L336,718 L341,722 L346,725 L351,729 L356,732 L361,736 L366,739 L372,742 L377,745 L382,748 L388,750 L393,753 L399,755 L404,758 L410,760 L416,762 L421,764 L427,766 L433,767 L439,769 L444,770 L450,772 L456,773 L462,774 L468,775 L474,776 L480,776 L486,777 L492,777 L498,777 L504,778 L510,777 L516,777 L522,777 L528,777 L534,776 L539,775 L545,775 L551,774 L557,773 L563,771 L569,770 L574,769 L580,767 L586,765 L591,763 L597,761 L603,759 L608,757 L614,755 L619,752 L624,750 L630,747 L635,744 L640,741 L645,738 L650,735 L655,732 L660,729 L665,725 L670,722 L674,718 L679,714 L683,710 L688,706 L692,702 L696,698 L700,694 L704,689 L708,685 L712,680 L716,676 L720,671 L723,666 L727,661 L730,656 L733,651 L736,646 L739,641 L742,636 L745,631 L747,625 L750,620 L752,614 L755,609 L757,603 L759,598 L761,592 L763,586 L764,580 L766,575 L767,569 L769,563 L770,557 L771,551 L772,545 L772,539 L773,533 L774,527 L774,521 L774,515 L774,509 L774,503 L774,497 L774,490 L773,484 L773,478 L772,472 L771,466 L770,460 L769,454 L768,448 L766,442 L765,436 L763,430 L761,424 L759,418 L757,412 L755,407 L753,401 L750,395 L748,389 L745,384 L742,378 L739,373 L736,367 L733,362 L730,356 L726,351 L723,346 L719,341 L715,335 L711,330 L707,325 L703,320 L699,316 L695,311 L690,306 L686,301 L681,297 L677,292 L672,287 L667,283 L663,277 Z" fill="#F3EEE3" mask="url(#spMask)"/>
+    <circle class="sp-dot" cx="570" cy="220" r="40" fill="#D8B46A"/>
+  </svg>
+  <div class="sp-word"><span class="sp-mono"><svg viewBox="0 0 1024 1024"><circle cx="452" cy="590" r="178" fill="none" stroke="#F3EEE3" stroke-width="74"/><line x1="630" y1="412" x2="630" y2="768" stroke="#F3EEE3" stroke-width="74" stroke-linecap="round"/><circle cx="630" cy="268" r="50" fill="#D8B46A"/></svg></span><span>arcogit</span></div>
+</div>
 <div class="wrap">
 
   <section class="auth" id="boot">
@@ -805,12 +851,35 @@ function inHour(h = 1) { const d = new Date(); d.setMinutes(0, 0, 0); d.setHours
 /* ---------- 화면 전환 ---------- */
 function show(id) {
   for (const s of ["boot", "auth", "naming", "home", "screen"]) $(s).hidden = s !== id;
+  if (id !== "boot") hideSplash();
 }
+/* 스플래시: 엔소가 한 붓으로 그려지고 금빛 점이 찍힌다. 첫 화면이 준비되면 걷힌다 (최소 1.75초) */
+const SPLASH_AT = performance.now();
+function hideSplash() {
+  const sp = document.getElementById("splash");
+  if (!sp || sp.classList.contains("gone")) return;
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const wait = Math.max(0, (reduce ? 300 : 1750) - (performance.now() - SPLASH_AT));
+  setTimeout(() => { sp.classList.add("gone"); setTimeout(() => sp.remove(), 520); }, wait);
+}
+setTimeout(hideSplash, 4500);          // 무슨 일이 있어도 첫 화면을 막지 않게
 function fail(title, detail) {
   show("boot");
   document.querySelector("#boot h1").textContent = title;
   $("bootMsg").textContent = detail;
 }
+
+/* ---------- arcogit 마크: 엔소(한 붓의 원 + 틈의 금빛 점)와 a·i 모노그램 ---------- */
+// 원은 순환 검증·사고 구조(arc), 금빛 점은 생각하는 '나'(cogito). 두 마크가 같은 점을 나눠 갖는다.
+const ENSO_D = "M678,253 L685,255 L692,258 L699,262 L705,265 L712,269 L718,273 L724,277 L730,282 L736,287 L742,291 L747,296 L753,301 L758,307 L764,312 L769,318 L774,323 L779,329 L783,335 L788,341 L792,347 L797,354 L801,360 L805,367 L809,373 L812,380 L816,387 L819,394 L822,401 L825,408 L828,415 L831,422 L833,430 L836,437 L838,445 L840,452 L841,460 L843,467 L845,475 L846,483 L847,490 L848,498 L848,506 L849,514 L849,521 L849,529 L849,537 L849,545 L849,553 L848,560 L847,568 L846,576 L845,584 L844,592 L842,599 L840,607 L838,615 L836,622 L834,630 L832,637 L829,645 L826,652 L823,659 L820,666 L817,674 L813,681 L809,688 L806,695 L802,701 L797,708 L793,715 L788,721 L784,728 L779,734 L774,740 L769,746 L764,752 L758,758 L753,764 L747,769 L741,775 L735,780 L729,785 L723,790 L717,795 L710,800 L704,804 L697,809 L691,813 L684,817 L677,821 L670,825 L663,828 L656,831 L648,835 L641,838 L634,841 L626,843 L619,846 L611,848 L603,850 L596,852 L588,854 L580,856 L572,857 L564,858 L557,859 L549,860 L541,861 L533,861 L525,862 L517,862 L509,862 L501,861 L493,861 L485,860 L478,859 L470,858 L462,857 L454,856 L447,854 L439,852 L431,850 L424,848 L416,846 L409,843 L401,841 L394,838 L387,835 L380,832 L372,828 L365,825 L359,821 L352,817 L345,813 L338,809 L332,805 L325,800 L319,796 L313,791 L307,786 L301,781 L295,776 L289,771 L284,765 L279,760 L273,754 L268,748 L263,742 L258,736 L254,730 L249,724 L245,718 L240,711 L236,705 L232,698 L229,692 L225,685 L222,678 L218,671 L215,664 L212,657 L210,650 L207,643 L205,636 L202,628 L200,621 L198,614 L197,606 L195,599 L194,591 L193,584 L192,577 L191,569 L190,562 L190,554 L189,547 L189,539 L189,532 L190,524 L190,517 L191,509 L191,502 L192,495 L193,487 L195,480 L196,473 L198,465 L200,458 L201,451 L204,444 L206,437 L208,430 L211,423 L214,417 L217,410 L220,403 L223,397 L226,390 L230,384 L233,378 L237,372 L241,366 L245,360 L249,354 L254,348 L258,343 L263,337 L268,332 L273,327 L278,322 L283,316 L287,311 L292,306 L297,301 L303,296 L308,292 L313,287 L319,283 L324,278 L330,274 L336,270 L342,266 L348,263 L354,259 L360,256 L366,252 L372,249 L379,246 L385,243 L392,240 L398,238 L405,235 L411,233 L418,231 L425,229 L432,227 L438,226 L445,224 L452,223 L459,222 L460,227 L453,228 L446,230 L440,231 L433,233 L427,235 L420,237 L414,240 L407,242 L401,245 L395,247 L388,250 L382,253 L376,257 L370,260 L364,263 L359,267 L353,271 L347,274 L342,278 L336,282 L331,287 L326,291 L320,295 L315,300 L310,305 L306,310 L301,314 L296,319 L292,325 L287,330 L283,335 L280,341 L276,347 L273,353 L270,359 L267,365 L263,371 L261,377 L258,383 L255,389 L253,395 L250,401 L248,408 L246,414 L244,420 L242,427 L241,433 L239,439 L238,446 L237,452 L236,459 L235,465 L234,472 L233,478 L233,485 L233,491 L233,498 L233,504 L233,511 L233,517 L234,524 L234,530 L235,536 L236,543 L237,549 L238,555 L239,562 L241,568 L242,574 L244,580 L246,586 L248,592 L250,598 L252,604 L255,610 L257,616 L260,621 L263,627 L266,633 L269,638 L272,644 L275,649 L278,654 L282,659 L285,664 L289,669 L293,674 L297,679 L301,684 L305,688 L309,693 L313,697 L318,702 L322,706 L327,710 L331,714 L336,718 L341,722 L346,725 L351,729 L356,732 L361,736 L366,739 L372,742 L377,745 L382,748 L388,750 L393,753 L399,755 L404,758 L410,760 L416,762 L421,764 L427,766 L433,767 L439,769 L444,770 L450,772 L456,773 L462,774 L468,775 L474,776 L480,776 L486,777 L492,777 L498,777 L504,778 L510,777 L516,777 L522,777 L528,777 L534,776 L539,775 L545,775 L551,774 L557,773 L563,771 L569,770 L574,769 L580,767 L586,765 L591,763 L597,761 L603,759 L608,757 L614,755 L619,752 L624,750 L630,747 L635,744 L640,741 L645,738 L650,735 L655,732 L660,729 L665,725 L670,722 L674,718 L679,714 L683,710 L688,706 L692,702 L696,698 L700,694 L704,689 L708,685 L712,680 L716,676 L720,671 L723,666 L727,661 L730,656 L733,651 L736,646 L739,641 L742,636 L745,631 L747,625 L750,620 L752,614 L755,609 L757,603 L759,598 L761,592 L763,586 L764,580 L766,575 L767,569 L769,563 L770,557 L771,551 L772,545 L772,539 L773,533 L774,527 L774,521 L774,515 L774,509 L774,503 L774,497 L774,490 L773,484 L773,478 L772,472 L771,466 L770,460 L769,454 L768,448 L766,442 L765,436 L763,430 L761,424 L759,418 L757,412 L755,407 L753,401 L750,395 L748,389 L745,384 L742,378 L739,373 L736,367 L733,362 L730,356 L726,351 L723,346 L719,341 L715,335 L711,330 L707,325 L703,320 L699,316 L695,311 L690,306 L686,301 L681,297 L677,292 L672,287 L667,283 L663,277 Z";
+function ensoSVG(cls = "") {
+  return `<svg class="enso ${cls}" viewBox="0 0 1024 1024" aria-hidden="true"><path d="${ENSO_D}" fill="currentColor"/><circle cx="570" cy="220" r="40" class="enso-dot"/></svg>`;
+}
+const MONO_SVG = `<svg class="mono" viewBox="0 0 1024 1024" aria-hidden="true"><circle cx="452" cy="590" r="178" fill="none" stroke="currentColor" stroke-width="74"/><line x1="630" y1="412" x2="630" y2="768" stroke="currentColor" stroke-width="74" stroke-linecap="round"/><circle cx="630" cy="268" r="50" class="enso-dot"/></svg>`;
+function gdot(title) { const d = el("span", "gdot"); if (title) d.title = title; return d; }
+// 생각 중: 점 셋 대신 엔소가 천천히 돈다 (순환하는 생각)
+function thinkMark() { const w = el("span", "thinkmark"); w.innerHTML = ensoSVG(); return w; }
+function thinkingLine(text) { const p = el("p", "muted small thinkline"); p.append(thinkMark(), text); return p; }
 
 /* ---------- 아이콘 ---------- */
 const ICON = {
@@ -941,11 +1010,13 @@ function planCard(h) {
   const plan = h.daily;
   const items = (plan?.items || []).filter((i) => i.state !== "dismissed");
   if (!plan) {
-    const get = el("button", "pill dark", "✦ 지금 생각해 보기");
+    const get = el("button", "pill dark");
+    const label = () => get.replaceChildren(gdot(), "지금 생각해 보기");
+    label();
     get.onclick = async () => {
-      get.disabled = true; get.textContent = "생각하는 중…";
+      get.disabled = true; get.replaceChildren(thinkMark(), "생각하는 중…");
       try { await post("/api/daily/now"); cache.drop("home"); await goHome(); }
-      catch (e) { toast(e.message, "err"); get.disabled = false; get.textContent = "✦ 지금 생각해 보기"; }
+      catch (e) { toast(e.message, "err"); get.disabled = false; label(); }
     };
     c.append(head, el("p", "pe", "매일 정한 시각에 비서가 오늘 할 만한 일을 먼저 골라 드려요."), get);
     return c;
@@ -1112,7 +1183,9 @@ function pinWidget(h, w) {
   const b = el("button", "bt card-w pinw " + (w.size === "wide" ? "wide" : "small"));
   const ic = el("span", "ai fill"); ic.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[w.icon] || ICON.bolt}</svg>`;
   const t = el("span", "pl");
-  t.append(el("span", "al", (w.origin === "agent" ? "✦ " : "") + (w.label || "기능")));
+  const al = el("span", "al", w.label || "기능");
+  if (w.origin === "agent") al.prepend(gdot("비서가 만든 기능"));
+  t.append(al);
   // 마지막으로 돌린 결과가 위젯에 살아 있게
   const st = el("span", "pd");
   if (!run) st.textContent = "아직 안 써 봤어요 · 눌러서 실행";
@@ -1364,7 +1437,8 @@ async function openWidgetPicker(pageIndex = curPage) {
     const row = (g, iconName, title, desc, onAdd, badge) => {
       const b = el("button", "pitem");
       const ic = el("span", "ai"); ic.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[iconName] || ICON.dot}</svg>`;
-      const t = el("span", "pt"); t.append(el("span", "pn", title + (badge ? " ✦" : "")));
+      const pn = el("span", "pn", title); if (badge) pn.append(gdot("비서가 만든 기능"));
+      const t = el("span", "pt"); t.append(pn);
       if (desc) t.append(el("span", "pd", desc));
       const plus = el("span", "pp", "+");
       b.append(ic, t, plus); b.onclick = onAdd; g.append(b);
@@ -1431,7 +1505,7 @@ $("homebar").addEventListener("submit", async (e) => {
   x.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   x.onclick = () => { homeResult = null; c.remove(); };
   c.classList.remove("w2");
-  const wait = el("div", "bubble thinking"); wait.append(el("i"), el("i"), el("i"));
+  const wait = el("div", "bubble thinking"); wait.append(thinkMark());
   c.append(x, el("p", "you", text), wait);
   homeResult = c; $("homeTop").replaceChildren(c); $("home").scrollTop = 0;
   try {
@@ -2064,7 +2138,7 @@ async function openDoc(id) {
     const out = el("div", "danswer");
     const askBtn = button("묻기", "small", async () => {
       if (!q.value.trim()) return q.focus();
-      out.replaceChildren(el("p", "muted small", "문서를 읽는 중…"));
+      out.replaceChildren(thinkingLine("문서를 읽는 중…"));
       try {
         const a = await post(`/api/docs/${d.id}/ask`, { text: q.value.trim() });
         out.replaceChildren(el("p", "dans", a.answer));
@@ -2086,7 +2160,7 @@ async function openDoc(id) {
     ed.append(ins, el("p", "muted small", "원본은 그대로 두고, 고친 파일을 새 버전으로 만들어요."));
     const go = button("고친 파일 만들기", "", async () => {
       if (!ins.value.trim()) return ins.focus();
-      res.replaceChildren(el("p", "muted small", "고치는 중… (10~20초)"));
+      res.replaceChildren(thinkingLine("고치는 중… (10~20초)"));
       try {
         const r = await post(`/api/docs/${d.id}/edit`, { text: ins.value.trim() });
         const card = el("div", "card dresult");
@@ -2194,7 +2268,7 @@ async function draftToDoc(d) {
       row.append(button("내려받기", "small", () => docDownload(r.doc.id)), button("열어 보기", "ghost small", () => openDoc(r.doc.id)));
       card.append(row); res.replaceChildren(card); cache.drop("docs");
     };
-    const opt = (title, sub, fn) => { const b = el("button", "item"); b.type = "button"; b.append(el("div", "t", title), el("div", "s", sub)); b.onclick = async () => { b.disabled = true; res.replaceChildren(el("p", "muted small", "만드는 중…")); try { done(await fn()); } catch (e) { res.replaceChildren(el("p", "dnote", e.message)); } finally { b.disabled = false; } }; return b; };
+    const opt = (title, sub, fn) => { const b = el("button", "item"); b.type = "button"; b.append(el("div", "t", title), el("div", "s", sub)); b.onclick = async () => { b.disabled = true; res.replaceChildren(thinkingLine("만드는 중…")); try { done(await fn()); } catch (e) { res.replaceChildren(el("p", "dnote", e.message)); } finally { b.disabled = false; } }; return b; };
     s.append(opt("새 워드 파일로", "# 제목, - 목록 줄은 모양을 살려요", () => post(`/api/drafts/${d.id}/to_doc`, { mode: "new" })));
     if (tpls.items.length) {
       s.append(el("div", "group", "내 양식에 넣기"));
@@ -2241,7 +2315,7 @@ async function openTplDraft({ doc, tpl }) {
   let name, fields, kind = doc?.kind || tpl?.kind;
   if (tpl) { name = tpl.name; fields = tpl.fields.map((f) => ({ ...f })); }
   else {
-    openSheet("양식 만들기", (s) => s.append(el("p", "muted", "문서를 읽고 바뀌는 자리를 찾는 중… (10초쯤)")));
+    openSheet("양식 만들기", (s) => s.append(thinkingLine("문서를 읽고 바뀌는 자리를 찾는 중… (10초쯤)")));
     try { const p = await post("/api/templates/propose", { doc_id: doc.id }); name = p.name; fields = p.fields; }
     catch (e) { return openSheet("양식 만들기", (s) => { s.append(el("p", "dnote", e.message)); const f = el("div", "actions"); f.append(el("span"), button("닫기", "ghost", closeSheet)); s.append(f); }); }
   }
@@ -2369,7 +2443,7 @@ async function openTemplate(tid) {
 /* ===================== 왜? — 판단 회상 ===================== */
 // 비서가 무언가를 권하거나 해 둘 때 남긴 판단 기록(어떤 판단 노드를 거쳤는지, 무엇을 근거로 삼았는지,
 // 비슷했던 지난 판단 중 무엇을 떠올렸는지)을 사람이 읽을 수 있게 보여 준다.
-// 제안 옆에 늘 보이는 '왜' 한 줄: 이유 + 근거 표시(📅📝📎…) + 몰랑이에게서 자란 판단이면 ✦
+// 제안 옆에 늘 보이는 '왜' 한 줄: 이유 + 근거 표시(📅📝📎…) + 몰랑이에게서 자란 판단이면 금빛 점
 const WHY_ICON = { event: "📅", calendar: "📅", reminder: "⏰", task: "✅", note: "📝", fact: "🧠", web: "🌐", doc: "📎", answer: "💬" };
 function whyLine(kind, refId, reason, j, label) {
   const b = el("button", "whyline");
@@ -2380,7 +2454,7 @@ function whyLine(kind, refId, reason, j, label) {
   b.append(el("span", "wl-k", "왜"), el("span", "wl-t", text));
   const tail = el("span", "wl-e");
   for (const e of because.slice(0, 3)) { const i = el("span", "", WHY_ICON[e.kind]); i.title = e.text; tail.append(i); }
-  if (j?.grown) { const g = el("span", "wl-g", "✦"); g.title = "몰랑이에게서 자란 판단"; tail.append(g); }
+  if (j?.grown) tail.append(gdot("몰랑이에게서 자란 판단"));
   if (tail.children.length) b.append(tail);
   b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); openWhy(kind, refId); };
   return b;
@@ -2417,6 +2491,7 @@ async function openWhy(kind, refId) {
   }
   openSheet("왜 이렇게 판단했나요", (s) => {
     s.classList.add("why-sheet");
+    s.querySelector("h2").insertAdjacentHTML("afterbegin", ensoSVG("h2-enso"));
     if (w.summary) s.append(el("p", "why-sum", w.summary));
     if (w.tainted) s.append(el("div", "taint", "검색 자료를 보고 나온 판단이에요. 웹페이지 글이 섞였을 수 있어 자동으로 하지 않고 꼭 물어봐요."));
 
@@ -2429,9 +2504,9 @@ async function openWhy(kind, refId) {
         const li = el("li", st.grown ? "grown" : "");
         li.append(el("span", "wp", st.prompt));
         const meta = [];
-        if (st.grown) meta.push("✦ 몰랑이에게서 자란 판단");
+        if (st.grown) meta.push("몰랑이에게서 자란 판단");
         if (st.p != null && st.alts > 1) meta.push(`갈래 ${st.alts}개 중 ${Math.round(st.p * 100)}%로 골랐어요`);
-        if (meta.length) li.append(el("span", "wm", meta.join(" · ")));
+        if (meta.length) { const wm = el("span", "wm", meta.join(" · ")); if (st.grown) wm.prepend(gdot()); li.append(wm); }
         ol.append(li);
       }
       sec.append(ol); s.append(sec);
@@ -2856,6 +2931,17 @@ SCREENS.settings = {
       const a = el("a", "", label); a.href = href; a.target = "_blank"; a.rel = "noopener"; legal.append(a);
     }
     box.append(legal);
+
+    // 앱 정보: arcogit 모노그램과 철학 한 줄
+    const about = el("div", "about");
+    const mono = el("span", "about-mono"); mono.innerHTML = MONO_SVG;
+    const ab = el("div", "about-t");
+    ab.append(el("b", "", "arcogit"),
+      el("span", "", "arc(순환 검증 · 사고 구조) + cogito(생각하는 나)"),
+      el("p", "", "판단은 원을 돌며 다듬어지고, 사람과 근거라는 바깥의 한 점에 닿을 때 확실해집니다."),
+      el("span", "ver", "이 비서는 arcogit 구조로 만들었어요"));
+    about.append(mono, ab);
+    box.append(about);
     body.replaceChildren(box);
   },
 };
@@ -2917,7 +3003,8 @@ SCREENS.memory = {
         d.append(row); nodes.push(d);
       }
       if (m.persona !== undefined) {
-        const d = el("div", "card mem persona"); d.append(el("div", "s", "✦ 지금까지 자란 나다움 (몰랑이의 자식)"), el("div", "b", m.persona || "아직 흐릿해요. 함께 지내며 또렷해져요."));
+        const d = el("div", "card mem persona"); const sl = el("div", "s", "지금까지 자란 나다움 (몰랑이의 자식)"); sl.prepend(gdot());
+        d.append(sl, el("div", "b", m.persona || "아직 흐릿해요. 함께 지내며 또렷해져요."));
         if (m.persona) {
           const row = el("div", "row");
           row.append(button("나다움 초기화", "ghost small", async () => {
@@ -3028,7 +3115,7 @@ $("compose").addEventListener("submit", async (e) => {
   const text = $("text").value.trim(); if (!text) return;
   $("text").value = ""; $("send").disabled = true;
   bubble("user", text); const wait = bubble("agent", "", "thinking");
-  wait.setAttribute("aria-label", "생각하는 중"); wait.append(el("i"), el("i"), el("i"));
+  wait.setAttribute("aria-label", "생각하는 중"); wait.append(thinkMark());
   try {
     const res = await post("/api/chat", { text });
     // 대화에서 과제를 맡았으면 크론을 기다리지 않고 바로 시작
