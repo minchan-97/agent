@@ -12,8 +12,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="비서">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#F3F6FA" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0C1520" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F4F1EA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0A101A" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <style>
@@ -444,7 +444,7 @@ body.editing .wslot > .bt{pointer-events:none}
 }
 .wslot.dragging{z-index:20;cursor:grabbing;filter:drop-shadow(0 14px 24px rgb(14 26 43 / .22))}
 .wctl{position:absolute;z-index:3;border:0;cursor:pointer;font:inherit}
-.wctl.rm{top:6px;left:6px;width:28px;height:28px;border-radius:14px;background:#C0392B;color:#fff;display:grid;place-items:center;box-shadow:0 2px 6px rgb(0 0 0 / .2)}
+.wctl.rm{top:6px;left:6px;width:28px;height:28px;border-radius:14px;background:var(--danger);color:#fff;display:grid;place-items:center;box-shadow:0 2px 6px rgb(0 0 0 / .2)}
 .wctl.rm::before{content:"";position:absolute;inset:-8px}
 .wctl.rm svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round}
 .wctl.sz{top:6px;right:6px;height:28px;padding:0 10px;border-radius:14px;background:var(--ink);color:var(--surface);font-size:.72rem;font-weight:700;box-shadow:0 2px 6px rgb(0 0 0 / .2)}
@@ -611,6 +611,44 @@ body.editing .wslot > .bt{opacity:.92}
   .thinkmark .enso{animation:ensoPulse 1.6s ease-in-out infinite}
   @keyframes ensoPulse{50%{opacity:.4}}
 }
+
+/* ===================== arcogit 색감 =====================
+   깊은 남색(생각의 바탕) · 아이보리(종이와 붓) · 금빛 점(cogito, 아껴 쓴다).
+   바탕은 차가운 회색 대신 따뜻한 종이색, 강조는 밝은 파랑 대신 브랜드 남색. */
+:root{
+  --bg:#F4F1EA; --surface:#FFFDF9; --soft:#EEE9DE; --ink:#16233A; --muted:#626976; --line:#E7E1D5;
+  --accent:#13294B; --accent-ink:#F3EEE3; --tile:#13294B; --tile-ink:#F3EEE3;
+  --hero:#13294B; --hero-ink:#F3EEE3; --hero-sub:#BCC5D3;
+  --wait:#8A5A12; --wait-bg:#F7EEDC; --amber-bg:#F6ECD8; --amber-ink:#5A3A0A;
+  --mine:#E5E8EF; --live:#2E7D5B; --danger:#A23B3B; --gold:#B8862E;
+  --hero-bg:radial-gradient(120% 140% at 12% 0%, #23436F 0%, rgb(35 67 111 / 0) 55%), linear-gradient(140deg, #16305A 0%, #0B1730 100%);
+  --shadow:0 1px 2px rgb(22 35 58 / .05), 0 6px 18px rgb(22 35 58 / .07);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0A101A; --surface:#121A28; --soft:#182233; --ink:#ECE7DC; --muted:#A1A8B4; --line:#24304A;
+    --accent:#DCCFAE; --accent-ink:#0A101A; --tile:#1A3459; --tile-ink:#F3EEE3;
+    --hero:#1A3459; --hero-ink:#F3EEE3; --hero-sub:#B9C3D3;
+    --wait:#E2B866; --wait-bg:#2A2214; --amber-bg:#2B2215; --amber-ink:#F1DDB5;
+    --mine:#1A2538; --live:#5FC195; --danger:#E8A3A3; --gold:#D8B46A;
+    --hero-bg:radial-gradient(120% 140% at 12% 0%, #2A4C7C 0%, rgb(42 76 124 / 0) 55%), linear-gradient(140deg, #1A3459 0%, #0E1B33 100%);
+    --shadow:0 1px 2px rgb(0 0 0 / .35), 0 8px 22px rgb(0 0 0 / .28);
+  }
+}
+/* '지금 비서가 하는 일': 남색 그라데이션 위에 희미한 엔소 하나 (금빛 점까지 그대로) */
+.bt.hero{background:var(--hero-bg);position:relative;overflow:hidden;isolation:isolate}
+.bt.hero::after{content:"";position:absolute;right:-34px;bottom:-46px;width:172px;height:172px;z-index:-1;pointer-events:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'%3E%3Cpath d='M678,253 L685,255 L692,258 L699,262 L705,265 L712,269 L718,273 L724,277 L730,282 L736,287 L742,291 L747,296 L753,301 L758,307 L764,312 L769,318 L774,323 L779,329 L783,335 L788,341 L792,347 L797,354 L801,360 L805,367 L809,373 L812,380 L816,387 L819,394 L822,401 L825,408 L828,415 L831,422 L833,430 L836,437 L838,445 L840,452 L841,460 L843,467 L845,475 L846,483 L847,490 L848,498 L848,506 L849,514 L849,521 L849,529 L849,537 L849,545 L849,553 L848,560 L847,568 L846,576 L845,584 L844,592 L842,599 L840,607 L838,615 L836,622 L834,630 L832,637 L829,645 L826,652 L823,659 L820,666 L817,674 L813,681 L809,688 L806,695 L802,701 L797,708 L793,715 L788,721 L784,728 L779,734 L774,740 L769,746 L764,752 L758,758 L753,764 L747,769 L741,775 L735,780 L729,785 L723,790 L717,795 L710,800 L704,804 L697,809 L691,813 L684,817 L677,821 L670,825 L663,828 L656,831 L648,835 L641,838 L634,841 L626,843 L619,846 L611,848 L603,850 L596,852 L588,854 L580,856 L572,857 L564,858 L557,859 L549,860 L541,861 L533,861 L525,862 L517,862 L509,862 L501,861 L493,861 L485,860 L478,859 L470,858 L462,857 L454,856 L447,854 L439,852 L431,850 L424,848 L416,846 L409,843 L401,841 L394,838 L387,835 L380,832 L372,828 L365,825 L359,821 L352,817 L345,813 L338,809 L332,805 L325,800 L319,796 L313,791 L307,786 L301,781 L295,776 L289,771 L284,765 L279,760 L273,754 L268,748 L263,742 L258,736 L254,730 L249,724 L245,718 L240,711 L236,705 L232,698 L229,692 L225,685 L222,678 L218,671 L215,664 L212,657 L210,650 L207,643 L205,636 L202,628 L200,621 L198,614 L197,606 L195,599 L194,591 L193,584 L192,577 L191,569 L190,562 L190,554 L189,547 L189,539 L189,532 L190,524 L190,517 L191,509 L191,502 L192,495 L193,487 L195,480 L196,473 L198,465 L200,458 L201,451 L204,444 L206,437 L208,430 L211,423 L214,417 L217,410 L220,403 L223,397 L226,390 L230,384 L233,378 L237,372 L241,366 L245,360 L249,354 L254,348 L258,343 L263,337 L268,332 L273,327 L278,322 L283,316 L287,311 L292,306 L297,301 L303,296 L308,292 L313,287 L319,283 L324,278 L330,274 L336,270 L342,266 L348,263 L354,259 L360,256 L366,252 L372,249 L379,246 L385,243 L392,240 L398,238 L405,235 L411,233 L418,231 L425,229 L432,227 L438,226 L445,224 L452,223 L459,222 L460,227 L453,228 L446,230 L440,231 L433,233 L427,235 L420,237 L414,240 L407,242 L401,245 L395,247 L388,250 L382,253 L376,257 L370,260 L364,263 L359,267 L353,271 L347,274 L342,278 L336,282 L331,287 L326,291 L320,295 L315,300 L310,305 L306,310 L301,314 L296,319 L292,325 L287,330 L283,335 L280,341 L276,347 L273,353 L270,359 L267,365 L263,371 L261,377 L258,383 L255,389 L253,395 L250,401 L248,408 L246,414 L244,420 L242,427 L241,433 L239,439 L238,446 L237,452 L236,459 L235,465 L234,472 L233,478 L233,485 L233,491 L233,498 L233,504 L233,511 L233,517 L234,524 L234,530 L235,536 L236,543 L237,549 L238,555 L239,562 L241,568 L242,574 L244,580 L246,586 L248,592 L250,598 L252,604 L255,610 L257,616 L260,621 L263,627 L266,633 L269,638 L272,644 L275,649 L278,654 L282,659 L285,664 L289,669 L293,674 L297,679 L301,684 L305,688 L309,693 L313,697 L318,702 L322,706 L327,710 L331,714 L336,718 L341,722 L346,725 L351,729 L356,732 L361,736 L366,739 L372,742 L377,745 L382,748 L388,750 L393,753 L399,755 L404,758 L410,760 L416,762 L421,764 L427,766 L433,767 L439,769 L444,770 L450,772 L456,773 L462,774 L468,775 L474,776 L480,776 L486,777 L492,777 L498,777 L504,778 L510,777 L516,777 L522,777 L528,777 L534,776 L539,775 L545,775 L551,774 L557,773 L563,771 L569,770 L574,769 L580,767 L586,765 L591,763 L597,761 L603,759 L608,757 L614,755 L619,752 L624,750 L630,747 L635,744 L640,741 L645,738 L650,735 L655,732 L660,729 L665,725 L670,722 L674,718 L679,714 L683,710 L688,706 L692,702 L696,698 L700,694 L704,689 L708,685 L712,680 L716,676 L720,671 L723,666 L727,661 L730,656 L733,651 L736,646 L739,641 L742,636 L745,631 L747,625 L750,620 L752,614 L755,609 L757,603 L759,598 L761,592 L763,586 L764,580 L766,575 L767,569 L769,563 L770,557 L771,551 L772,545 L772,539 L773,533 L774,527 L774,521 L774,515 L774,509 L774,503 L774,497 L774,490 L773,484 L773,478 L772,472 L771,466 L770,460 L769,454 L768,448 L766,442 L765,436 L763,430 L761,424 L759,418 L757,412 L755,407 L753,401 L750,395 L748,389 L745,384 L742,378 L739,373 L736,367 L733,362 L730,356 L726,351 L723,346 L719,341 L715,335 L711,330 L707,325 L703,320 L699,316 L695,311 L690,306 L686,301 L681,297 L677,292 L672,287 L667,283 L663,277 Z' fill='%23F3EEE3' fill-opacity='.10'/%3E%3Ccircle cx='570' cy='220' r='40' fill='%23D8B46A' fill-opacity='.75'/%3E%3C/svg%3E") center/contain no-repeat}
+/* 아래 바·입력줄: 종이 위에 떠 있는 유리 */
+.dock{background:rgb(255 253 249 / .78);box-shadow:inset 0 0 0 1px rgb(22 35 58 / .06)}
+@media (prefers-color-scheme: dark){ .dock{background:rgb(18 26 40 / .82);box-shadow:inset 0 0 0 1px rgb(236 231 220 / .06)} }
+form.homebar,form.compose{box-shadow:0 1px 2px rgb(22 35 58 / .05),0 8px 22px rgb(22 35 58 / .09)}
+/* 문서 종류 표시: 원색 대신 차분한 색 */
+.dbadge.x{background:#3B7553}.dbadge.w{background:#2B4C7E}.dbadge.p{background:#9B3A4C}.dbadge.h{background:#2D7472}.dbadge.i{background:#9A6516}
+.dbadge{color:#F8F5EE}
+/* 내 말풍선·제안 카드 */
+.toast{background:var(--ink);color:var(--surface)}
+.toast.err{background:var(--danger);color:#FFFFFF}
+@media (prefers-color-scheme: dark){ .toast.err{color:#2A0F12} }
 </style>
 </head>
 <body>
@@ -902,7 +940,7 @@ const ICON = {
   docs: '<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5L12 11l2.5 2.5"/>',
   memory: '<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/><path d="M18.5 4.5l1 1M20.5 9h-1.4"/>',
 };
-const TINT = { blue: "#2563EB", indigo: "#4F46E5", amber: "#B45309", green: "#15803D", teal: "#0D9488", rose: "#BE123C" };
+const TINT = { blue: "#2B4C7E", indigo: "#4A4B8A", amber: "#9A6516", green: "#3B7553", teal: "#2D7472", rose: "#9B3A4C" };
 function miniIcon(name, tint) {
   const span = el("span", "mini");
   span.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[name] || ICON.dot}</svg>`;
