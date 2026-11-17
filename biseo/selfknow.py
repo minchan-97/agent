@@ -66,7 +66,7 @@ def usage(sb, days: int = 30) -> dict:
     since = _since(days)
     out = {"days": days, "by_cap": {}, "decided": {}, "unmet": [], "talks": 0}
     try:
-        acts = sb.table("actions").select("kind,status,args").gte("created_at", since).limit(2000).execute().data or []
+        acts = sb.table("actions").select("kind,status,args,origin,task_id").gte("created_at", since).limit(2000).execute().data or []
     except Exception:
         acts = []
     used = Counter()
@@ -94,14 +94,6 @@ def usage(sb, days: int = 30) -> dict:
     except Exception:
         pass
     out["by_cap"] = dict(used)
-    words = Counter()
-    for a in acts:
-        if a.get("kind") == "search":
-            q = str((a.get("args") or {}).get("query") or "")
-            for w in set(re.findall(r"[가-힣A-Za-z]{2,}", q)):
-                if w not in _STOP:
-                    words[w] += 1
-    out["top_search"] = [(w, c) for w, c in words.most_common(3) if c >= 3]
     # 못 해 드린 부탁: 비서가 '할 수 없다'고 답한 직전의 사용자 말 + 막힌 행동
     try:
         eps = (sb.table("episodes").select("role,text").gte("created_at", since)
@@ -116,6 +108,16 @@ def usage(sb, days: int = 30) -> dict:
     if blocked.get("send_message"):
         unmet.append(f"메시지를 직접 보내 달라는 부탁 {blocked['send_message']}번")
     out["unmet"] = list(dict.fromkeys(unmet))[-6:]
+    # 자주 찾은 말: 사람이 직접 부탁한 검색만(맡은 일이 스스로 한 검색은 빼고),
+    # 그리고 그 말을 사람이 실제로 입에 올린 횟수로 센다. 모델이 덧붙인 말(예: 직업)은 여기서 걸러진다.
+    cand = set()
+    for a in acts:
+        if a.get("kind") == "search" and a.get("origin", "user") == "user" and not a.get("task_id"):
+            q = str((a.get("args") or {}).get("query") or "")
+            cand |= {w for w in re.findall(r"[가-힣A-Za-z]{2,}", q) if w not in _STOP}
+    said = [str(e.get("text") or "") for e in eps if e.get("role") == "user"]
+    words = Counter({w: sum(1 for t in said if w in t) for w in cand})
+    out["top_search"] = [(w, c) for w, c in words.most_common(3) if c >= 3]
     return out
 
 
@@ -210,6 +212,14 @@ _CANNOT_HINT = [
 ]
 
 
+def _eul(w: str) -> str:
+    """받침에 맞는 을/를."""
+    ch = w[-1]
+    if "가" <= ch <= "힣":
+        return "을" if (ord(ch) - 0xAC00) % 28 else "를"
+    return "를"
+
+
 def asks_improvement(text: str) -> bool:
     return bool(ASKS_IMPROVE.search(text or ""))
 
@@ -241,7 +251,7 @@ def improve_answer(sb, u: dict | None = None) -> str:
     top_search = u.get("top_search") or []
     if top_search:
         w, c = top_search[0]
-        parts.append(f"• '{w}'를 {c}번 찾으셨어요. 홈에 '{w}' 버튼을 두면 누르기만 해도 바로 찾아 드려요. "
+        parts.append(f"• '{w}'{_eul(w)} {c}번 물어보셨어요. 홈에 '{w}' 버튼을 두면 누르기만 해도 바로 찾아 드려요. "
                      f"\"{w} 버튼 만들어 줘\"라고 하시면 돼요.")
     elif used.get("note", 0) >= 20:
         parts.append(f"• 메모가 {used['note']}개 쌓였어요. \"이번 주 메모 정리해 줘\"라고 맡기시면 묶어서 정리해 드려요.")
