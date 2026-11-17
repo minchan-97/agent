@@ -68,19 +68,20 @@ actions 에 쓸 수 있는 kind 와 args
                 문서를 보내 달라고 하면: 문서 화면의 '보내기'로 사용자가 직접 보낸다고 안내하고,
                 필요하면 그 문서를 붙인 reminder("~에게 보내기")나 보낼 말 draft 를 만들어.
 
-문서 (아래 [문서함]의 번호로 가리킨다. D=문서, T=양식, R=초안. 목록에 없는 문서는 가리키지 마)
-  read_doc      {"doc": "D1", "question": "무엇을 알아야 하는지"}
+문서 (아래 [문서함]의 번호로 가리킨다: 문서1·양식1·초안1. 목록에 없는 문서는 가리키지 마.
+     번호는 args 에만 쓰고, reply 에는 문서 이름으로 말해라)
+  read_doc      {"doc": "문서1", "question": "무엇을 알아야 하는지"}
                 문서 내용을 알아야 답할 때 (요약, 질문, 날짜 확인 등). 시스템이 문서를 읽어 보여 준 뒤 다시 답한다.
-  doc_edit      {"doc": "D1", "instruction": "어떻게 고칠지 구체적으로"}   원본은 두고 고친 새 버전을 만든다
-  doc_make      {"template": "T1", "text": "칸에 넣을 내용 (사용자 말 그대로)"}   양식으로 새 문서
-  doc_new       {"title": "파일 이름", "text": "문서 본문 (# 제목, - 목록 가능)"} 또는 {"title": "...", "draft": "R1"}
+  doc_edit      {"doc": "문서1", "instruction": "어떻게 고칠지 구체적으로"}   원본은 두고 고친 새 버전을 만든다
+  doc_make      {"template": "양식1", "text": "칸에 넣을 내용 (사용자 말 그대로)"}   양식으로 새 문서
+  doc_new       {"title": "파일 이름", "text": "문서 본문 (# 제목, - 목록 가능)"} 또는 {"title": "...", "draft": "초안1"}
                 글·초안을 워드 파일로 만들 때
-  reminder · event · draft 의 args 에 "doc": "D1" 을 넣으면 그 문서와 연결된다 (알림을 누르면 문서가 열린다).
+  reminder · event · draft 의 args 에 "doc": "문서1" 을 넣으면 그 문서와 연결된다 (알림을 누르면 문서가 열린다).
   "가정통신문 금요일까지 내야 해"처럼 문서와 관련된 마감이면 reminder 에 doc 을 붙여라.
 
 규칙
 - because: 그 행동의 근거가 된 줄의 번호. U = 사용자의 이번 말, F번호 = 아는 사실, N번호 = 업무 기록.
-  근거가 사용자의 이번 말뿐이면 ["U"]. D번호 = 문서. 근거를 댈 수 없는 행동은 하지 마.
+  근거가 사용자의 이번 말뿐이면 ["U"]. 문서번호(문서1) = 문서. 근거를 댈 수 없는 행동은 하지 마.
 - 하자고 한 일이 "이미 끝났다"고 말하지 마. 실행할지는 시스템과 사용자가 정한다.
   "메모로 남겨 둘게요", "알림을 걸어 둘게요"처럼 말하면 충분하다.
 - 할 일이 없으면 actions 는 [].
@@ -204,7 +205,7 @@ def respond(sb, agent: dict, user_text: str) -> dict:
     extra += sk.for_prompt(sb)
     # 문서함: 번호(D1·T1·R1)로만 가리키게 한다. 진짜 id 는 서버만 안다
     try:
-        doc_text, doc_index = docagent.catalog(sb)
+        doc_text, doc_index = docagent.catalog(sb, text)
     except Exception as e:
         print("DOC_CATALOG_SKIP", type(e).__name__, str(e)[:120])
         doc_text, doc_index = "", {}
@@ -290,7 +291,7 @@ def respond(sb, agent: dict, user_text: str) -> dict:
         out = _ask(messages)
     out["actions"] = [a for a in out["actions"] if a.get("kind") not in ("search", "read_doc")]
 
-    reply = out["reply"].strip() or "잠깐 생각이 엉켰어요. 한 번만 다시 말해 줄래요?"
+    reply = docagent.humanize(out["reply"].strip(), doc_index) or "잠깐 생각이 엉켰어요. 한 번만 다시 말해 줄래요?"
 
     # 검색 결과를 본 뒤의 행동은 사용자가 시킨 것과 웹페이지 글이 시킨 것을 구분할 수 없다.
     # 그래서 오염 표시를 붙여, 승격돼 있어도 반드시 묻게 한다.
@@ -306,7 +307,7 @@ def respond(sb, agent: dict, user_text: str) -> dict:
         done.append(row)
         # 행동마다 판단 하나: 이 행동이 어느 근거(이번 말·사실·기록)에서 나왔는지
         if jw and row.get("id"):
-            tags = [str(t).strip("[] ") for t in (a.get("because") or ["U"]) if isinstance(t, (str, int))][:4] or ["U"]
+            tags = [docagent.because_key(t) for t in (a.get("because") or ["U"]) if isinstance(t, (str, int))][:4] or ["U"]
             ev = [evidence_index[t] for t in tags if t in evidence_index] or [evidence_index["U"]]
             if saw_external:
                 ev.append({"tag": "W", "kind": "web", "id": None, "text": "이번 답에 쓴 검색 자료"})
