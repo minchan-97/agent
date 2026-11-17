@@ -41,6 +41,10 @@ KINDS = {
     "note":         {"tier": 3, "label": "메모 저장"},
     "reminder":     {"tier": 3, "label": "알림 예약"},
     "event":        {"tier": 3, "label": "일정 추가"},
+    # 문서: 원본은 그대로 두고 새 파일(버전)을 만든다 → 되돌리면 그 파일을 지운다
+    "doc_edit":     {"tier": 3, "label": "문서 고치기"},
+    "doc_make":     {"tier": 3, "label": "양식으로 문서 만들기"},
+    "doc_new":      {"tier": 3, "label": "문서 파일 만들기"},
     "send_message": {"tier": 4, "label": "메시지 보내기", "enabled": False},
 }
 
@@ -110,16 +114,18 @@ def execute(sb, row: dict) -> dict:
                  "ref_action": aid}).execute().data[0]
             patch = {"status": "done", "done_at": _now(), "result": {"memory_id": m["id"]}}
         elif kind == "draft":
-            m = sb.table("task_memory").insert(
-                {"kind": "draft", "content": str(args.get("text", ""))[:4000],
-                 "ref_action": aid}).execute().data[0]
+            row_ = {"kind": "draft", "content": str(args.get("text", ""))[:4000], "ref_action": aid}
+            if args.get("doc_id"):
+                row_["doc_id"] = int(args["doc_id"])          # 어느 문서로 쓴 초안인지
+            m = sb.table("task_memory").insert(row_).execute().data[0]
             patch = {"status": "done", "done_at": _now(),
                      "result": {"memory_id": m["id"], "to": args.get("to", "")}}
         elif kind == "reminder":
             from . import apps
             r = apps.create_reminder(sb, {"text": args.get("text") or "알림",
                                           "due_at": args.get("due_at"),
-                                          "repeat": args.get("repeat")},
+                                          "repeat": args.get("repeat"),
+                                          "doc_id": args.get("doc_id")},
                                      by="agent" if row.get("origin") == "self" else "user")
             patch = {"status": "done", "done_at": _now(), "due_at": r["due_at"],
                      "result": {"reminder_id": r["id"]}}
@@ -129,6 +135,24 @@ def execute(sb, row: dict) -> dict:
             patch = {"status": "done", "done_at": _now(), "result": {"event_id": ev["id"]}}
         elif kind == "search":
             patch = {"status": "done", "done_at": _now()}
+        elif kind == "doc_edit":
+            from . import docs
+            r = docs.edit(sb, int(args["doc_id"]), str(args.get("instruction") or ""))
+            patch = {"status": "done", "done_at": _now(),
+                     "result": {"made_doc_id": r["doc"]["id"], "summary": r.get("summary"),
+                                "changed": sum(1 for c in r["changes"] if c["ok"])}}
+        elif kind == "doc_make":
+            from . import templates as tpl
+            vals = args.get("values") if isinstance(args.get("values"), dict) else None
+            if vals is None:
+                vals = tpl.fill(sb, int(args["template_id"]), str(args.get("text") or ""))["values"]
+            r = tpl.make(sb, int(args["template_id"]), vals)
+            patch = {"status": "done", "done_at": _now(),
+                     "result": {"made_doc_id": r["doc"]["id"], "empty": r["empty"]}}
+        elif kind == "doc_new":
+            from . import docagent
+            d = docagent.new_doc(sb, str(args.get("title") or ""), str(args.get("text") or ""))
+            patch = {"status": "done", "done_at": _now(), "result": {"made_doc_id": d["id"]}}
         elif kind == "start_task":
             from .tasks import create
             t = create(sb, str(args.get("goal", "")), skill_id=args.get("skill_id"))
@@ -217,6 +241,12 @@ def undo(sb, action_id: int) -> dict:
         sb.table("reminders").delete().eq("id", res["reminder_id"]).eq("status", "scheduled").execute()
     if res.get("event_id"):
         sb.table("events").delete().eq("id", res["event_id"]).execute()
+    if res.get("made_doc_id"):                       # 비서가 만든 문서 파일
+        from . import docs
+        try:
+            docs.remove(sb, int(res["made_doc_id"]))
+        except LookupError:
+            pass
     if row.get("auto_executed") and row["tier"] == 3:
         _save_trust(sb, row["kind"], 0, promoted=False)
     from . import judge
