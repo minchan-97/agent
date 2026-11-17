@@ -63,8 +63,9 @@ try:
     from biseo import docs as dx  # noqa: E402
     from biseo import storage as st  # noqa: E402
     from biseo import templates as tpl  # noqa: E402
+    from biseo import docagent as dag  # noqa: E402
 except Exception:  # noqa: BLE001
-    dx = st = tpl = None
+    dx = st = tpl = dag = None
     _DOCS_ERROR = traceback.format_exc().strip().splitlines()[-1]
     print("DOCS_BOOT_ERROR", _DOCS_ERROR)
 
@@ -597,14 +598,52 @@ def docs_list(authorization: str | None = Header(None)):
     return dx.list_docs(_session(authorization))
 
 
+DOC_AUTOSCAN = os.environ.get("DOC_AUTOSCAN", "1") != "0"
+
+
 @app.post("/api/docs")
 def docs_register(body: DocIn, authorization: str | None = Header(None)):
-    return _doc(dx.register, _session(authorization), body.path, body.name, body.mime, body.size)
+    sb = _session(authorization)
+    row = _doc(dx.register, sb, body.path, body.name, body.mime, body.size)
+    row["found"] = 0
+    if DOC_AUTOSCAN:               # 올린 문서에서 마감·일정 찾기 → 확인함. 실패해도 올리기는 성공
+        try:
+            row["found"] = len(dag.scan(sb, row))
+        except Exception as e:  # noqa: BLE001
+            print("DOC_SCAN_SKIP", type(e).__name__, str(e)[:120])
+    return row
 
 
 @app.get("/api/docs/{doc_id}")
 def docs_get(doc_id: int, authorization: str | None = Header(None)):
-    return _doc(dx.get, _session(authorization), doc_id)
+    sb = _session(authorization)
+    d = _doc(dx.get, sb, doc_id)
+    d["links"] = dag.linked(sb, doc_id)
+    return d
+
+
+@app.post("/api/docs/{doc_id}/scan")
+def docs_scan(doc_id: int, authorization: str | None = Header(None)):
+    sb = _session(authorization)
+    d = _doc(dx.get, sb, doc_id)
+    return {"found": len(_doc(dag.scan, sb, d))}
+
+
+@app.post("/api/docs/{doc_id}/draft")
+def docs_draft(doc_id: int, body: DocAskIn, authorization: str | None = Header(None)):
+    return _doc(dag.draft_from_doc, _session(authorization), doc_id, body.text)
+
+
+class DraftDocIn(BaseModel):
+    mode: str = Field(pattern="^(new|template|edit)$")
+    template_id: int | None = None
+    doc_id: int | None = None
+    title: str = Field("", max_length=60)
+
+
+@app.post("/api/drafts/{draft_id}/to_doc")
+def draft_to_doc(draft_id: int, body: DraftDocIn, authorization: str | None = Header(None)):
+    return _doc(dag.from_draft, _session(authorization), draft_id, body.mode, body.template_id, body.doc_id, body.title)
 
 
 @app.get("/api/docs/{doc_id}/url")
