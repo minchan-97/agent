@@ -972,7 +972,17 @@ async def push_unsubscribe(request: Request, authorization: str | None = Header(
 def push_status(authorization: str | None = Header(None)):
     sb = _session(authorization)
     rows = sb.table("push_subscriptions").select("id,device,created_at").execute().data or []
-    return {"devices": rows}
+    # 알림 시계: 크론이 마지막으로 서버에 닿은 시각 + 다음에 울릴 내 알림
+    last = None
+    try:
+        r = db.for_cron().table("app_secrets").select("value").eq("key", "cron_last").limit(1).execute().data
+        last = (r[0]["value"] or {}).get("at") if r else None
+    except Exception:  # noqa: BLE001
+        pass
+    nxt = sb.table("reminders").select("text,due_at").eq("status", "scheduled").order("due_at").limit(1).execute().data
+    stuck = sb.table("reminders").select("id", count="exact").eq("status", "scheduled") \
+              .lt("due_at", (datetime.now(timezone.utc) - timedelta(minutes=3)).isoformat()).execute().count or 0
+    return {"devices": rows, "cron_last": last, "next": (nxt or [None])[0], "overdue": stuck}
 
 
 @app.post("/api/push/test")
@@ -1116,7 +1126,13 @@ def cron_tick(only: str = "", authorization: str | None = Header(None)):
     given = (authorization or "").removeprefix("Bearer ")
     if not secret or not hmac.compare_digest(given, secret):
         raise HTTPException(401, "unauthorized")
-    return {"ok": True, "report": tick.run(db.for_cron(), brain._ask, only_due=(only == "due"))}
+    svc = db.for_cron()
+    try:      # 서버 알림 시계: 크론이 마지막으로 다녀간 시각 (설정 화면에서 '알림 시계'로 보인다)
+        svc.table("app_secrets").upsert({"key": "cron_last", "value": {
+            "at": datetime.now(timezone.utc).isoformat(), "only": only or "all"}}).execute()
+    except Exception as e:  # noqa: BLE001
+        print("CRON_MARK_SKIP", type(e).__name__)
+    return {"ok": True, "report": tick.run(svc, brain._ask, only_due=(only == "due"))}
 
 
 # ---------- 상태 확인 ----------
