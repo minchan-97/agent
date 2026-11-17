@@ -78,7 +78,7 @@ def _meter(sb, what: str):
     now = datetime.now(timezone.utc)
 
     def count(since):
-        return (sb.table("audit").select("id", count="exact").in_("kind", ["doc_read", "doc_ask", "doc_edit"])
+        return (sb.table("audit").select("id", count="exact").in_("kind", ["doc_read", "doc_ask", "doc_edit", "doc_tpl"])
                 .gte("created_at", since.isoformat()).execute().count or 0)
     if count(now - timedelta(minutes=1)) >= DOC_PER_MIN:
         raise RateLimited("문서 작업이 너무 빨라요. 1분쯤 뒤에 다시 해 주세요.")
