@@ -14,6 +14,12 @@ actions.py — 비서가 바깥에 대해 하는 일과, 어디까지 스스로 
 
 강등: 자동 실행한 것을 사용자가 되돌리면 그 종류는 다시 묻는 단계로 내려간다.
 
+상황별 자율 (autonomy.py, 정반합 동의 관문)
+  위 규칙이 '정'(종류 단위 공유 규칙)이고, 상황마다(종류 × 주중/주말 × 시간대 × 누가 시켰나)
+  받아들임·넘김 기록이 '반'이다. 상황 기록이 종류 규칙보다 꾸준히 더 맞혀 왔을 때만 그 상황에서
+  기록을 따른다. 예) 주말 저녁 알림만 자주 넘기면 그 상황만 다시 묻고, 종류 전체의 승격은 지키지 않는다.
+  tier 3 이면서 오염되지 않은 것에만 적용된다. tier 4·오염·바깥 계기는 바꾸지 않는다.
+
 검색 오염 (tainted)
   검색 결과(바깥 웹페이지)를 본 뒤에 나온 행동은 '오염됨'으로 표시한다.
   웹페이지 안의 글이 LLM 을 움직여 행동을 만들었을 수 있기 때문이다.
@@ -84,23 +90,35 @@ def propose(sb, kind: str, args: dict, reason: str = "", origin: str = "user",
                       tainted=tainted)
         return {**row, "why": "아직 이 비서가 할 수 없는 일"}
 
-    auto = tier in (1, 2) or (tier == 3 and not tainted and _trust(sb, kind).get("promoted"))
+    basis = None
+    if tier in (1, 2):
+        auto = True
+    elif tier == 3 and not tainted:
+        from . import autonomy
+        auto, basis = autonomy.safe_decide(sb, kind, origin, bool(_trust(sb, kind).get("promoted")))
+    else:
+        auto = False
     if not auto:
         return _insert(sb, kind, tier, origin, args, reason, "proposed", task_id=task_id,
-                       tainted=tainted)
+                       tainted=tainted, basis=basis)
 
     row = _insert(sb, kind, tier, origin, args, reason, "proposed", auto=True, task_id=task_id,
-                  tainted=tainted)
+                  tainted=tainted, basis=basis)
     return execute(sb, row)
 
 
 def _insert(sb, kind, tier, origin, args, reason, status, auto=False, task_id=None,
-            tainted=False) -> dict:
+            tainted=False, basis=None) -> dict:
     data = {"kind": kind, "tier": tier, "origin": origin, "args": args or {},
             "reason": (reason or "")[:300], "status": status, "auto_executed": auto,
             "tainted": bool(tainted)}
     if task_id:
         data["task_id"] = task_id
+    if basis:
+        try:                                         # 상황별 자율의 근거 (열이 아직 없으면 빼고 넣는다)
+            return sb.table("actions").insert({**data, "auto_basis": basis[:200]}).execute().data[0]
+        except Exception as e:
+            print("AUTO_BASIS_SKIP", type(e).__name__, str(e)[:120])
     return sb.table("actions").insert(data).execute().data[0]
 
 
@@ -196,6 +214,8 @@ def approve(sb, action_id: int) -> dict:
         t = _trust(sb, row["kind"])
         clean = t.get("clean", 0) + 1
         _save_trust(sb, row["kind"], clean, promoted=clean >= PROMOTE_AT)
+        from . import autonomy
+        autonomy.safe_learn(sb, row, +1.0)                       # 이 상황에서 받아들임
     _resume_task(sb, row, "승인됨 → " + done["status"])
     from . import judge
     judge.safe_feedback(sb, "action", action_id, 1.0)          # 판단 노드가 배운다
@@ -208,7 +228,10 @@ def reject(sb, action_id: int) -> dict:
         return {"error": "거절할 수 있는 상태가 아님"}
     # 오염된 행동을 거절한 건 그 종류를 못 믿어서가 아니라 바깥 글을 걸러낸 것이므로 강등하지 않는다
     if row["tier"] == 3 and not row.get("tainted"):
-        _save_trust(sb, row["kind"], 0, promoted=False)
+        from . import autonomy
+        autonomy.safe_learn(sb, row, -1.0)                       # 이 상황에서 넘김
+        if not autonomy.safe_explains(sb, row):                 # 상황만의 사정이면 종류 승격은 지킨다
+            _save_trust(sb, row["kind"], 0, promoted=False)
     if row["kind"] == "suggest_shortcut":
         pid = (row.get("args") or {}).get("pattern_id")
         if pid:
@@ -247,8 +270,11 @@ def undo(sb, action_id: int) -> dict:
             docs.remove(sb, int(res["made_doc_id"]))
         except LookupError:
             pass
-    if row.get("auto_executed") and row["tier"] == 3:
-        _save_trust(sb, row["kind"], 0, promoted=False)
+    if row["tier"] == 3 and not row.get("tainted"):
+        from . import autonomy
+        autonomy.safe_learn(sb, row, -1.0, weight=1.5)           # 되돌림은 넘김보다 무겁게
+        if row.get("auto_executed") and not autonomy.safe_explains(sb, row):
+            _save_trust(sb, row["kind"], 0, promoted=False)
     from . import judge
     judge.safe_feedback(sb, "action", action_id, -1.0)          # 되돌린 건 틀린 판단
     return sb.table("actions").update({"status": "undone", "decided_at": _now()}
