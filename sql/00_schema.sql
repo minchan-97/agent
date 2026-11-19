@@ -266,6 +266,25 @@ create table if not exists action_trust (
   primary key (user_id, kind)
 );
 
+-- ---------- 9-1. 상황별 자율 (정반합 동의 관문, biseo/autonomy.py) ----------
+-- 상황(종류 × 주중/주말 × 시간대 × 누가 시켰나)마다 받아들임·넘김의 감쇠 합과 동의 점수.
+-- ctx 가 'kind|*' 인 줄은 종류 전체의 기록(정), 나머지는 상황 기록(반).
+create table if not exists action_context (
+  user_id    uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  ctx        text not null,
+  kind       text not null,
+  label      text,
+  acc        real not null default 0,      -- 받아들임 (감쇠 합)
+  rej        real not null default 0,      -- 넘김·되돌림 (감쇠 합)
+  n          int  not null default 0,
+  pi         real not null default 0,      -- 상황 기록이 종류 규칙보다 더 맞혀 온 정도
+  mode       text check (mode in ('auto','ask')),
+  changed_at timestamptz,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, ctx)
+);
+alter table actions add column if not exists auto_basis text;   -- 상황별 자율로 바로 했거나 다시 물은 근거
+
 -- ---------- 10. 알림 (앱) ----------
 -- 일정에 붙은 알림은 일정을 지우면 같이 지워진다.
 -- offset_min 이 있으면 "일정 몇 분 전"이라 일정 시각을 따라 움직인다.
@@ -490,7 +509,7 @@ begin
   foreach t in array array['agents','facts','quarantine','episodes','events','task_memory',
                            'skills','tasks','actions','action_trust','reminders','shortcuts',
                            'usage_patterns','outbox','push_subscriptions','agent_state','audit',
-                           'judgments','docs','templates']
+                           'judgments','docs','templates','action_context']
   loop
     execute format('alter table %I enable row level security', t);
     execute format('drop policy if exists own_rows on %I', t);
