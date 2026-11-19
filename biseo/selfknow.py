@@ -30,6 +30,9 @@ CAPABILITIES = [
     ("template", "양식", "자주 쓰는 문서를 양식으로 저장해, 내용만 말하면 같은 모양의 새 문서를 만든다", "\"체험학습 양식으로 6월 3일 박물관 써 줘\""),
     ("think", "판단 구조", "답·제안마다 판단 트리(요청 파악 → 할 일 정하기 → 확인된 것으로 답하기)를 걷고, 비슷했던 지난 판단을 회상한다. "
      "받아들이면 그 길이 강해지고, 넘기거나 되돌리면 약해진다 — 쓸수록 이 사람에 맞게 판단 습관이 바뀐다", "'왜' 화면의 판단 경로"),
+    ("autonomy", "상황별 자율", "같은 종류라도 상황(주중/주말·시간대·누가 시켰나)마다 받아들이신 기록을 본다. 그 상황 기록이 "
+     "종류 전체 규칙보다 꾸준히 더 맞혀 왔을 때만 따라서, 늘 받아들이시는 상황은 바로 하고 자주 넘기시는 상황만 다시 묻는다. "
+     "남에게 닿는 일·검색이나 문서 글에서 나온 일은 언제나 묻는다", "설정 → 상황별 자율에서 따로 정해진 상황과 바뀐 기록 보기"),
     ("why", "왜", "제안·행동마다 이유 한 줄과 근거(일정·메모·문서…), 판단 경로를 보여 준다", "제안 아래 '왜' 줄을 누르기"),
     ("memory", "기억", "사용자가 말한 자기 사실을 기억하되, 확인한 것만 확실하게 쓴다. 보고·고치고·지울 수 있다", "기억 앱"),
     ("skill", "기능·버튼 만들기", "반복되는 부탁을 기능이나 홈 버튼으로 만든다 (기본 도구 범위 안에서만)", "\"회의 준비하는 기능 만들어 줘\""),
@@ -45,7 +48,7 @@ CANNOT = [
 _STOP = {"오늘", "내일", "어제", "이번", "지금", "현재", "최근", "알려", "알려줘", "어때", "뭐야", "있어", "정보",
          "관련", "검색", "찾아", "찾아줘", "요즘", "최신", "기준", "년", "월", "일"}
 # 쓰임이 따로 기록되지 않는, 늘 켜져 있는 기능
-ALWAYS_ON = {"think", "why", "memory", "voice"}
+ALWAYS_ON = {"think", "why", "memory", "voice", "autonomy"}
 LABEL = {k: n for k, n, _, _ in CAPABILITIES}
 ACTION_TO_CAP = {"event": "schedule", "reminder": "reminder", "note": "note", "draft": "draft",
                  "start_task": "task", "self_task": "task", "search": "search", "doc_edit": "doc",
@@ -134,7 +137,7 @@ def evidence_lines(u: dict) -> list:
     if used:
         top = sorted(used.items(), key=lambda x: -x[1])
         lines.append("자주 쓴 기능: " + ", ".join(f"{LABEL.get(k, k)} {v}번" for k, v in top[:5] if v))
-    never = [LABEL[k] for k, *_ in CAPABILITIES if not used.get(k) and k not in ("why", "memory", "voice", "think")]
+    never = [LABEL[k] for k, *_ in CAPABILITIES if not used.get(k) and k not in ALWAYS_ON]
     if never:
         lines.append("최근에 한 번도 안 쓴 기능: " + ", ".join(never))
     d = u.get("decided") or {}
