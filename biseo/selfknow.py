@@ -57,7 +57,8 @@ ACTION_TO_CAP = {"event": "schedule", "reminder": "reminder", "note": "note", "d
 
 ABOUT_ME = re.compile(r"(기능|할 수 있|할수있|뭘 할|무엇을 할|뭐 할 수|뭐가 돼|뭐 돼|사용법|어떻게 써|어떻게 쓰|개선|추가하면|"
                       r"더하면|업데이트|필요한 기능|부족한|아쉬운|너는 뭐|넌 뭐|자기소개|소개해|도움말|할 줄|"
-                     r"차별|다른 (?:llm|LLM|AI|ai|앱|비서)|gpt|GPT|챗GPT|챗지피티|지피티|클로드|제미나이|뭐가 달라|더 나은|장점|강점)")
+                     r"보완|보강|자율|스스로|판단 구조|관문핵|GateCore|gatecore|"
+                      r"차별|다른 (?:llm|LLM|AI|ai|앱|비서)|gpt|GPT|챗GPT|챗지피티|지피티|클로드|제미나이|뭐가 달라|더 나은|장점|강점)")
 REFUSAL = re.compile(r"(할 수 없|할 수가 없|못 해요|못해요|못 해 드|못 합니다|지원하지 않|아직 못|아직 할 수 없|불가능|"
                      r"드릴 수 없|드릴 수는 없|볼 수 없|접근할 수 없|연결돼 있지 않|연결되어 있지 않|직접은 어려|직접 하기는 어려)")
 
@@ -183,6 +184,18 @@ def for_prompt(sb, text: str) -> tuple:
   '맞춤형·다정함·정직함·노력' 같은 성격 자랑은 하지 않는다. 큰 모델이 더 나은 일(긴 글·깊은 추론·코딩)도 한 줄로 인정한다.
 - 안 쓰는 기능이 있으면 그중 이 사람에게 도움이 될 하나를 골라 써 보는 법을 알려 줘도 좋다."""
     evidence = {k: {"tag": k, "kind": "usage", "id": None, "text": t[:160]} for k, t in ev}
+    if asks_autonomy(text):
+        try:
+            al = autonomy_lines(_au().facts(sb))
+        except Exception as e:
+            print("SELFKNOW_AUTONOMY_SKIP", type(e).__name__, str(e)[:120]); al = []
+        if al:
+            block += ("\n\n[내 자율 판단 구조(관문핵 구조)의 실제 상태 — 근거 번호 A]\n" + "\n".join(f"[{k}] {t}" for k, t in al) + """
+자율·판단 구조 개선을 물으면 (문서·보고서를 보여 주며 물어도 같다)
+- 보고서 문장을 다시 말하지 않는다. '연구가 필요하다·강화가 필요하다·모색한다' 같은 말은 쓰지 않는다.
+- 이미 있는 요소(A 줄에 '있음')를 새로 필요하다고 하지 않는다. 제안은 '없음'인 요소나, 숫자가 보여 주는 약한 곳에서만 고른다.
+- 제안마다 [A번호]를 대고, 무엇을 바꾸면 어떤 숫자가 달라질지 한 줄로 말한다. 기록이 적으면 그렇다고 솔직히 말한다. 3개 이하로.""")
+            evidence.update({k: {"tag": k, "kind": "autonomy", "id": None, "text": t[:160]} for k, t in al})
     return block, evidence
 
 
@@ -203,9 +216,11 @@ def overview(sb) -> dict:
 # 프롬프트 규칙만으로는 LLM 이 "소통을 원활하게, 맞춤형 강화" 같은 빈말로 답할 때가 있다.
 # 그래서 개선 질문이면 답을 검사하고, 빈말이면 실제 쓰임 기록으로 서버가 직접 답을 짠다.
 ASKS_IMPROVE = re.compile(r"(개선|더하면|추가하면|추가했으면|필요한 기능|부족한|아쉬운|업데이트|뭘 더|뭐를 더|뭐 더|"
-                          r"고치면|바꾸면 좋|발전)")
+                          r"고치면|바꾸면 좋|발전|보완|보강|높이|높일)")
 VAGUE = re.compile(r"(원활|맞춤형|강화|향상|편리하게|더 쉽게|다양한|효율적|최적화|사용자 경험|발전할 수|"
-                   r"인터페이스|직관적|접근성|다정|소중히|깊이 이해|차별화|최선을|노력하)")
+                   r"인터페이스|직관적|접근성|다정|소중히|깊이 이해|차별화|최선을|노력하|필요성|모색|정비|지속적)")
+ASKS_AUTONOMY = re.compile(r"(자율|판단 구조|판단구조|스스로 (?:판단|하|정)|알아서|묻지 않|안 묻|자동으로|관문핵|gatecore|"
+                           r"메타인지|판단 회상|예외)", re.I)
 ASKS_COMPARE = re.compile(r"(차별|다른 (?:llm|ai|앱|비서|모델)|gpt|챗gpt|챗지피티|지피티|클로드|claude|제미나이|gemini|"
                           r"뭐가 달라|뭐가 다르|더 나은|더 낫|장점|강점|왜 너를|왜 이걸 써)", re.I)
 
@@ -335,3 +350,69 @@ def compare_answer(sb, u: dict | None = None) -> str:
     return (f"솔직히, 제 안쪽에서 생각하는 건 {model_name()} 모델이에요. 그래서 똑똑함 자체로는 ChatGPT나 Claude를 앞서지 않아요.\n"
             f"차이는 그 모델을 감싼 구조에 있어요.\n{body}\n"
             "반대로 긴 글쓰기·깊은 추론·코딩은 큰 모델이 더 나아요. 그런 일은 그쪽을 쓰시는 게 맞아요.")
+
+
+# ── 자율 판단 구조(관문핵 구조)에 대한 '확실한' 답 ────────────────────────────
+# "보고서 보고 네 자율성을 높일 방법을 말해 봐" 같은 질문에 LLM 은 보고서 소제목을 되풀이하기 쉽다.
+# 그래서 실제 상황 기록(autonomy.facts)으로 근거 줄을 만들고, 빈말이면 서버가 직접 답을 짠다.
+def _au():
+    from . import autonomy
+    return autonomy
+
+
+def asks_autonomy(text: str) -> bool:
+    return bool(ASKS_AUTONOMY.search(text or ""))
+
+
+def autonomy_lines(f: dict) -> list:
+    sp = f.get("special") or []
+    autos = [s for s in sp if s["mode"] == "auto"]
+    asks = [s for s in sp if s["mode"] == "ask"]
+    held = f.get("held") or []
+    lines = [
+        f"최근 {f['days']}일 제 제안·실행 {f['decided']}건: 묻지 않고 바로 {f['auto_done']}건, 여쭌 것 {f['asked']}건, 되돌리신 것 {f['undone']}건",
+        f"상황별 기록 {f['tracked']}개 중 따로 정해진 상황 {len(sp)}개 (바로 {len(autos)} · 묻기 {len(asks)})"
+        + (": " + ", ".join(f"{s['label']}→{'바로' if s['mode'] == 'auto' else '묻기'}" for s in sp[:3]) if sp else ""),
+        f"상황 기록 근거로 바로 하거나 다시 물은 것 {f['ctx_based']}건, 가까운 상황 기록을 빌려 판단한 것 {f['borrowed']}건",
+        (f"받아들임이 짧은 기간에 몰려 자동을 미루고 지켜보는 상황 {len(held)}개: " + ", ".join(h['label'] for h in held[:3]))
+        if held else "기간이 짧아 지켜보는 상황 없음",
+        f"상황 결정이 바뀐 기록(시대 기록) {f['changes']}번",
+        "요소 — 있음: 공유 규칙(종류 승격), 상황별 기록, 동의 관문, 이웃 상황 나눠 세기, 가짜 예외 기간 조건, 시대 기록, 상황별 되돌리기 / "
+        "없음: 여러 상황이 같은 쪽으로 꾸준할 때 종류 규칙(핵) 자체를 바꾸는 단계와 옛 기록 재해석",
+    ]
+    return [(f"A{i}", t) for i, t in enumerate(lines, 1)]
+
+
+def is_vague_autonomy(reply: str) -> bool:
+    """숫자도 상황 이름도 없이 '필요성·강화' 같은 말만 하는 답인가."""
+    r = reply or ""
+    nums = len(re.findall(r"\d", r))
+    cites = len(re.findall(r"A\d", r))
+    named = sum(1 for w in ("주중", "주말", "아침", "낮", "저녁", "밤", "가까운 상황", "되돌리", "시대 기록") if w in r)
+    return (nums + cites + named) < 2 or (bool(VAGUE.search(r)) and (cites + named) < 2)
+
+
+def autonomy_answer(sb, f: dict | None = None) -> str:
+    """실제 기록으로만 짠 자율 개선 답."""
+    f = f or _au().facts(sb)
+    sp = f.get("special") or []
+    held = f.get("held") or []
+    out = [f"제 자율 판단(관문핵 구조)을 최근 {f['days']}일 기록으로 보면,",
+           f"• 제안·실행 {f['decided']}건 중 묻지 않고 바로 한 게 {f['auto_done']}건, 여쭌 게 {f['asked']}건, 되돌리신 게 {f['undone']}건이에요."]
+    if sp:
+        out.append("• 따로 정해진 상황: " + ", ".join(f"{s['label']}은 {'바로' if s['mode'] == 'auto' else '묻기'}" for s in sp[:3]) + ".")
+    else:
+        out.append(f"• 상황별 기록은 {f['tracked']}개인데, 아직 따로 정해질 만큼 쌓인 상황은 없어요.")
+    if held:
+        out.append("• " + ", ".join(h["label"] for h in held[:2]) + "은 받아들임이 하루에 몰려 있어서, 하루 더 겪어 보고 바로 하려고 지켜보는 중이에요.")
+    if f["borrowed"]:
+        out.append(f"• 처음 겪는 상황에서 가까운 상황 기록을 빌려 판단한 게 {f['borrowed']}건이에요.")
+    out.append("\n보완할 것 (아직 없는 것부터):")
+    sugg = []
+    if f["undone"] and f["auto_done"] and f["undone"] / max(f["auto_done"], 1) >= 0.2:
+        sugg.append(f"• 바로 한 일 {f['auto_done']}건 중 {f['undone']}건을 되돌리셨어요. 자동 기준(받아들임 80%)을 더 높이거나, 되돌림이 난 상황은 일주일간 묻게 하면 이 비율이 내려가요.")
+    sugg.append("• 종류 규칙 자체를 바꾸는 단계가 없어요. 지금은 상황마다 따로만 바뀌어서, 여러 상황이 같은 쪽으로 꾸준해도 종류 규칙은 그대로예요. "
+                "이 단계를 넣으면 따로 정해진 상황 수가 줄고 규칙이 단순해져요.")
+    if f["decided"] < 30:
+        sugg.append(f"• 기록이 {f['decided']}건이라 아직 판단이 이르다는 것도 솔직한 상태예요. 30건쯤 쌓이면 어느 상황이 진짜 예외인지 더 분명해져요.")
+    return "\n".join(out + sugg[:3])
