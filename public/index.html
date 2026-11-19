@@ -3189,7 +3189,7 @@ SCREENS.settings = {
     try {
       const au = await api("/api/autonomy");
       const sec = el("details", "caps auto"); sec.append(el("summary", "", "상황별 자율"));
-      sec.append(el("p", "muted small", "같은 종류라도 상황(주중·주말, 시간대, 누가 시켰나)마다 받아들이신 기록을 봐요. 그 기록이 종류 전체 규칙보다 꾸준히 더 맞을 때만 따라요. 남에게 닿는 일과 검색·문서 글에서 나온 일은 언제나 여쭤봐요."));
+      sec.append(el("p", "muted small", "같은 종류라도 상황(주중·주말, 시간대, 누가 시켰나)마다 받아들이신 기록을 봐요. 그 기록이 종류 전체 규칙보다 꾸준히 더 맞을 때만 따라요. 처음 겪는 상황은 가까운 시간대에서 받아들이신 기록을 빌려 봐요. 남에게 닿는 일과 검색·문서 글에서 나온 일은 언제나 여쭤봐요."));
       if (au.unavailable) sec.append(el("p", "muted small", "아직 준비 중이에요. 서버에 표가 만들어지면 기록이 쌓이기 시작해요."));
       else if (!au.special.length) sec.append(el("p", "auto-empty", au.tracked ? `상황 ${au.tracked}개를 지켜보고 있어요. 아직 따로 정한 상황은 없어요.` : "아직 기록이 없어요. 확인함에서 하기·하지 않기를 누르실수록 배워요."));
       for (const s of au.special) {
@@ -3202,6 +3202,12 @@ SCREENS.settings = {
           try { await post("/api/autonomy/reset", { ctx: s.ctx }); r.remove(); toast("이 상황은 다시 종류 규칙을 따라요."); } catch (e) { toast(e.message, "err"); }
         }));
         r.append(top, meta, row); sec.append(r);
+      }
+      if (au.held && au.held.length) {
+        const hd = el("div", "auto-hist"); hd.append(el("b", "", "지켜보는 중"));
+        hd.append(el("p", "muted small", "받아들이신 기록이 하루에 몰려 있어서, 다른 날도 겪어 본 뒤 바로 하려고 해요."));
+        for (const h of au.held.slice(0, 4)) hd.append(el("p", "", `${h.label} · ${h.days || 0}/${h.need}일`));
+        sec.append(hd);
       }
       if (au.history && au.history.length) {
         const hist = el("div", "auto-hist"); hist.append(el("b", "", "바뀐 기록"));
