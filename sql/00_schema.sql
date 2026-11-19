@@ -282,6 +282,8 @@ create table if not exists action_context (
   changed_at timestamptz,
   days       int  not null default 0,      -- 겪은 서로 다른 날 수 (가짜 예외 막기)
   last_day   text,
+  rival      int  not null default 0,      -- 종류 행: 핵과 반대쪽 압력이 이어진 서로 다른 날 수 (혁명)
+  rival_day  text,
   updated_at timestamptz not null default now(),
   primary key (user_id, ctx)
 );
