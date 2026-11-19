@@ -3203,6 +3203,26 @@ SCREENS.settings = {
         }));
         r.append(top, meta, row); sec.append(r);
       }
+      if (au.cores && au.cores.length) {
+        const cs = el("div", "auto-hist"); cs.append(el("b", "", "종류 규칙이 바뀐 것"));
+        cs.append(el("p", "muted small", "여러 상황에서 며칠 동안 꾸준히 같은 쪽이셔서, 상황마다가 아니라 종류 전체 규칙을 바꿨어요."));
+        for (const c of au.cores) {
+          const r = el("div", "cap auto-row");
+          const top = el("div", "cap-t");
+          top.append(el("b", "", c.label), el("span", "cap-n " + (c.mode === "auto" ? "is-auto" : "is-ask"), c.mode === "auto" ? "바로 해요" : "여쭤봐요"));
+          const row = el("div", "row");
+          row.append(button("원래 규칙으로", "ghost small", async () => {
+            try { await post("/api/autonomy/core_reset", { kind: c.kind }); r.remove(); toast("이 종류는 다시 원래 규칙을 따라요."); } catch (e) { toast(e.message, "err"); }
+          }));
+          r.append(top, el("p", "", c.changed_at ? md(c.changed_at) + "부터" : ""), row); cs.append(r);
+        }
+        sec.append(cs);
+      }
+      if (au.rival && au.rival.length) {
+        const rv = el("div", "auto-hist"); rv.append(el("b", "", "종류 규칙이 바뀔 수도 있는 것"));
+        for (const x of au.rival.slice(0, 4)) rv.append(el("p", "", `${x.label} · 여러 상황이 같은 쪽 ${x.days}/${x.need}일째`));
+        sec.append(rv);
+      }
       if (au.held && au.held.length) {
         const hd = el("div", "auto-hist"); hd.append(el("b", "", "지켜보는 중"));
         hd.append(el("p", "muted small", "받아들이신 기록이 하루에 몰려 있어서, 다른 날도 겪어 본 뒤 바로 하려고 해요."));
@@ -3212,8 +3232,8 @@ SCREENS.settings = {
       if (au.history && au.history.length) {
         const hist = el("div", "auto-hist"); hist.append(el("b", "", "바뀐 기록"));
         for (const x of au.history.slice(0, 6)) {
-          const to = x.to === "auto" ? "바로 하기로" : x.to === "ask" ? "여쭤보기로" : x.from === "user_reset" ? "처음 규칙으로 (직접)" : "종류 규칙으로";
-          hist.append(el("p", "", `${x.at ? ago(x.at) + " · " : ""}${x.label || ""} → ${to}`));
+          const to = x.to === "auto" ? "바로 하기로" : x.to === "ask" ? "여쭤보기로" : x.from === "user_reset" ? (x.revolution ? "원래 규칙으로 (직접)" : "처음 규칙으로 (직접)") : x.revolution ? "원래 규칙으로" : "종류 규칙으로";
+          hist.append(el("p", "", `${x.at ? ago(x.at) + " · " : ""}${x.revolution ? "[종류 전체] " : ""}${x.label || ""} → ${to}`));
         }
         sec.append(hist);
       }
