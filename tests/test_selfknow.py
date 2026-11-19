@@ -158,12 +158,12 @@ def test_report_echo_is_vague_and_gets_grounded_answer():
     assert any(f["type"] == "vague" for f in found)
     ans = s.autonomy_answer(sb)
     assert not s.is_vague_autonomy(ans)
-    assert "종류 규칙" in ans and "기록이 0건" in ans          # 없는 요소와 솔직한 상태
+    assert "기준값" in ans and "기록이 0건" in ans             # 고정값 고백과 솔직한 상태
 
 
 def test_autonomy_block_goes_into_prompt():
     from biseo import selfknow as s
     from fakedb import FakeDB
     block, ev = s.for_prompt(FakeDB(), ASK_AUTO)
-    assert "관문핵 구조" in block and "[A6]" in block and "A1" in ev
-    assert "없음: 여러 상황이" in block
+    assert "관문핵 구조" in block and "[A7]" in block and "A1" in ev
+    assert "혁명" in block and "고정값으로 둔 것" in block
