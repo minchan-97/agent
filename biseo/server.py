@@ -9,6 +9,8 @@ biseo/server.py — 비서진 창구 (몰랑이 api.py 처럼 코어는 건드�
   POST /api/actions/{id}/approve   승인
   POST /api/actions/{id}/reject    거절
   POST /api/actions/{id}/undo      되돌리기
+  GET  /api/autonomy               상황별 자율 (따로 정해진 상황, 바뀐 기록)
+  POST /api/autonomy/reset         상황 하나를 지워 종류 규칙으로 돌림
   GET  /api/history                최근 대화
   GET  /api/cron/tick              pg_cron 전용 (Bearer CRON_SECRET)
 
@@ -973,6 +975,30 @@ def self_overview(authorization: str | None = Header(None)):
     """비서가 할 수 있는 일과 최근 30일 쓰임 (설정 → 할 수 있는 일)"""
     from biseo import selfknow
     return selfknow.overview(_session(authorization))
+
+
+@app.get("/api/autonomy")
+def autonomy_overview(authorization: str | None = Header(None)):
+    """상황별 자율: 따로 정해진 상황과 최근 바뀐 기록 (설정 화면)"""
+    from biseo import autonomy
+    try:
+        return autonomy.overview(_session(authorization))
+    except Exception as e:
+        print("AUTONOMY_OVERVIEW_SKIP", type(e).__name__, str(e)[:120])
+        return {"special": [], "history": [], "tracked": 0, "unavailable": True}
+
+
+class CtxIn(BaseModel):
+    ctx: str = Field(..., max_length=120)
+
+
+@app.post("/api/autonomy/reset")
+def autonomy_reset(body: CtxIn, authorization: str | None = Header(None)):
+    from biseo import autonomy
+    ctx = body.ctx.strip()
+    if not ctx or ctx.endswith("|*"):
+        raise HTTPException(400, "상황을 골라 주세요")
+    return autonomy.reset(_session(authorization), ctx)
 
 
 @app.get("/api/push/status")
