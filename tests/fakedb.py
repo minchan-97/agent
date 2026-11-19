@@ -33,7 +33,7 @@ DEFAULTS = {
               "last_step_at": None, "lease_until": "1970-01-01T00:00:00+00:00"},
     "action_trust": {"clean": 0, "promoted": False},
 }
-PKEYS = {"action_trust": ("kind",), "agent_state": ("key",)}
+PKEYS = {"action_trust": ("kind",), "agent_state": ("key",), "action_context": ("ctx",)}
 
 
 class _Res:
