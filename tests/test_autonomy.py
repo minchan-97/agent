@@ -181,3 +181,88 @@ def test_neighbour_that_asks_blocks_borrowed_auto(monkeypatch):
     assert au.borrow(own, [good])[0] == "auto"
     assert au.borrow(own, [good, bad])[0] is None              # 가까운 이웃이 '묻기'면 빌린 자동은 내지 않는다
     assert au.borrow({**own, "n": 3}, [good])[0] is None       # 자기 기록이 충분하면 빌리지 않는다
+
+
+# ── 혁명과 재해석: 종류 규칙 자체가 바뀌는 단계 ──
+def _iso(d, hh_utc):
+    return datetime(2026, 11, d, hh_utc, 30, tzinfo=timezone.utc).isoformat()
+
+
+# 2026-11: 16 월 … 21 토, 22 일 / KST = UTC+9
+WD_EVE = lambda d: _iso(d, 10)      # 19:30 저녁
+WD_NIGHT = lambda d: _iso(d, 13)    # 22:30 밤
+
+
+def _seed_promoted(sb):
+    sb.table("action_trust").upsert({"kind": "note", "clean": 5, "promoted": True}).execute()
+    sb.table("action_context").upsert({"ctx": "note|*", "kind": "note", "label": "note", "acc": 100.0, "rej": 0.0, "n": 100}).execute()
+
+
+def _rej(sb, iso, n=1):
+    for _ in range(n):
+        au.learn(sb, {"kind": "note", "origin": "user", "created_at": iso}, -1.0)
+
+
+def _three_contexts_reject(sb, day):
+    _rej(sb, WD_EVE(day), 3)            # 주중 저녁
+    _rej(sb, WD_NIGHT(day), 3)          # 주중 밤
+    _rej(sb, _iso(21, 10), 3)           # 주말 저녁
+
+
+def test_revolution_after_three_steady_days_and_reinterpretation(monkeypatch):
+    sb = FakeDB(); _seed_promoted(sb)
+    _three_contexts_reject(sb, 16)
+    k = au._row(sb, "note|*")
+    assert k.get("rival") == 1 and not k.get("mode")             # 하루로는 바뀌지 않는다
+    _rej(sb, WD_EVE(17))
+    assert au._row(sb, "note|*")["rival"] == 2
+    _rej(sb, WD_EVE(18))                                          # 서로 다른 셋째 날 → 혁명
+    k = au._row(sb, "note|*")
+    assert k["mode"] == "ask" and k["rival"] == 0
+    eve = au._row(sb, "note|user|주중|저녁")
+    assert eve["rej"] < 1.5                                       # 재해석: 옛 기록이 0.3배로 가벼워짐
+    hist = au.overview(sb)
+    assert hist["cores"] and hist["cores"][0]["mode"] == "ask"
+    assert any(h.get("revolution") and h.get("to") == "ask" for h in hist["history"])
+    # 겪지 않은 먼 상황(주말 아침)도 이제 새 종류 규칙을 따른다 — 승격은 그대로지만 묻는다
+    at(monkeypatch, datetime(2026, 11, 22, 0, 30, tzinfo=timezone.utc))
+    auto, basis = au.decide(sb, "note", "user", True)
+    assert auto is False and "종류 규칙" in basis
+
+
+def test_streak_breaks_when_a_context_supports_the_core():
+    sb = FakeDB(); _seed_promoted(sb)
+    _three_contexts_reject(sb, 16)
+    assert au._row(sb, "note|*")["rival"] == 1
+    for _ in range(3):                                           # 주중 아침은 꾸준히 받아들임 → 핵 편
+        au.learn(sb, {"kind": "note", "origin": "user", "created_at": _iso(17, 0)}, +1.0)
+    assert au._row(sb, "note|*")["rival"] == 0                    # 꾸준함이 깨지면 처음부터
+    _rej(sb, WD_EVE(18)); _rej(sb, WD_EVE(19))
+    assert not au._row(sb, "note|*").get("mode")
+
+
+def test_two_contexts_are_not_enough():
+    sb = FakeDB(); _seed_promoted(sb)
+    for d in (16, 17, 18, 19):
+        _rej(sb, WD_EVE(d), 2); _rej(sb, WD_NIGHT(d), 2)
+    k = au._row(sb, "note|*")
+    assert not k.get("mode") and not k.get("rival")
+
+
+def test_core_reset_restores_the_promotion_rule(monkeypatch):
+    sb = FakeDB(); _seed_promoted(sb)
+    _three_contexts_reject(sb, 16); _rej(sb, WD_EVE(17)); _rej(sb, WD_EVE(18))
+    assert au._row(sb, "note|*")["mode"] == "ask"
+    au.core_reset(sb, "note")
+    assert not au._row(sb, "note|*").get("mode")
+    at(monkeypatch, datetime(2026, 11, 22, 0, 30, tzinfo=timezone.utc))
+    assert au.decide(sb, "note", "user", True) == (True, None)
+    assert any(h.get("from") == "user_reset" and h.get("revolution") for h in au.overview(sb)["history"])
+
+
+def test_revolution_never_touches_safety(monkeypatch):
+    sb = FakeDB(); _seed_promoted(sb)
+    _three_contexts_reject(sb, 16); _rej(sb, WD_EVE(17)); _rej(sb, WD_EVE(18))
+    sb.table("action_context").update({"mode": "auto"}).eq("ctx", "note|*").execute()   # 반대 방향 혁명이라 해도
+    r = propose(sb, monkeypatch, datetime(2026, 11, 22, 0, 30, tzinfo=timezone.utc), tainted=True)
+    assert r["status"] == "proposed"
