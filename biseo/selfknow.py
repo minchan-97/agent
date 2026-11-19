@@ -377,8 +377,12 @@ def autonomy_lines(f: dict) -> list:
         (f"받아들임이 짧은 기간에 몰려 자동을 미루고 지켜보는 상황 {len(held)}개: " + ", ".join(h['label'] for h in held[:3]))
         if held else "기간이 짧아 지켜보는 상황 없음",
         f"상황 결정이 바뀐 기록(시대 기록) {f['changes']}번",
-        "요소 — 있음: 공유 규칙(종류 승격), 상황별 기록, 동의 관문, 이웃 상황 나눠 세기, 가짜 예외 기간 조건, 시대 기록, 상황별 되돌리기 / "
-        "없음: 여러 상황이 같은 쪽으로 꾸준할 때 종류 규칙(핵) 자체를 바꾸는 단계와 옛 기록 재해석",
+        ("혁명으로 종류 규칙이 바뀐 것: " + ", ".join(f"{c['label']}→{'바로' if c['mode'] == 'auto' else '묻기'}" for c in f.get('cores') or [])
+         if f.get("cores") else "혁명으로 종류 규칙이 바뀐 것 없음")
+        + ("; 바뀔 수도 있는 것: " + ", ".join(f"{x['label']} {x['days']}/{x['need']}일" for x in f.get('rival') or []) if f.get("rival") else ""),
+        "요소 — 있음: 공유 규칙(종류 승격), 상황별 기록, 동의 관문, 이웃 상황 나눠 세기, 가짜 예외 기간 조건, "
+        "혁명(여러 상황이 서로 다른 3일 꾸준히 같은 쪽이면 종류 규칙을 바꿈)과 재해석(옛 기록 ×0.3), 시대 기록, 상황·종류 되돌리기 / "
+        "고정값으로 둔 것: 자동 80%·묻기 50% 기준, 2일 기간 조건, 혁명 3상황·3일, 재해석 0.3 — 실제 기록으로 아직 맞춰 보지 않음",
     ]
     return [(f"A{i}", t) for i, t in enumerate(lines, 1)]
 
@@ -411,8 +415,16 @@ def autonomy_answer(sb, f: dict | None = None) -> str:
     sugg = []
     if f["undone"] and f["auto_done"] and f["undone"] / max(f["auto_done"], 1) >= 0.2:
         sugg.append(f"• 바로 한 일 {f['auto_done']}건 중 {f['undone']}건을 되돌리셨어요. 자동 기준(받아들임 80%)을 더 높이거나, 되돌림이 난 상황은 일주일간 묻게 하면 이 비율이 내려가요.")
-    sugg.append("• 종류 규칙 자체를 바꾸는 단계가 없어요. 지금은 상황마다 따로만 바뀌어서, 여러 상황이 같은 쪽으로 꾸준해도 종류 규칙은 그대로예요. "
-                "이 단계를 넣으면 따로 정해진 상황 수가 줄고 규칙이 단순해져요.")
+    if f.get("cores"):
+        c = f["cores"][0]
+        sugg.append(f"• {c['label']}은 여러 상황이 꾸준해서 종류 규칙이 '{'바로' if c['mode'] == 'auto' else '여쭤보기'}'로 바뀌었어요. "
+                    "이후 되돌림이 늘면 그 혁명이 성급했다는 뜻이라, 혁명 조건(3상황·3일)을 높이는 근거가 돼요.")
+    elif f.get("rival"):
+        x = f["rival"][0]
+        sugg.append(f"• {x['label']}은 여러 상황이 같은 쪽을 가리킨 지 {x['days']}/{x['need']}일째라, 곧 종류 규칙이 바뀔 수 있어요.")
+    if len(sp) >= 4 and not f.get("cores"):
+        sugg.append(f"• 따로 정해진 상황이 {len(sp)}개로 많아요. 같은 종류에서 방향이 갈리면 혁명이 안 일어나니, 상황 구분(시간대 4칸)이 너무 잘다는 신호일 수 있어요.")
+    sugg.append("• 기준값(자동 80%, 2일, 혁명 3상황·3일, 재해석 0.3)은 아직 연구 실험값 그대로예요. 실제 기록의 되돌림 비율로 맞춰 보는 게 남았어요.")
     if f["decided"] < 30:
         sugg.append(f"• 기록이 {f['decided']}건이라 아직 판단이 이르다는 것도 솔직한 상태예요. 30건쯤 쌓이면 어느 상황이 진짜 예외인지 더 분명해져요.")
     return "\n".join(out + sugg[:3])
