@@ -673,6 +673,10 @@ form.homebar,form.compose{box-shadow:0 1px 2px rgb(22 35 58 / .05),0 8px 22px rg
 .btn{letter-spacing:-.005em}
 .clock{display:flex;align-items:center;gap:8px;margin:12px 0 4px;font-size:.8125rem}
 .ck-dot{width:8px;height:8px;border-radius:50%;flex:none}.ck-dot.on{background:var(--live)}.ck-dot.off{background:var(--danger)}
+.auto-row .cap-n.is-auto{color:var(--accent)}.auto-row .cap-n.is-ask{color:var(--gold, #B8862E)}
+.auto-hist{margin-top:10px;font-size:.8125rem;color:var(--muted)}.auto-hist b{display:block;color:var(--ink);font-size:.8125rem;margin-bottom:4px}.auto-hist p{margin:2px 0}
+.auto-empty{font-size:.875rem;color:var(--muted);margin:8px 0}
+.basis{font-size:.8125rem;color:var(--muted);margin-top:6px;display:flex;gap:6px;align-items:flex-start}.basis::before{content:"";flex:none;width:6px;height:6px;border-radius:50%;background:var(--gold, #B8862E);margin-top:.45em}
 .caps{margin:22px 0 0}.caps summary{cursor:pointer;font-weight:700;font-size:.9375rem;padding:6px 0}
 .caplist{display:flex;flex-direction:column;gap:8px;margin:8px 0}
 .cap{background:var(--surface);border-radius:14px;padding:11px 14px;box-shadow:var(--shadow)}
@@ -2937,6 +2941,7 @@ SCREENS.inbox = {
       // 검색 결과를 보고 나온 일: 웹페이지 글이 시킨 것일 수 있으니 내용을 한 번 더 보게 한다
       if (a.tainted) d.append(el("div", "taint", a.args?.doc_id ? "문서 내용을 보고 나온 일이에요. 문서에 적힌 대로인지 확인해 주세요." : "검색 자료를 보고 나온 일이에요. 내용이 맞는지 확인해 주세요."));
       if (a.args?.doc_id) { const c = el("button", "docchip", `${a.args.doc_name || "문서"}`); c.type = "button"; c.onclick = () => openDoc(a.args.doc_id); d.append(c); }
+      if (a.auto_basis) d.append(el("div", "basis", a.auto_basis));     // 상황별 자율: 이번엔 왜 여쭙는지
       d.append(whyLine("action", a.id, a.reason, a.why, describe(a)));
       const row = el("div", "row");
       const decide = (verb) => async () => {
@@ -2951,6 +2956,7 @@ SCREENS.inbox = {
     if (recent.length) nodes.push(el("div", "group", "묻지 않고 해 둔 일"));
     for (const a of recent) {
       const d = el("div", "card ended"); d.append(actionLead(a), el("div", "b", describe(a)));
+      if (a.auto_basis) d.append(el("div", "basis", a.auto_basis));     // 상황별 자율: 왜 묻지 않고 했는지
       if (a.tier === 3) { const row = el("div", "row"); row.append(button("되돌리기", "ghost small", async () => { await post(`/api/actions/${a.id}/undo`); await render(); })); d.append(row); }
       nodes.push(d);
     }
@@ -3177,6 +3183,35 @@ SCREENS.settings = {
       cap.append(ul, no,
         el("p", "muted small", "채팅에서 \u201c무슨 기능을 더하면 좋을까?\u201d라고 물으면, 이 목록과 실제 쓰임을 근거로 답해요."));
       box.append(cap);
+    } catch {}
+
+    // 상황별 자율: 종류 규칙(정) 위에서 상황 기록(반)이 동의를 얻은 곳만 따로 (합)
+    try {
+      const au = await api("/api/autonomy");
+      const sec = el("details", "caps auto"); sec.append(el("summary", "", "상황별 자율"));
+      sec.append(el("p", "muted small", "같은 종류라도 상황(주중·주말, 시간대, 누가 시켰나)마다 받아들이신 기록을 봐요. 그 기록이 종류 전체 규칙보다 꾸준히 더 맞을 때만 따라요. 남에게 닿는 일과 검색·문서 글에서 나온 일은 언제나 여쭤봐요."));
+      if (au.unavailable) sec.append(el("p", "muted small", "아직 준비 중이에요. 서버에 표가 만들어지면 기록이 쌓이기 시작해요."));
+      else if (!au.special.length) sec.append(el("p", "auto-empty", au.tracked ? `상황 ${au.tracked}개를 지켜보고 있어요. 아직 따로 정한 상황은 없어요.` : "아직 기록이 없어요. 확인함에서 하기·하지 않기를 누르실수록 배워요."));
+      for (const s of au.special) {
+        const r = el("div", "cap auto-row");
+        const top = el("div", "cap-t");
+        top.append(el("b", "", s.label), el("span", "cap-n " + (s.mode === "auto" ? "is-auto" : "is-ask"), s.mode === "auto" ? "바로 해요" : "여쭤봐요"));
+        const meta = el("p", "", `받아들이신 비율 ${Math.round((s.rate || 0) * 100)}% · ${s.n}번 겪음${s.changed_at ? " · " + md(s.changed_at) + "부터" : ""}`);
+        const row = el("div", "row");
+        row.append(button("처음 규칙으로", "ghost small", async () => {
+          try { await post("/api/autonomy/reset", { ctx: s.ctx }); r.remove(); toast("이 상황은 다시 종류 규칙을 따라요."); } catch (e) { toast(e.message, "err"); }
+        }));
+        r.append(top, meta, row); sec.append(r);
+      }
+      if (au.history && au.history.length) {
+        const hist = el("div", "auto-hist"); hist.append(el("b", "", "바뀐 기록"));
+        for (const x of au.history.slice(0, 6)) {
+          const to = x.to === "auto" ? "바로 하기로" : x.to === "ask" ? "여쭤보기로" : x.from === "user_reset" ? "처음 규칙으로 (직접)" : "종류 규칙으로";
+          hist.append(el("p", "", `${x.at ? ago(x.at) + " · " : ""}${x.label || ""} → ${to}`));
+        }
+        sec.append(hist);
+      }
+      box.append(sec);
     } catch {}
 
     // 앱 정보: arcogit 모노그램과 철학 한 줄
