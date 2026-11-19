@@ -135,3 +135,35 @@ def test_compare_question_gets_honest_structural_answer(monkeypatch):
     assert not selfknow.is_vague(out)
     long, _ = selfknow.for_prompt(sb, "챗GPT랑 뭐가 달라?")
     assert "성격 자랑" in long
+
+
+# ── 자율 판단 구조에 대한 개선 질문 (보고서를 보여 주며 물은 실제 사례) ──
+ASK_AUTO = "이 보고서 보고 너 자신의 자율성 등을 높이기 위해 보완할 걸 제시해 줘"
+GOT = ("1. 판단 구조를 다듬기 위한 지속적인 연구 필요성 강조. 2. 예외를 잘 찾아내는 구조가 필요. "
+       "3. 판단 회상과 메타인지 기능을 더욱 강화할 필요. 4. 경쟁 프로그램과의 비교를 통해 학습 패턴을 개선할 수 있는 방법 모색. "
+       "5. 오류 발생 시 재검토 및 기록 시스템 정비. 6. 과거의 판단을 재해석하는 방식에 대한 철학적 설계 선택이 중요.")
+
+
+def test_autonomy_question_is_recognised():
+    from biseo import selfknow as s
+    assert s.asks_about_me(ASK_AUTO) and s.asks_improvement(ASK_AUTO) and s.asks_autonomy(ASK_AUTO)
+
+
+def test_report_echo_is_vague_and_gets_grounded_answer():
+    from biseo import selfknow as s, contra
+    from fakedb import FakeDB
+    sb = FakeDB()
+    assert s.is_vague_autonomy(GOT)
+    found = contra.check(GOT, [], ASK_AUTO)
+    assert any(f["type"] == "vague" for f in found)
+    ans = s.autonomy_answer(sb)
+    assert not s.is_vague_autonomy(ans)
+    assert "종류 규칙" in ans and "기록이 0건" in ans          # 없는 요소와 솔직한 상태
+
+
+def test_autonomy_block_goes_into_prompt():
+    from biseo import selfknow as s
+    from fakedb import FakeDB
+    block, ev = s.for_prompt(FakeDB(), ASK_AUTO)
+    assert "관문핵 구조" in block and "[A6]" in block and "A1" in ev
+    assert "없음: 여러 상황이" in block
