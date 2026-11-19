@@ -96,7 +96,7 @@ def check(reply: str, acted: list, user_text: str = "") -> list:
                             "against": f"할 수 있는 일: {cap[1]} — {cap[2].split('. ')[0]}",
                             "fix": f"{cap[1]}은(는) 할 수 있어요. 예: {cap[3]}"})
     if selfknow.asks_about_me(user_text) and (selfknow.asks_compare(user_text) or selfknow.asks_improvement(user_text)) \
-            and selfknow.is_vague(reply):
+            and (selfknow.is_vague_autonomy(reply) if selfknow.asks_autonomy(user_text) else selfknow.is_vague(reply)):
         out.append({"type": "vague", "sentence": "", "cap": None,
                     "against": "자기 모형: 기능 이름과 실제 쓰임으로 말해야 함", "fix": ""})
     return out
@@ -106,7 +106,7 @@ def prompt_text(found: list) -> str:
     """다시 쓰게 할 때 넣는 글: 어느 문장이 어느 확정된 판단과 어긋나는지."""
     lines = [f"- \"{f['sentence'][:80]}\" ↔ {f['against']}" for f in found if f["type"] != "vague"]
     if any(f["type"] == "vague" for f in found):
-        lines.append("- 자기 소개·비교·개선 답이 기능 이름 없이 빈말이다 ↔ [나에 대해] 목록과 K 쓰임으로만 말할 것")
+        lines.append("- 자기 소개·비교·개선 답이 기능 이름 없이 빈말이다 ↔ [나에 대해] 목록과 K 쓰임(자율 질문이면 A 상태 숫자)으로만 말할 것")
     return ("[모순 검사 — 네 답이 이미 확정된 판단과 어긋난다]\n" + "\n".join(lines) +
             "\n참·거짓을 다투지 말고, 확정된 쪽에 맞게 reply 만 다시 써라. 행동(actions)은 새로 만들지 마라.")
 
