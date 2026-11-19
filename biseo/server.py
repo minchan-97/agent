@@ -11,6 +11,7 @@ biseo/server.py — 비서진 창구 (몰랑이 api.py 처럼 코어는 건드�
   POST /api/actions/{id}/undo      되돌리기
   GET  /api/autonomy               상황별 자율 (따로 정해진 상황, 바뀐 기록)
   POST /api/autonomy/reset         상황 하나를 지워 종류 규칙으로 돌림
+  POST /api/autonomy/core_reset    혁명으로 바뀐 종류 규칙을 원래(승격 규칙)대로
   GET  /api/history                최근 대화
   GET  /api/cron/tick              pg_cron 전용 (Bearer CRON_SECRET)
 
@@ -999,6 +1000,20 @@ def autonomy_reset(body: CtxIn, authorization: str | None = Header(None)):
     if not ctx or ctx.endswith("|*"):
         raise HTTPException(400, "상황을 골라 주세요")
     return autonomy.reset(_session(authorization), ctx)
+
+
+class KindIn(BaseModel):
+    kind: str = Field(..., max_length=40)
+
+
+@app.post("/api/autonomy/core_reset")
+def autonomy_core_reset(body: KindIn, authorization: str | None = Header(None)):
+    from biseo import autonomy
+    from biseo.actions import KINDS
+    kind = body.kind.strip()
+    if kind not in KINDS:
+        raise HTTPException(400, "종류를 골라 주세요")
+    return autonomy.core_reset(_session(authorization), kind)
 
 
 @app.get("/api/push/status")
