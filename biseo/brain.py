@@ -195,7 +195,8 @@ def _verify(sb, messages, out, reply, done, text, doc_index, jw):
     except Exception as e:
         print("CONTRA_RETRY_SKIP", type(e).__name__, str(e)[:120])
     if any(f["type"] == "vague" for f in found):
-        reply = selfknow.compare_answer(sb) if selfknow.asks_compare(text) else selfknow.improve_answer(sb)
+        reply = (selfknow.autonomy_answer(sb) if selfknow.asks_autonomy(text) else
+                 selfknow.compare_answer(sb) if selfknow.asks_compare(text) else selfknow.improve_answer(sb))
         found = [f for f in found if f["type"] != "vague"]
     if found:
         reply = contra.repair(reply, found) or reply
