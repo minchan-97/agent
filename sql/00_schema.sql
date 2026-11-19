@@ -280,6 +280,8 @@ create table if not exists action_context (
   pi         real not null default 0,      -- 상황 기록이 종류 규칙보다 더 맞혀 온 정도
   mode       text check (mode in ('auto','ask')),
   changed_at timestamptz,
+  days       int  not null default 0,      -- 겪은 서로 다른 날 수 (가짜 예외 막기)
+  last_day   text,
   updated_at timestamptz not null default now(),
   primary key (user_id, ctx)
 );
